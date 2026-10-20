@@ -118,7 +118,10 @@ export async function syncStateToFirestore(snapshotPayload: {
   const path = `orbit_snapshots/${docId}`;
   const docRef = doc(db, 'orbit_snapshots', docId);
 
-  const serialized = JSON.stringify(snapshotPayload.data).slice(0, 890000);
+  const serialized = JSON.stringify(snapshotPayload.data);
+  if (serialized.length > 890000) {
+    throw new Error('حجم النسخة السحابية أكبر من الحد المسموح. لم تُحفظ نسخة ناقصة.');
+  }
   const safeFleetCount = Math.max(0, Math.min(500, Math.floor(snapshotPayload.fleetCount)));
 
   try {
@@ -126,7 +129,7 @@ export async function syncStateToFirestore(snapshotPayload: {
     if (!existingSnap.exists()) {
       await setDoc(docRef, {
         ownerUid: user.uid,
-        ownerEmail: (user.email || 'volcanokw@gmail.com').slice(0, 254),
+        ownerEmail: (user.email || '').slice(0, 254),
         workspaceName: 'ORBIT Sovereign Fleet Workspace',
         fleetCount: safeFleetCount,
         payloadJson: serialized,
