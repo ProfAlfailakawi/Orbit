@@ -453,12 +453,15 @@ export default function App() {
         body: JSON.stringify({ appId: appCode }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'تعذر مزامنة GitHub.');
       if (data.platforms) setPlatforms(data.platforms);
       if (data.auditLogs) setAuditLogs(data.auditLogs);
-      setSyncBanner(data.message || 'تمت مزامنة GitHub بنجاح (Read-Only)');
-      setTimeout(() => setSyncBanner(null), 4000);
-    } catch {
-      // ignore
+      const checked = Array.isArray(data.syncedResults) ? data.syncedResults.length : 0;
+      const successful = Array.isArray(data.syncedResults)
+        ? data.syncedResults.filter((item: { integrity: string }) => item.integrity === 'Live').length : 0;
+      setSyncBanner(`تم فحص ${checked} مستودعات؛ تأكد الوصول إلى ${successful}. هذا لا يثبت عمل المواقع الإنتاجية.`);
+    } catch (error) {
+      setSyncBanner(error instanceof Error ? error.message : 'تعذر الوصول إلى GitHub.');
     }
   };
 
@@ -471,11 +474,11 @@ export default function App() {
     isUserVisible: boolean;
     environment: string;
   }) => {
-    const res = await fetch('/api/events/ingest', {
+    const res = await fetch('/api/radar/ingest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Orbit-Idempotency-Key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        'X-Idempotency-Key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       },
       body: JSON.stringify(payload),
     });
@@ -490,12 +493,13 @@ export default function App() {
     incidentId: string,
     nextStatus: IncidentStatus,
     technicallyVerified: boolean,
-    note: string
+    note: string,
+    addToMemory = false
   ) => {
     const res = await fetch(`/api/incidents/${incidentId}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nextStatus, technicallyVerified, note }),
+      body: JSON.stringify({ nextStatus, technicalVerificationPassed: technicallyVerified, note, addToMemory }),
     });
     const data = await res.json();
     if (data.incidents) setIncidents(data.incidents);
@@ -506,7 +510,7 @@ export default function App() {
   const handleRequestAiAnalysis = async (incidentId: string) => {
     setLoadingAi(true);
     try {
-      const res = await fetch('/api/ai/analyze-incident', {
+      const res = await fetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ incidentId }),
@@ -542,10 +546,16 @@ export default function App() {
   };
 
   const handleVerifyConnection = async (id: string) => {
-    const res = await fetch(`/api/fleet/${id}/verify`, { method: 'POST' });
-    const data = await res.json();
-    if (data.platforms) setPlatforms(data.platforms);
-    if (data.auditLogs) setAuditLogs(data.auditLogs);
+    try {
+      const res = await fetch(`/api/fleet/${encodeURIComponent(id)}/verify`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'تعذر التحقق من الاتصال.');
+      if (data.platforms) setPlatforms(data.platforms);
+      if (data.auditLogs) setAuditLogs(data.auditLogs);
+      setSyncBanner('تم تأكيد الوصول إلى GitHub فقط؛ أداء الموقع والمستخدمين ما زال يحتاج فحصاً مستقلاً.');
+    } catch (error) {
+      setSyncBanner(error instanceof Error ? error.message : 'تعذر التحقق من الاتصال.');
+    }
   };
 
   const handleLifecycleChange = async (id: string, nextLifecycle: PlatformLifecycleState) => {
@@ -902,12 +912,13 @@ export default function App() {
                 params.incidentId,
                 params.nextStatus,
                 params.technicalVerificationPassed,
-                params.note
+                params.note,
+                params.addToMemory
               );
             }}
             onRunCanary={handleRunCanary}
             onRequestAiDiagnosis={async (incidentId) => {
-              const res = await fetch('/api/ai/analyze-incident', {
+              const res = await fetch('/api/ai/diagnose', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ incidentId }),
