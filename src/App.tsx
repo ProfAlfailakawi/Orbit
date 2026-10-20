@@ -110,7 +110,7 @@ type MainNavId =
 type CockpitDeckTab = 'incidents' | 'commits' | 'memory' | 'acceptance';
 
 export default function App() {
-  const [isDark, setIsDark] = useState<boolean>(true);
+  const [isDark, setIsDark] = useState<boolean>(false);
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
   const [cockpitDeck, setCockpitDeck] = useState<CockpitDeckTab>('incidents');
   const [selectedPlatformId, setSelectedPlatformId] = useState<string | null>(null);
@@ -365,6 +365,7 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (isLocked) { setAuthError('سجّل الدخول إلى ORBIT أولاً قبل ربط Google.'); return; }
     try {
       const user = await signInWithGoogleOperator();
       const syncRes = await syncStateToFirestore({
@@ -971,7 +972,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setIsLocked(true)}
+            onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}
             aria-label="قفل الجلسة"
             className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 ${
               isDark
@@ -1001,6 +1002,12 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {/* Seed snapshots are examples, never verified production telemetry. */}
+      <div role="status" className={`mx-auto max-w-[1440px] px-4 sm:px-8 py-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
+        <AlertTriangle className="w-5 h-5 shrink-0" />
+        <span>تنبيه: تحتوي ORBIT حالياً على بيانات توضيحية ومخزنة. لا تعتبر نسب الصحة أو الحوادث دليلاً مباشراً على حالة برامجك حتى يكتمل ربط المصادر والتحقق منها.</span>
+      </div>
 
       {/* Main Content Container */}
       <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
