@@ -1248,7 +1248,9 @@ export interface SecurityGuardianScanResult {
 }
 
 export function runNonDestructiveSecurityScan(platforms: PlatformRecord[]): SecurityGuardianScanResult {
-  const activeCount = platforms.filter((p) => p.lifecycleState === 'active').length;
+  const activeCount = platforms.filter(p => p.lifecycleState === 'active').length;
+  // This is a coverage assessment, not a remote vulnerability scan.
+  // Never report Verified Safe without actual scan evidence.
   return {
     scanId: `SEC-${Date.now().toString(36).toUpperCase()}`,
     timestamp: new Date().toISOString(),
@@ -1256,59 +1258,59 @@ export function runNonDestructiveSecurityScan(platforms: PlatformRecord[]): Secu
     checks: [
       {
         id: 'SEC-01',
-        dimensionAr: '1. فحص الاعتماديات القديمة والخطرة (Dependencies & CVE Advisory)',
-        status: 'Verified Safe',
-        finding: `تم فحص ملفات الحزم لـ ${activeCount} برنامج نشط؛ لا توجد ثغرات حرجة مكشوفة في الاعتماديات الأساسية.`,
-        recommendation: 'الإبقاء على مراجعة Dependabot للقراءة فقط قبل أي تحديث.',
+        dimensionAr: '1. الاعتماديات والثغرات (Dependencies & CVE)',
+        status: 'Monitoring Gap',
+        finding: `لا توجد نتائج تدقيق حية معتمدة لاعتماديات ${activeCount} برنامج نشط.`,
+        recommendation: 'اربط تقارير Dependabot أو تدقيق CI للقراءة فقط قبل إعلان سلامة الاعتماديات.',
       },
       {
         id: 'SEC-02',
-        dimensionAr: '2. درع منع تسرب الأسرار والمفاتيح (Secret Leakage Guard)',
-        status: 'Verified Safe',
-        finding: 'تم التحقق من عدم وجود أي مفاتيح API أو GitHub Tokens في كود الواجهة أو سجلات الصندوق الأسود.',
-        recommendation: 'استمرار تفعيل sanitizeTelemetryPayload قبل حفظ أي حدث.',
+        dimensionAr: '2. تسرب المفاتيح والأسرار (Secret Leakage)',
+        status: 'Monitoring Gap',
+        finding: 'تنقية بيانات ORBIT مفعلة في المحرك؛ لم يصل تقرير فحص أسرار مستقل عن كل مستودع.',
+        recommendation: 'راجع نتائج TruffleHog أو GitHub Secret Scanning دون نسخ المفاتيح للوحة.',
       },
       {
         id: 'SEC-03',
-        dimensionAr: '3. مراقبة تغييرات الصلاحيات والمصادقة (Permission & Auth Drift)',
-        status: 'Verified Safe',
-        finding: 'لم يتم رصد أي تعديل في ملفات المصادقة أو قواعد الصلاحيات خلال آخر 24 ساعة.',
-        recommendation: 'تفعيل تنبيه حرج فوري عند لمس مسارات auth/* في أي مستودع.',
+        dimensionAr: '3. تغييرات المصادقة والصلاحيات (Auth Drift)',
+        status: 'Monitoring Gap',
+        finding: 'لم يتم إنشاء خط أساس موثوق لمقارنة ملفات المصادقة والصلاحيات في جميع المستودعات.',
+        recommendation: 'افحص تغييرات auth/rules/permissions في سجل commits الموثق فقط.',
       },
       {
         id: 'SEC-04',
-        dimensionAr: '4. إعدادات الأمان ورؤوس الحماية (Security Configuration & CORS/CSP)',
-        status: 'Verified Safe',
-        finding: 'جميع واجهات ORBIT محمية بمصادقة المشغل، Rate Limiting، وفحص التوقيع الرقمي.',
-        recommendation: 'الحفاظ على مبدأ Least Privilege (صلاحية قراءة فقط).',
+        dimensionAr: '4. رؤوس الأمان وCORS وCSP',
+        status: 'Monitoring Gap',
+        finding: 'لا توجد نتائج فحص HTTP مباشر موثقة لكل موقع إنتاجي.',
+        recommendation: 'فعّل فحص رؤوس آمن للقراءة فقط بعد موافقة المالك على النطاقات.',
       },
       {
         id: 'SEC-05',
-        dimensionAr: '5. حالة اختبارات الحماية (Security Protection Tests)',
+        dimensionAr: '5. اختبارات الحماية (Security Tests)',
         status: 'Advisory',
-        finding: 'بعض المستودعات (مثل NAHJ) تحتاج اختبارات قبول إضافية لصلاحيات الأدوار.',
-        recommendation: 'إضافة اختبار قراءة غير مدمر في مختبر Digital Twin.',
+        finding: 'اختبارات المحرك المحلي لا تثبت صلاحيات الأدوار أو قواعد الإنتاج في البرامج الأخرى.',
+        recommendation: 'اعتمد نتائج CI واختبارات صلاحيات فعلية في كل مشروع على حدة.',
       },
       {
         id: 'SEC-06',
-        dimensionAr: '6. التحقق من حالة النسخ الاحتياطية (Backup Verification Signal)',
-        status: 'Verified Safe',
-        finding: 'تأكيد وجود لقطات استعادة موثقة لقواعد البيانات في البرامج الإنتاجية المتصلة.',
-        recommendation: 'مراجعة تاريخ آخر لقطة أسبوعياً ضمن التقرير الصباحي.',
+        dimensionAr: '6. النسخ الاحتياطية والاستعادة (Backups)',
+        status: 'Monitoring Gap',
+        finding: 'لا يوجد دليل خارجي موثق على آخر نسخة احتياطية أو نجاح اختبار استعادة.',
+        recommendation: 'اربط سجل نسخ واستعادة مقروءاً فقط؛ لا تنفذ استعادة في الإنتاج.',
       },
       {
         id: 'SEC-07',
-        dimensionAr: '7. صلاحية الوصول إلى الخدمات الخارجية (Service Access Health)',
-        status: 'Verified Safe',
-        finding: 'روابط GitHub Read-Only والخدمات المتصلة تعمل ضمن الحصة المجانية الآمنة.',
-        recommendation: 'عدم طلب أي صلاحيات Write طالما القراءة كافية.',
+        dimensionAr: '7. سلامة الخدمات الخارجية (Integration Access)',
+        status: 'Monitoring Gap',
+        finding: 'الوصول إلى GitHub لا يثبت عمل البريد أو قواعد البيانات أو خدمات الدفع.',
+        recommendation: 'استقبل إشارات تحقق مستقلة من الخدمات عند تفعيل حساسات آمنة.',
       },
       {
         id: 'SEC-08',
-        dimensionAr: '8. رصد تغييرات البنية الحساسة (Sensitive Infrastructure Drift)',
-        status: 'Verified Safe',
-        finding: 'صفر تغييرات في إعدادات النشر أو DNS أو بوابات الدفع في جميع البرامج.',
-        recommendation: 'حظر أي تعديل تلقائي على ملفات البيئة والنشر.',
+        dimensionAr: '8. تغييرات النشر وDNS (Infrastructure Drift)',
+        status: 'Monitoring Gap',
+        finding: 'لم يُجرِ النظام مقارنة موثقة لإعدادات DNS والنشر وبوابات الدفع.',
+        recommendation: 'استخدم سجلات تدقيق قراءة فقط للمقارنة؛ لا تغيّر أي إعداد إنتاجي.',
       },
     ],
   };
