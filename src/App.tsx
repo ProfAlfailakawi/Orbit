@@ -770,7 +770,7 @@ export default function App() {
   return (
     <div
       dir="rtl"
-      className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
+      className={`orbit-shell min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
         isDark ? 'bg-[#070B14] text-slate-100' : 'bg-[#F4F7FB] text-slate-900'
       }`}
     >
@@ -778,7 +778,7 @@ export default function App() {
 
       {/* Strict 3-Zone Top Bar Contract (frontend-design Section 2) */}
       <header
-        className={`sticky top-0 z-40 flex items-center justify-between gap-2 sm:gap-8 px-4 sm:px-8 py-3.5 border-b backdrop-blur-md ${
+        className={`orbit-header sticky top-0 z-40 flex items-center justify-between gap-2 sm:gap-8 px-4 sm:px-8 py-3.5 border-b backdrop-blur-md ${
           isDark ? 'border-slate-800/80 bg-[#070B14]/90' : 'border-slate-200 bg-white/90'
         }`}
       >
@@ -792,13 +792,13 @@ export default function App() {
           }}
           className="text-lg font-bold tracking-tight whitespace-nowrap shrink-0"
         >
-          ORBIT | أوربت
+          <span className="orbit-wordmark">ORBIT</span><span className="orbit-wordmark-ar">أوربت</span>
         </a>
 
         {/* Zone 2: 5 concise single-line text navigation links */}
         <nav
           aria-label="التنقل الرئيسي"
-          className="hidden md:flex items-center gap-7 text-sm font-medium"
+          className="orbit-navigation hidden md:flex items-center gap-7 text-sm font-medium"
         >
           {(
             [
@@ -873,7 +873,7 @@ export default function App() {
 
       {/* Minimalist Icon & Search Strip */}
       <div
-        className={`border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
+        className={`orbit-utility border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
           isDark ? 'border-slate-800/60 bg-[#0A0F1D]/80' : 'border-slate-200 bg-slate-100/70'
         }`}
       >
@@ -882,7 +882,7 @@ export default function App() {
           <span>·</span>
           <span className="tabular-nums text-slate-200 font-semibold">{activeFleet.length} منصة</span>
           <span>·</span>
-          <span className="text-emerald-400">Read-Only 100%</span>
+          <span className="text-emerald-400">قراءة فقط</span>
           <span>·</span>
           <span className="tabular-nums text-sky-400">{selfHealth.eventProcessingDelayMs}ms</span>
         </div>
