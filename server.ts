@@ -49,7 +49,25 @@ const __dirname = path.dirname(__filename);
 const DATA_SNAPSHOT_PATH = path.join(__dirname, '.orbit-data.json');
 
 // Cost-First zero-billing storage with automatic local disk persistence (.orbit-data.json) + JSON export/import
-let platforms = [...INITIAL_PLATFORMS];
+// Seed repositories are an onboarding catalog, not verified health telemetry.
+let platforms: PlatformRecord[] = INITIAL_PLATFORMS.map(p => ({
+  ...p,
+  healthStatus: p.runtimeMode === 'local-only' ? 'Local / Not Running' : 'Monitoring Gap',
+  dataIntegrity: 'Unverified' as PlatformRecord['dataIntegrity'],
+  monitoringCoveragePct: 0,
+  connectionVerified: false,
+  connectionStatus: 'Pending Credentials',
+  productionUrlVerified: false,
+  lastVerifiedEvidence: '',
+  lastVerifiedTimestamp: '',
+  releaseShield: 'Insufficient Evidence',
+  releaseConfidencePct: 0,
+  recentRuns: [],
+  recentCommits: [],
+  ecgMetrics: [],
+  journeys: [],
+  fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+}));
 let events = [] as typeof INITIAL_EVENTS;
 let incidents = [] as typeof INITIAL_INCIDENTS;
 let alerts = [] as typeof INITIAL_ALERTS;
