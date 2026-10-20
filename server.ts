@@ -463,6 +463,71 @@ async function startServer() {
 
         if (resp.ok) {
           const repoData = (await resp.json()) as { default_branch?: string; pushed_at?: string };
+          // Independently fetch CI status; a GitHub repo HTTP 200 alone says
+          // nothing about workflows, deployment, uptime or real user journeys.
+          let recentRuns: PlatformRecord['recentRuns'] = [];
+          let githubCiPassed: boolean | null = null;
+          let actionsChecked = false;
+          let recentCommits: PlatformRecord['recentCommits'] = [];
+          const baseUrl = `https://api.github.com/repos/${encodeURIComponent(plat.owner)}/${encodeURIComponent(plat.repoName)}`;
+          try {
+            costGuard.githubApiCallsToday += 1;
+            const runsResponse = await fetch(`${baseUrl}/actions/runs?per_page=5`, {
+              headers,
+              signal: AbortSignal.timeout(4500),
+            });
+            if (runsResponse.ok) {
+              actionsChecked = true;
+              const result = (await runsResponse.json()) as { workflow_runs?: Array<{
+                id?: number; name?: string; head_branch?: string; head_sha?: string;
+                display_title?: string; status?: string; conclusion?: string | null;
+                created_at?: string; run_started_at?: string; updated_at?: string;
+              }> };
+              recentRuns = (result.workflow_runs || []).slice(0, 5).map(run => ({
+                id: String(run.id || ''),
+                workflowName: run.name || 'GitHub workflow',
+                branch: run.head_branch || '',
+                commitSha: run.head_sha || '',
+                commitMessage: run.display_title || '',
+                status: run.status !== 'completed' ? 'in_progress' : run.conclusion === 'success' ? 'success' : 'failure',
+                hasSubJobWarning: false,
+                warningDetails: 'Run-level status only; sub-job warnings have not been checked.',
+                durationSec: 0,
+                timestamp: run.created_at || '',
+                dataIntegrity: 'Live',
+              }));
+              const latestCompleted = (result.workflow_runs || []).find(run => run.status === 'completed');
+              if (latestCompleted) githubCiPassed = latestCompleted.conclusion === 'success';
+            }
+          } catch {
+            // GitHub Actions may be unavailable; keep CI unknown instead of green.
+          }
+          // Commit metadata is also read-only. Without fetching file-level diffs,
+          // risk must remain explicitly unknown.
+          try {
+            costGuard.githubApiCallsToday += 1;
+            const commitsResponse = await fetch(`${baseUrl}/commits?per_page=3`, {
+              headers,
+              signal: AbortSignal.timeout(4500),
+            });
+            if (commitsResponse.ok) {
+              const result = (await commitsResponse.json()) as Array<{
+                sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } };
+              }>;
+              recentCommits = result.slice(0, 3).map(commit => ({
+                sha: commit.sha?.slice(0, 10) || '',
+                author: commit.commit?.author?.name || 'Unknown',
+                message: commit.commit?.message?.split('\\n')[0] || '',
+                timestamp: commit.commit?.author?.date || '',
+                branch: repoData.default_branch || plat.defaultBranch,
+                changedFiles: [],
+                riskLevel: 'Unknown',
+                dataIntegrity: 'Live',
+              }));
+            }
+          } catch {
+            // Do not fall back to seeded or fabricated commit records.
+          }
           platforms = platforms.map((p) =>
             p.id === plat.id
               ? {
@@ -473,11 +538,13 @@ async function startServer() {
                   connectionStatus: 'Connected (Read-Only)',
                   healthStatus: 'Monitoring Gap',
                   monitoringCoveragePct: 0,
-                  fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+                  fourState: { ciPassed: githubCiPassed, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+                  recentRuns,
+                  recentCommits,
                   releaseShield: 'Insufficient Evidence',
                   releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `GitHub repository API HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}). Production health not checked.`,
+                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}. Deploy/user journey not tested.`,
                 }
               : p
           );
