@@ -15,6 +15,7 @@ import {
   Compass,
   Copy,
   Cpu,
+  Ellipsis,
   Eye,
   FolderGit2,
   GitCommit,
@@ -802,8 +803,6 @@ export default function App() {
               { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
               { id: 'universal-radar', name: 'الرادار', Icon: Radar },
               { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
-              { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
-              { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
             ] as const).map(({ id, name, Icon }) => (
               <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
                 onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
@@ -813,6 +812,13 @@ export default function App() {
             ))}
           </nav>
           <div className="orbit-header-controls">
+            <details className="orbit-more-menu orbit-more-menu-desktop">
+              <summary aria-label="المزيد"><Ellipsis size={18}/><span>المزيد</span></summary>
+              <div className="orbit-more-popover">
+                <button type="button" aria-current={activeNav === 'intelligence' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={17}/> الرؤى</button>
+                <button type="button" aria-current={activeNav === 'operations' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={17}/> الحماية</button>
+              </div>
+            </details>
             <span className="orbit-header-evidence"><span/> قيد التحقق</span>
             <details className="orbit-tools-menu">
               <summary aria-label="أدوات وإعدادات"><Settings2 size={18}/><span>الأدوات</span></summary>
@@ -836,8 +842,6 @@ export default function App() {
             { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
             { id: 'universal-radar', name: 'الرادار', Icon: Radar },
             { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
-            { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
-            { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
           ] as const).map(({ id, name, Icon }) => (
             <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
               onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
@@ -845,6 +849,13 @@ export default function App() {
               <Icon size={19} strokeWidth={1.75}/><span>{name}</span>
             </button>
           ))}
+          <details className="orbit-more-menu orbit-more-menu-mobile">
+            <summary aria-label="المزيد"><Ellipsis size={20}/><span>المزيد</span></summary>
+            <div className="orbit-more-popover">
+              <button type="button" aria-current={activeNav === 'intelligence' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={17}/> الرؤى</button>
+              <button type="button" aria-current={activeNav === 'operations' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={17}/> الحماية</button>
+            </div>
+          </details>
         </nav>
       </header>
 
@@ -1097,6 +1108,7 @@ export default function App() {
             <ExecutiveOverview
               platforms={platforms}
               incidents={incidents}
+              events={events}
               onOpenPlatform={(id) => setSelectedPlatformId(id)}
               onOpenIncident={(id) => {
                 setSelectedIncidentId(id);
@@ -1104,11 +1116,9 @@ export default function App() {
               }}
               onOpenRadar={() => setActiveNav('universal-radar')}
               onOpenFleet={() => setActiveNav('fleet-manager')}
-              onOpenIntelligence={() => setActiveNav('intelligence')}
-              onOpenOperations={() => setActiveNav('operations')}
             />
             <details className="orbit-advanced">
-              <summary>المؤشرات والتحليلات التفصيلية · عرض اختياري</summary>
+              <summary>تفاصيل إضافية</summary>
               <div className="space-y-6 pt-3">
             {/* ROW 1: 3 VISUAL INFOGRAPHIC HERO CARDS */}
             <section

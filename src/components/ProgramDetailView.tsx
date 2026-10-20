@@ -37,26 +37,27 @@ import {
 } from './Primitives';
 
 const PROGRAM_TABS = [
-  { id: 'overview', labelAr: 'نظرة عامة' },
-  { id: 'radar', labelAr: 'الرادار' },
-  { id: 'client-errors', labelAr: 'الواجهة' },
-  { id: 'backend-errors', labelAr: 'الخادم' },
-  { id: 'journeys', labelAr: 'رحلات المستخدم' },
-  { id: 'deployments', labelAr: 'النشر' },
+  { id: 'overview', labelAr: 'ملخص' },
+  { id: 'radar', labelAr: 'مراقبة مباشرة' },
+  { id: 'client-errors', labelAr: 'أخطاء الموقع' },
+  { id: 'backend-errors', labelAr: 'أخطاء الخادم' },
+  { id: 'journeys', labelAr: 'تجربة الزائر' },
+  { id: 'deployments', labelAr: 'التحديثات' },
   { id: 'actions', labelAr: 'الاختبارات' },
   { id: 'commits', labelAr: 'التحديثات' },
-  { id: 'performance', labelAr: 'نبض الأداء' },
-  { id: 'security', labelAr: 'الأمان' },
-  { id: 'feature-dna', labelAr: 'بصمة المزايا' },
-  { id: 'release-shield', labelAr: 'حماية الإصدار' },
-  { id: 'incidents', labelAr: 'الحوادث' },
-  { id: 'memory', labelAr: 'الذاكرة' },
-  { id: 'innovation', labelAr: 'فرص التطوير' },
+  { id: 'performance', labelAr: 'السرعة' },
+  { id: 'security', labelAr: 'الحماية' },
+  { id: 'feature-dna', labelAr: 'المزايا' },
+  { id: 'release-shield', labelAr: 'جاهزية الإصدار' },
+  { id: 'incidents', labelAr: 'التنبيهات' },
+  { id: 'memory', labelAr: 'الحلول السابقة' },
+  { id: 'innovation', labelAr: 'اقتراحات' },
   { id: 'coverage', labelAr: 'التغطية' },
   { id: 'reports', labelAr: 'التقارير' },
 ] as const;
 
 type ProgramTabId = (typeof PROGRAM_TABS)[number]['id'];
+const PRIMARY_PROGRAM_TABS: ProgramTabId[] = ['overview', 'journeys', 'deployments', 'incidents'];
 
 interface ProgramDetailViewProps {
   platform: PlatformRecord;
@@ -264,41 +265,39 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
 
           {/* Four-State Separation Matrix (Section 8: Never conflate CI, Deploy, Reachability, User Journey) */}
           <div className="lg:col-span-5 grid grid-cols-2 gap-3 text-xs border border-slate-800/80 rounded-lg p-3.5 bg-slate-950/40">
-            <div className="col-span-2 text-xs font-semibold text-slate-300 pb-1 border-b border-slate-800/70">
-              فصل الحالات الأربع المستقلة (Four-State Separation)
-            </div>
+            <div className="col-span-2 text-xs font-semibold text-slate-300 pb-1 border-b border-slate-800/70">حالة الموقع</div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">1. نجاح CI:</span>
+              <span className="text-slate-400">الاختبارات:</span>
               <span className="font-mono font-semibold">
                 {platform.fourState.ciPassed === true
-                  ? 'Pass'
+                  ? 'ناجحة'
                   : platform.fourState.ciPassed === false
-                  ? 'Fail X'
-                  : 'N/A'}
+                  ? 'فشلت'
+                  : 'غير متاح'}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">2. نجاح النشر:</span>
+              <span className="text-slate-400">النشر:</span>
               <span className="font-mono font-semibold">
                 {platform.fourState.deploymentSucceeded === true
-                  ? 'Pass'
+                  ? 'ناجح'
                   : platform.fourState.deploymentSucceeded === false
-                  ? 'Fail X'
-                  : 'Local/N/A'}
+                  ? 'لم ينجح'
+                  : 'غير متاح'}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">3. استجابة الموقع:</span>
+              <span className="text-slate-400">الموقع:</span>
               <span className="font-mono font-semibold">
                 {platform.fourState.siteReachable === true
-                  ? 'Online'
+                  ? 'يستجيب'
                   : platform.fourState.siteReachable === false
-                  ? 'Offline X'
-                  : 'Local Session'}
+                  ? 'لا يستجيب'
+                  : 'لم يُفحص'}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">4. رحلة المستخدم:</span>
+              <span className="text-slate-400">التجربة:</span>
               <span
                 className={`font-mono font-semibold ${
                   platform.fourState.userJourneyHealthy === false
@@ -309,10 +308,10 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
                 }`}
               >
                 {platform.fourState.userJourneyHealthy === true
-                  ? 'Verified'
+                  ? 'مؤكدة'
                   : platform.fourState.userJourneyHealthy === false
-                  ? 'Impaired !'
-                  : 'Unverified ?'}
+                  ? 'تحتاج مراجعة'
+                  : 'لم تُفحص'}
               </span>
             </div>
           </div>
@@ -320,24 +319,31 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
 
         {/* Filters Bar (Section 30) */}
         <div className="mt-5 pt-4 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1">
-            {PROGRAM_TABS.map((t) => (
+          <div className="orbit-program-tabs">
+            {PROGRAM_TABS.filter(t => PRIMARY_PROGRAM_TABS.includes(t.id)).map((t) => (
               <button
                 key={t.id}
                 type="button"
+                aria-current={activeTab === t.id ? 'page' : undefined}
                 onClick={() => setActiveTab(t.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  activeTab === t.id
-                    ? 'bg-sky-500 text-slate-950 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
+                className="transition-colors whitespace-nowrap shrink-0"
               >
                 {t.labelAr}
               </button>
             ))}
+            <label className="orbit-program-more">
+              <span>المزيد</span>
+              <select aria-label="أقسام إضافية" value={PRIMARY_PROGRAM_TABS.includes(activeTab) ? '' : activeTab}
+                onChange={(event) => { if (event.target.value) setActiveTab(event.target.value as ProgramTabId); }}>
+                <option value="">أقسام إضافية</option>
+                {PROGRAM_TABS.filter(t => !PRIMARY_PROGRAM_TABS.includes(t.id)).map(t => <option key={t.id} value={t.id}>{t.labelAr}</option>)}
+              </select>
+            </label>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          {['radar', 'client-errors', 'backend-errors', 'incidents'].includes(activeTab) && <details className="orbit-program-filters">
+            <summary>تصفية النتائج</summary>
+            <div className="orbit-program-filters-panel">
             <label className="text-slate-400" htmlFor="prog-period-filter">
               الفترة:
             </label>
@@ -402,13 +408,16 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
                 </option>
               ))}
             </select>
-          </div>
+            </div>
+          </details>}
         </div>
       </div>
 
       {/* Tab Content Area */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <details className="orbit-advanced">
+          <summary>تفاصيل الموقع</summary>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-5">
           <div className={`lg:col-span-8 rounded-xl border p-6 space-y-5 ${surfaceCls}`}>
             <h2 className="text-base font-semibold">الهوية التقنية، البيئات، وآخر دليل مؤكد</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -472,7 +481,8 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </details>
       )}
 
       {(activeTab === 'radar' || activeTab === 'client-errors' || activeTab === 'backend-errors') && (

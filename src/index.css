@@ -58,14 +58,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-executive { --o-ink:#16243a; --o-muted:#7b879a; --o-line:#e6ebf2; --o-blue:#305fd6; --o-tint:#f4f7fc; color:var(--o-ink); font-size:14px; }
 .orbit-executive button { -webkit-tap-highlight-color:transparent; }
 .orbit-executive button:focus-visible,.orbit-executive input:focus-visible { outline:3px solid #628bea; outline-offset:3px; }
-.orbit-intro { position:relative; isolation:isolate; overflow:hidden; min-height:300px; border:1px solid #e5ebf5; border-radius:28px; background:linear-gradient(118deg,#ffffff 0%,#fcfdff 44%,#eaf0fc 100%); display:flex; align-items:center; justify-content:space-between; box-shadow:0 10px 45px rgba(42,68,112,.043); }
-.orbit-intro-copy { padding:43px clamp(26px,5vw,64px); z-index:2; max-width:720px; position:relative; }
+.orbit-intro { position:relative; isolation:isolate; overflow:hidden; min-height:174px; border:1px solid #e5ebf5; border-radius:25px; background:linear-gradient(118deg,#ffffff 0%,#fcfdff 55%,#edf2fc 100%); display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 30px rgba(42,68,112,.035); }
+.orbit-intro-copy { padding:30px clamp(24px,4vw,48px); z-index:2; max-width:720px; position:relative; }
 .orbit-eyebrow { display:inline-flex; align-items:center; gap:9px; letter-spacing:.11em; font-size:10px; font-weight:750; color:#5f78a9; direction:ltr; }
 .orbit-eyebrow-dot { width:7px; height:7px; border-radius:50%; background:#5c85db; box-shadow:0 0 0 4px #e8effd; }
-.orbit-intro h1 { margin:17px 0 8px; font-size:clamp(30px,4.1vw,51px)!important; line-height:1.32; font-weight:800; letter-spacing:-.055em!important; }
+.orbit-intro h1 { margin:0 0 5px; font-size:clamp(28px,3.5vw,43px)!important; line-height:1.32; font-weight:800; letter-spacing:-.055em!important; }
 .orbit-intro h1 span { color:#3e64c4; }
 .orbit-intro p { color:#69778f; font-size:14px; line-height:1.95; max-width:480px; margin:0; }
-.orbit-intro-actions { display:flex; flex-wrap:wrap; gap:10px; margin:27px 0 21px; }
+.orbit-intro-actions { display:flex; flex-wrap:wrap; gap:9px; margin:18px 0 13px; }
 .orbit-main-button,.orbit-quiet-button { display:inline-flex; align-items:center; justify-content:center; gap:9px; border-radius:12px; font-size:13px; font-weight:700; min-height:41px; padding:9px 17px; line-height:1.4; border:1px solid transparent; white-space:nowrap; }
 .orbit-main-button { background:#315fd4; color:#fff; box-shadow:0 5px 16px #315fd421; }
 .orbit-main-button:hover { background:#234cb5; box-shadow:0 8px 21px #315fd43d; }
@@ -88,24 +88,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-art-point-c { top:120px;left:2px; }
 .orbit-art-label { position:absolute;bottom:9px;color:#8fa3c6;font-size:9px;font-weight:750;letter-spacing:.2em;direction:ltr; }
 .orbit-stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px!important; margin-top:18px; }
-.orbit-stat-card { min-height:154px;border:1px solid var(--o-line);border-radius:20px;padding:20px 22px;background:#fff;box-shadow:0 8px 28px #1b376509;display:flex;flex-direction:column;align-items:flex-start;position:relative; }
+.orbit-stat-card { min-height:112px;border:1px solid var(--o-line);border-radius:18px;padding:16px 19px;background:#fff;box-shadow:0 6px 20px #1b376506;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;position:relative; }
 .orbit-stat-icon { width:38px;height:38px;border-radius:13px;display:grid;place-items:center;position:absolute;left:20px;top:20px; }
 .orbit-tone-blue { color:#3b69d2;background:#edf3ff; }
 .orbit-tone-mint { color:#23816c;background:#e9f8f4; }
 .orbit-tone-amber { color:#ac792c;background:#fff6e7; }
 .orbit-tone-coral { color:#c36070;background:#fff0f2; }
 .orbit-tone-violet { color:#7c6ab4;background:#f1effb; }
-.orbit-stat-number { display:block;font-weight:800;font-size:38px;line-height:1.1;letter-spacing:-.05em;color:#1d2f4c;font-variant-numeric:tabular-nums; }
-.orbit-stat-name { font-size:13px;font-weight:750;margin-top:10px;color:#354662; }
+.orbit-stat-number { display:block;font-weight:800;font-size:34px;line-height:1.05;letter-spacing:-.05em;color:#1d2f4c;font-variant-numeric:tabular-nums; }
+.orbit-stat-name { font-size:12px;font-weight:750;margin-top:7px;color:#354662; }
 .orbit-stat-card small { font-size:11px;margin-top:4px;color:#96a2b3; }
-.orbit-overview-columns { display:grid;grid-template-columns:minmax(0,1.46fr) minmax(310px,1fr);gap:16px;margin-top:17px; }
-.orbit-focus-panel,.orbit-quick-panel { min-height:318px;border:1px solid var(--o-line);border-radius:23px;padding:25px 26px;background:#fff;box-shadow:0 9px 32px #1b376508; }
+.orbit-overview-columns { display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:14px; }
+.orbit-focus-panel,.orbit-quick-panel { min-height:unset;border:1px solid var(--o-line);border-radius:21px;padding:22px 24px;background:#fff;box-shadow:0 7px 24px #1b376506; }
 .orbit-panel-heading { display:flex;align-items:flex-start;justify-content:space-between;gap:12px; }
 .orbit-kicker { color:#8d9ab0; font-size:11px; font-weight:650; }
 .orbit-executive .orbit-panel-heading h2,.orbit-executive .orbit-fleet-heading h2 { font-size:20px!important;font-weight:800;line-height:1.4;margin:4px 0 0; }
 .orbit-subtle-link { display:inline-flex;gap:5px;align-items:center;color:#4771bd;background:transparent;padding:5px;font-size:12px;font-weight:650;white-space:nowrap; }
 .orbit-subtle-link:hover { color:#254eae; }
-.orbit-incident-inner { margin-top:20px; }
+.orbit-incident-inner { margin-top:14px; }
 .orbit-incident-pill { display:inline-flex;align-items:center;gap:9px;color:#b65468;font-size:11px;font-weight:750;background:#fff3f5;border-radius:20px;padding:6px 11px; }
 .orbit-incident-inner h3 { font-size:17px!important;font-weight:780;margin:14px 0 5px;line-height:1.65; }
 .orbit-incident-inner p { font-size:13px;line-height:1.85;color:#707f93; }
@@ -136,9 +136,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-filter-tabs button.active { color:#305fcc;background:#e8effe; }
 .orbit-filter-tabs button span { font-size:10px;font-weight:750;opacity:.72; }
 .orbit-app-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px!important; }
-.orbit-app-card { display:flex;flex-direction:column;align-items:stretch;text-align:right;min-height:222px;background:#fff;border:1px solid #e7ebf2;border-radius:20px;padding:20px 19px 15px;box-shadow:0 7px 24px #23436908; }
+.orbit-app-card { display:flex;flex-direction:column;align-items:stretch;text-align:right;min-height:174px;background:#fff;border:1px solid #e7ebf2;border-radius:18px;padding:15px 16px 12px;box-shadow:0 5px 18px #23436906; }
 .orbit-app-card:hover { transform:translateY(-3px);border-color:#c3d3f1;box-shadow:0 15px 34px #23436916; }
-.orbit-app-card-head { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:19px; }
+.orbit-app-card-head { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px; }
 .orbit-app-icon { width:45px;height:45px;border-radius:15px;background:#edf2fc;color:#4c6fb0;display:grid;place-items:center; }
 .orbit-app-arrow { color:#b0bcd0; }
 .orbit-app-name { font-size:15px;line-height:1.45;font-weight:800;color:#253b5e;display:block;overflow-wrap:anywhere; }
@@ -150,8 +150,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-status-issue { color:#bb6670; }
 .orbit-status-pending { color:#a08353; }
 .orbit-indicator { border-radius:50%;background:currentColor;width:6px;height:6px;flex-shrink:0; }
-.orbit-signal-strip { display:flex;justify-content:space-between;gap:4px;color:#9ca8b9;font-size:10px; }
-.orbit-signal-strip > span { display:inline-flex;align-items:center;gap:5px;white-space:nowrap; }
+.orbit-signal-strip { display:flex;justify-content:flex-start;gap:15px;color:#9ca8b9;font-size:10px; }
+.orbit-signal-strip > span { display:inline-flex;align-items:center;gap:6px;white-space:nowrap; }
 .orbit-dot-muted,.orbit-dot-good,.orbit-dot-bad { display:inline-block;vertical-align:middle;width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#c2ccda; }
 .orbit-dot-good { background:#45ab8b; }
 .orbit-dot-bad { background:#dd7887; }
@@ -169,7 +169,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-advanced > summary::-webkit-details-marker { display:none; }
 @media(max-width:1200px) { .orbit-app-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .orbit-art { margin-inline-end:0;min-width:240px; width:240px;transform:scale(.82); } }
 @media(max-width:900px) { .orbit-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .orbit-overview-columns { grid-template-columns:1fr; } .orbit-art { width:200px;min-width:200px; margin-inline-end:-25px;transform:scale(.7); } .orbit-app-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:600px) { .orbit-intro { min-height:unset;border-radius:23px; } .orbit-intro-copy { padding:29px 22px 24px; } .orbit-intro h1 { font-size:32px!important; } .orbit-intro p { font-size:12px; } .orbit-art { position:absolute;opacity:.13;inset-inline-end:-130px;top:-30px;transform:scale(.78);pointer-events:none; } .orbit-intro-actions { margin:21px 0 17px; } .orbit-main-button,.orbit-quiet-button { padding:10px 13px;font-size:12px; } .orbit-stat-grid { gap:9px!important; margin-top:11px; } .orbit-stat-card { min-height:124px;border-radius:16px;padding:15px; } .orbit-stat-icon { width:30px;height:30px;border-radius:10px;top:14px;left:12px; } .orbit-stat-icon svg { width:16px;height:16px; } .orbit-stat-number { font-size:30px; } .orbit-stat-name { font-size:11px;margin-top:11px; } .orbit-stat-card small { font-size:10px; } .orbit-overview-columns { margin-top:11px;gap:11px; } .orbit-focus-panel,.orbit-quick-panel { border-radius:19px; padding:20px 18px;min-height:auto; } .orbit-empty-state { padding-top:17px; } .orbit-fleet-heading { align-items:flex-start;flex-direction:column;gap:12px; } .orbit-searchbox { width:100%; } .orbit-filter-tabs { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } .orbit-filter-tabs button { justify-content:center; } .orbit-app-grid { gap:10px!important; } .orbit-app-card { padding:15px 12px 11px;border-radius:16px;min-height:205px; } .orbit-app-icon { width:37px;height:37px;border-radius:13px; } .orbit-app-name { font-size:13px; } .orbit-app-card-head { margin-bottom:15px; } .orbit-signal-strip { gap:3px;font-size:9px; } .orbit-signal-strip > span { gap:3px; } .orbit-legend { gap:11px; } .orbit-bottom-note { line-height:1.8; } }
+@media(max-width:600px) { .orbit-intro { min-height:unset;border-radius:20px; } .orbit-intro-copy { padding:22px 18px 19px; } .orbit-intro h1 { font-size:29px!important; } .orbit-intro p { font-size:12px; } .orbit-art { display:none; } .orbit-intro-actions { margin:15px 0 11px; } .orbit-main-button,.orbit-quiet-button { padding:9px 12px;font-size:12px; } .orbit-stat-grid { gap:8px!important; margin-top:9px; } .orbit-stat-card { min-height:89px;border-radius:15px;padding:12px; } .orbit-stat-icon { width:28px;height:28px;border-radius:9px;top:10px;left:10px; } .orbit-stat-icon svg { width:15px;height:15px; } .orbit-stat-number { font-size:27px; } .orbit-stat-name { font-size:10px;margin-top:6px;max-width:calc(100% - 25px); } .orbit-stat-card small { font-size:10px; } .orbit-overview-columns { margin-top:9px;gap:9px; } .orbit-focus-panel,.orbit-quick-panel { border-radius:17px; padding:17px 15px;min-height:auto; } .orbit-empty-state { padding-top:14px; } .orbit-fleet-heading { align-items:center;flex-direction:row;gap:10px; } .orbit-searchbox { width:min(48%,230px);min-width:120px; } .orbit-filter-tabs { display:flex;gap:3px;margin:10px 0; } .orbit-filter-tabs button { justify-content:center;padding:8px 9px;font-size:11px; } .orbit-app-grid { gap:8px!important; } .orbit-app-card { padding:12px 11px 10px;border-radius:15px;min-height:155px; } .orbit-app-icon { width:34px;height:34px;border-radius:11px; } .orbit-app-name { font-size:12px; } .orbit-app-card-head { margin-bottom:9px; } .orbit-signal-strip { gap:10px;font-size:9px; } .orbit-signal-strip > span { gap:4px; } .orbit-legend { gap:11px; } .orbit-bottom-note { line-height:1.8; } }
 @media(max-width:365px) { .orbit-app-grid { grid-template-columns:1fr; } .orbit-intro-actions { align-items:stretch; flex-direction:column; } .orbit-main-button,.orbit-quiet-button { width:100%; } }
 @media(prefers-reduced-motion:reduce) { .orbit-app-card:hover { transform:none; } }
 
@@ -282,6 +282,45 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .orbit-shell.orbit-dark .orbit-subpage pre { background:#1a2a42!important;color:#d7e3f6!important;border-color:#314361!important; }
 .orbit-shell.orbit-dark .orbit-subpage input,.orbit-shell.orbit-dark .orbit-subpage textarea,.orbit-shell.orbit-dark .orbit-subpage select { background:#1c2b43!important;color:#ecf3ff!important;border-color:#364962!important; }
 @media (max-width:600px) { .orbit-subpage > div:first-child { padding:20px!important; } .orbit-subpage h1 { font-size:22px!important; } .orbit-subpage [class*="grid-cols-5"] { gap:6px; } }
+
+/* Quiet navigation for specialist workspaces. */
+.orbit-more-menu { position:relative; }
+.orbit-more-menu > summary { display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 12px;cursor:pointer;list-style:none;border:1px solid #e6eaf2;border-radius:12px;color:#748198;font-size:12px;font-weight:700;background:#fff; }
+.orbit-more-menu > summary::-webkit-details-marker { display:none; }
+.orbit-more-menu > summary:hover,.orbit-more-menu[open] > summary { background:#f1f5fc;color:#385eaa;border-color:#d6e0f1; }
+.orbit-more-popover { position:absolute;left:0;top:calc(100% + 8px);min-width:170px;padding:6px;background:#fff;border:1px solid #e2e9f3;border-radius:14px;box-shadow:0 16px 42px #1c3c751b;z-index:90;display:grid;gap:2px; }
+.orbit-more-popover > button { display:flex;align-items:center;gap:10px;border:0;background:transparent;border-radius:10px;padding:11px;color:#41536e;text-align:right;font-size:12px;font-weight:650;white-space:nowrap; }
+.orbit-more-popover > button:hover,.orbit-more-popover > button[aria-current="page"] { background:#f2f6fd;color:#315cbb; }
+.orbit-more-menu-mobile { display:none; }
+.orbit-program-tabs { display:flex;align-items:center;gap:5px;max-width:100%;overflow-x:auto;padding-bottom:2px; }
+.orbit-program-tabs button { min-height:36px;border-radius:10px;background:transparent;color:#65758d;border:1px solid transparent;padding:7px 12px;font-size:12px;font-weight:650;white-space:nowrap; }
+.orbit-program-tabs button:hover { background:#f2f6fc;color:#365fae; }
+.orbit-program-tabs button[aria-current="page"] { background:#eaf1ff;color:#315fc3;border-color:#dbe6fc; }
+.orbit-program-more { position:relative;display:inline-flex;align-items:center; }
+.orbit-program-more>span { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+.orbit-program-more select { height:36px;max-width:145px;border:1px solid #e1e7f0;border-radius:10px;background:#fff;color:#62738c;padding:0 10px;font-size:12px; }
+.orbit-program-filters { position:relative; }
+.orbit-program-filters>summary { list-style:none;cursor:pointer;border:1px solid #e1e7f0;border-radius:10px;padding:8px 11px;background:#fff;color:#65758d;font-size:11px;font-weight:650;white-space:nowrap; }
+.orbit-program-filters>summary::-webkit-details-marker { display:none; }
+.orbit-program-filters-panel { position:absolute;top:calc(100% + 7px);left:0;z-index:20;display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:min(90vw,560px);padding:12px;background:#fff;border:1px solid #e1e7f0;border-radius:13px;box-shadow:0 14px 36px #1c3c751b; }
+.orbit-shell.orbit-dark .orbit-more-menu>summary,.orbit-shell.orbit-dark .orbit-program-more select,.orbit-shell.orbit-dark .orbit-program-filters>summary { background:#1b2940;color:#c4d2e8;border-color:#30405e; }
+.orbit-shell.orbit-dark .orbit-more-popover,.orbit-shell.orbit-dark .orbit-program-filters-panel { background:#17243a;border-color:#2b3d5a; }
+.orbit-shell.orbit-dark .orbit-more-popover>button { color:#c5d2e5; }
+.orbit-shell.orbit-dark .orbit-more-popover>button:hover,.orbit-shell.orbit-dark .orbit-more-popover>button[aria-current="page"] { background:#233651;color:#e7f0ff; }
+.orbit-shell.orbit-dark .orbit-program-tabs button { color:#b1c0d7; }
+.orbit-shell.orbit-dark .orbit-program-tabs button[aria-current="page"] { background:#24375b;color:#acc7ff;border-color:#31486d; }
+@media(max-width:760px) {
+  .orbit-more-menu-desktop { display:none; }
+  .orbit-more-menu-mobile { display:block; }
+  .orbit-mobile-nav { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .orbit-more-menu-mobile>summary { min-height:56px;flex-direction:column;gap:5px;width:100%;border:0;background:transparent;border-radius:12px;color:#8996aa;font-size:10px; }
+  .orbit-more-menu-mobile[open]>summary,.orbit-more-menu-mobile>summary:hover { background:#edf3ff;color:#315ec1; }
+  .orbit-more-menu-mobile .orbit-more-popover { left:8px;top:auto;bottom:calc(100% + 8px);min-width:155px; }
+  .orbit-program-tabs { width:100%; }
+  .orbit-program-tabs button { padding:7px 10px; }
+  .orbit-program-more select { max-width:115px; }
+  .orbit-program-filters-panel { position:fixed;left:5vw;right:5vw;top:auto;min-width:0; }
+}
 
 /* ORBIT Specialist landing pages — visual hierarchy in five seconds */
 .orbit-workspace-overview{color:#20334f;direction:rtl;}

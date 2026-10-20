@@ -46,10 +46,12 @@ try {
   await nav.nth(2).click();
   await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
-  await nav.nth(3).click();
+  await page.locator('.orbit-more-menu-desktop > summary').click();
+  await page.getByRole('button', { name: 'الرؤى' }).click();
   await page.locator('.orbit-workspace-overview[data-mode="intelligence"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
-  await nav.nth(4).click();
+  await page.locator('.orbit-more-menu-desktop > summary').click();
+  await page.getByRole('button', { name: 'الحماية' }).click();
   await page.locator('.orbit-workspace-overview[data-mode="operations"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-governance.png', fullPage: true });
   await nav.first().click();

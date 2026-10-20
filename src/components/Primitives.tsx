@@ -200,33 +200,33 @@ export const ThreeEyesInfographicRow: React.FC<{
   };
 
   return (
-    <div className="grid grid-cols-3 gap-1.5 w-full" aria-label="حالة العيون الثلاث">
+    <div className="grid grid-cols-3 gap-1.5 w-full" aria-label="مؤشرات الموقع">
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e1
         )}`}
-        title={`العين 1 (الكود): ${e1}`}
+        title={`جودة الموقع: ${e1}`}
       >
         <Code2 className="w-3.5 h-3.5 shrink-0" />
-        <span>الكود</span>
+        <span>الجودة</span>
       </div>
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e2
         )}`}
-        title={`العين 2 (التشغيل): ${e2}`}
+        title={`تجربة الموقع: ${e2}`}
       >
         <Activity className="w-3.5 h-3.5 shrink-0" />
-        <span>التشغيل</span>
+        <span>التجربة</span>
       </div>
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e3
         )}`}
-        title={`العين 3 (السجل): ${e3}`}
+        title={`آخر تحديث: ${e3}`}
       >
         <Terminal className="w-3.5 h-3.5 shrink-0" />
-        <span>السجل</span>
+        <span>التحديث</span>
       </div>
     </div>
   );
