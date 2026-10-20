@@ -1,7 +1,7 @@
 name: ORBIT browser and visual smoke
 on:
   push:
-    branches: [orbit/security-foundation-20261020]
+    branches: [main]
   pull_request:
     branches: [main]
 permissions:
@@ -21,8 +21,10 @@ jobs:
         run: |
           echo "ORBIT_OPERATOR_PASSKEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           echo "ORBIT_SENSOR_INGEST_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORBIT_SENSOR_APP_ID=MIRAS" >> "$GITHUB_ENV"
+          echo "ORBIT_WEBHOOK_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Start ORBIT preview

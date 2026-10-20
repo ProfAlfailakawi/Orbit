@@ -277,11 +277,6 @@ export default function App() {
             setDiscoveredCandidates(cloudData.discoveredCandidates as DiscoveredRepoCandidate[]);
           }
           setCloudSyncedAt(syncedIso);
-          void fetch('/api/state/hydrate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cloudData),
-          }).catch(() => {});
           setTimeout(() => {
             hydratingFromCloudRef.current = false;
           }, 600);
@@ -363,6 +358,7 @@ export default function App() {
       if (data.authenticated) {
         setIsLocked(false);
         setAuthError(null);
+        await fetchServerState();
       } else {
         setAuthError(data.error || 'رمز الدخول غير صحيح.');
       }

@@ -92,6 +92,10 @@ const googleProvider = new GoogleAuthProvider();
 
 export async function signInWithGoogleOperator(): Promise<User> {
   const credential = await signInWithPopup(auth, googleProvider);
+  if (!credential.user.emailVerified || credential.user.email?.toLowerCase() !== 'volcanokw@gmail.com') {
+    await signOut(auth);
+    throw new Error('هذا الحساب غير مصرح له بمزامنة مساحة ORBIT.');
+  }
   return credential.user;
 }
 
