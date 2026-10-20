@@ -96,6 +96,13 @@ try {
     data: { appId: 'MIRAS', environment: 'staging', operationName: 'ci.visual.smoke', errorCode: 'CI_SMOKE', errorMessage: 'Synthetic browser-only verification of opt-in secure sensor' },
   });
   assert.equal(authorizedSensor.status(), 202, 'Authenticated staging sensor must accept a test event');
+  const spoofedSensor = await page.request.post(base + '/api/sensor/ingest', {
+    headers: { Authorization: 'Bearer ' + sensorToken },
+    data: { appId: 'THRIVE', environment: 'staging', operationName: 'ci.spoof.attempt', errorCode: 'CI_SPOOF', errorMessage: 'A MIRAS credential must not impersonate another app' },
+  });
+  assert.equal(spoofedSensor.status(), 403, 'An app-scoped sensor credential must not impersonate another app');
+  const hydrate = await page.request.post(base + '/api/state/hydrate', { data: state });
+  assert.equal(hydrate.status(), 410, 'Client cloud snapshots must not overwrite shared server truth');
   const updatedState = await page.request.get(base + '/api/state');
   const newState = await updatedState.json();
   assert.ok(newState.events.some(event => event.appId === 'MIRAS' && event.dataIntegrity === 'Live'), 'Authenticated sensor event should be Live');
