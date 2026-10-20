@@ -19,7 +19,7 @@ export const INITIAL_PLATFORMS: PlatformRecord[] = [
   {
     id: 'miras',
     codeName: 'MIRAS',
-    nameAr: 'ميراث التعليمي (Mirasedu)',
+    nameAr: 'مراس التعليمي (Mirasedu)',
     description: 'المنصة التعليمية المتكاملة للتدفقات الأكاديمية والتسليمات الطلابية والتقييم التفاعلي.',
     owner: 'ProfAlfailakawi',
     repoName: 'Mirasedu',
