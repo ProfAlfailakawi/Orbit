@@ -227,6 +227,13 @@ async function startServer() {
     return res.json({ authenticated: true, operator: 'Operator' });
   });
 
+  app.post('/api/auth/logout', (req, res) => {
+    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
+    if (cookie) sessions.delete(cookie.slice(cookieName.length + 1));
+    res.clearCookie(cookieName, { path: '/api', sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+    res.json({ authenticated: false });
+  });
+
   app.get('/api/auth/session', (req, res) => {
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
     const token = cookie?.slice(cookieName.length + 1) || '';
@@ -243,7 +250,13 @@ async function startServer() {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.get('origin');
       const host = req.get('host');
-      if (origin && (!host || new URL(origin).host !== host)) return res.status(403).json({ error: 'Origin rejected' });
+      if (origin) {
+        try {
+          if (!host || new URL(origin).host !== host) return res.status(403).json({ error: 'Origin rejected' });
+        } catch {
+          return res.status(403).json({ error: 'Invalid origin' });
+        }
+      }
     }
     next();
   });
