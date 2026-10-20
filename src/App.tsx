@@ -1188,10 +1188,10 @@ export default function App() {
                         <Code2 className="w-3.5 h-3.5 text-emerald-400" />
                         <span>الكود والمستودع</span>
                       </span>
-                      <span className="font-mono tabular-nums text-emerald-400">96%</span>
+                      <span className="font-mono tabular-nums text-emerald-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-400 w-[96%]" />
+                      <div className="h-full rounded-full bg-emerald-400 w-[0%]" />
                     </div>
                   </div>
 
@@ -1201,10 +1201,10 @@ export default function App() {
                         <Activity className="w-3.5 h-3.5 text-sky-400" />
                         <span>رحلة المستخدم</span>
                       </span>
-                      <span className="font-mono tabular-nums text-sky-400">88%</span>
+                      <span className="font-mono tabular-nums text-sky-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-sky-400 w-[88%]" />
+                      <div className="h-full rounded-full bg-sky-400 w-[0%]" />
                     </div>
                   </div>
 
@@ -1214,10 +1214,10 @@ export default function App() {
                         <Terminal className="w-3.5 h-3.5 text-amber-400" />
                         <span>السجل الصامت</span>
                       </span>
-                      <span className="font-mono tabular-nums text-amber-400">91%</span>
+                      <span className="font-mono tabular-nums text-amber-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-400 w-[91%]" />
+                      <div className="h-full rounded-full bg-amber-400 w-[0%]" />
                     </div>
                   </div>
                 </div>
