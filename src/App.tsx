@@ -80,6 +80,7 @@ import type {
   SilentFailureSignal,
 } from './core/types';
 import { DynamicFleetView } from './components/DynamicFleetView';
+import { ExecutiveOverview } from './components/ExecutiveOverview';
 import {
   EngineeringIntelligenceView,
   OperationsAndGovernanceView,
@@ -1124,14 +1125,22 @@ export default function App() {
              MISSION CONTROL — INFOGRAPHIC, ICON-FIRST, MINIMAL-TEXT DESIGN
              ================================================================= */
           <div className="space-y-6">
-            <section className="orbit-welcome" aria-label="مرحباً في أوربت">
-              <div>
-                <div className="text-[11px] font-semibold tracking-widest text-blue-600 mb-1">ORBIT · MISSION CONTROL</div>
-                <h1>برامجك، في مدار واحد.</h1>
-                <p>صورة واضحة. تنبيه مفهوم. وحل جاهز للنسخ إلى Claude.</p>
-              </div>
-              <div className="orbit-orb" aria-hidden="true"><Radar className="w-9 h-9" /></div>
-            </section>
+            <ExecutiveOverview
+              platforms={platforms}
+              incidents={incidents}
+              onOpenPlatform={(id) => setSelectedPlatformId(id)}
+              onOpenIncident={(id) => {
+                setSelectedIncidentId(id);
+                setActiveNav('universal-radar');
+              }}
+              onOpenRadar={() => setActiveNav('universal-radar')}
+              onOpenFleet={() => setActiveNav('fleet-manager')}
+              onOpenIntelligence={() => setActiveNav('intelligence')}
+              onOpenOperations={() => setActiveNav('operations')}
+            />
+            <details className="orbit-advanced">
+              <summary>المؤشرات والتحليلات التفصيلية · عرض اختياري</summary>
+              <div className="space-y-6 pt-3">
             {/* ROW 1: 3 VISUAL INFOGRAPHIC HERO CARDS */}
             <section
               aria-label="ملخص المؤشرات البصرية"
@@ -1657,6 +1666,8 @@ export default function App() {
                 </div>
               )}
             </section>
+              </div>
+            </details>
           </div>
         )}
       </main>
