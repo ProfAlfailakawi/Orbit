@@ -297,6 +297,81 @@ async function startServer() {
     res.json({ authenticated: Boolean(expiry && expiry > Date.now()) });
   });
 
+  // Opt-in server-to-server telemetry (never embed this token in browser code).
+  // Authenticated sensor data is distinct from operator-run Demo simulations.
+  const sensorRate = new Map<string, { count: number; until: number }>();
+  app.post('/api/sensor/ingest', (req, res) => {
+    const expected = process.env.ORBIT_SENSOR_INGEST_TOKEN || '';
+    const authorization = req.get('authorization') || '';
+    const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    if (expected.length < 32 || supplied.length < 32) {
+      return res.status(401).json({ error: 'Sensor authentication required' });
+    }
+    const a = crypto.createHash('sha256').update(supplied).digest();
+    const b = crypto.createHash('sha256').update(expected).digest();
+    if (!crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Sensor authentication rejected' });
+
+    const ip = req.ip || 'unknown';
+    const now = Date.now();
+    const previous = sensorRate.get(ip);
+    const window = previous && previous.until > now ? previous : { count: 0, until: now + 60_000 };
+    window.count += 1;
+    sensorRate.set(ip, window);
+    if (window.count > 120) return res.status(429).json({ error: 'Telemetry rate limit exceeded' });
+    if (sensorRate.size > 1000) for (const [key, item] of sensorRate) if (item.until <= now) sensorRate.delete(key);
+
+    const body = req.body || {};
+    const appId = typeof body.appId === 'string' ? body.appId.toUpperCase().trim() : '';
+    const target = platforms.find(p => p.codeName.toUpperCase() === appId);
+    if (!target) return res.status(404).json({ error: 'Unknown program' });
+    if (target.lifecycleState !== 'active') return res.status(202).json({ accepted: false, reason: 'Monitoring paused for this program' });
+
+    const environment = body.environment;
+    if (!['production', 'staging', 'local'].includes(environment)) return res.status(400).json({ error: 'Invalid environment' });
+    const operationName = body.operationName;
+    const errorCode = body.errorCode;
+    const errorMessage = body.errorMessage;
+    if ([operationName, errorCode, errorMessage].some(v => typeof v !== 'string' || v.length === 0 || v.length > 4000)) {
+      return res.status(400).json({ error: 'Missing or invalid event fields' });
+    }
+
+    const outcome = ingestAndCorrelateEvent({
+      appId,
+      environment,
+      operationName,
+      errorCode,
+      errorMessage,
+      stackTrace: typeof body.stackTrace === 'string' ? body.stackTrace.slice(0, 12000) : '',
+      releaseVersion: typeof body.releaseVersion === 'string' ? body.releaseVersion : '',
+      commitSha: typeof body.commitSha === 'string' ? body.commitSha : '',
+      browserOs: typeof body.browserOs === 'string' ? body.browserOs : '',
+      detectionSource: 'ORBIT Sensor',
+      isSilentMismatch: Boolean(body.isSilentMismatch),
+      isUserVisible: Boolean(body.isUserVisible),
+      latencyMs: typeof body.latencyMs === 'number' ? body.latencyMs : undefined,
+      dataIntegrity: 'Live',
+    }, events, incidents, alerts);
+
+    events = outcome.events;
+    incidents = outcome.incidents;
+    alerts = outcome.alerts;
+    platforms = platforms.map(p => p.id === target.id ? {
+      ...p,
+      dataIntegrity: 'Live',
+      connectionVerified: true,
+      connectionStatus: p.runtimeMode === 'local-only' ? 'Local Session Telemetry' : p.connectionStatus,
+      healthStatus: outcome.incident.severity === 'Critical' || outcome.incident.severity === 'High' ? 'Incident' : 'Monitoring Gap',
+      lastVerifiedTimestamp: new Date().toISOString(),
+      lastVerifiedEvidence: 'Authenticated ORBIT Sensor event received (production health still needs independent checks).',
+    } : p);
+    selfHealth.lastSuccessfulIngestion = new Date().toISOString();
+    costGuard.ingestedEventsCount += 1;
+    if (outcome.isDeduplicated) costGuard.deduplicatedSavedEvents += 1;
+    appendAudit('ORBIT Sensor', 'AUTHENTICATED_SENSOR_INGEST', appId, 'تم استقبال حدث مصادق عليه وتسجيله بعد تنقية بياناته الحساسة.');
+    broadcastRealtimeUpdate('SENSOR_EVENT_INGESTED');
+    return res.status(202).json({ accepted: true, eventId: outcome.event.eventId, incidentId: outcome.incident.incidentId, deduplicated: outcome.isDeduplicated });
+  });
+
   app.use('/api', (req, res, next) => {
     // Sensor ingestion is a separate integration; never allow unauthenticated writes.
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
@@ -496,7 +571,9 @@ async function startServer() {
         isSilentMismatch: Boolean(isSilentMismatch),
         isUserVisible: Boolean(isUserVisible),
         latencyMs: latencyMs ? Number(latencyMs) : undefined,
-        dataIntegrity: 'Live',
+        dataIntegrity: 'Demo',
+        detectionSource: 'Synthetic Canary',
+        environment: 'canary-sandbox',
       },
       events,
       incidents,
@@ -516,7 +593,8 @@ async function startServer() {
     if (outcome.incident.severity === 'Critical' || outcome.incident.severity === 'High') {
       platforms = platforms.map((p) =>
         p.codeName.toUpperCase() === String(appId).toUpperCase() && p.lifecycleState === 'active'
-          ? { ...p, healthStatus: 'Incident', dataIntegrity: 'Live' }
+          ? p // Manually injected demonstrations must never mark production as broken.
+          : p
           : p
       );
     }
@@ -528,6 +606,7 @@ async function startServer() {
       `البرنامج ${appId}: ${outcome.event.operationName} (${outcome.event.errorCode}) — التكرار #${outcome.incident.occurrenceCount}`
     );
 
+    broadcastRealtimeUpdate('DEMO_RADAR_EVENT');
     res.json({
       event: outcome.event,
       incident: outcome.incident,
