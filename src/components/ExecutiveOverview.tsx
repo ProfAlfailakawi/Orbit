@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Activity, ArrowLeft, ArrowUpLeft, BookOpen, CalendarDays, Check, CheckCircle2,
-  ChevronLeft, CircleHelp, CloudOff, Code2, Copy, Database, ExternalLink,
-  Eye, FileText, GraduationCap, Layers3, LayoutDashboard, LockKeyhole,
-  Radar, Search, ShieldCheck, ShoppingBag, Sparkles, TriangleAlert, Wifi,
+  Activity, ArrowLeft, ArrowUpLeft, BookOpen, CalendarDays, Check, Code2, Rocket, UserRound,
+  ChevronLeft, CircleHelp, CloudOff, Copy, Database, FileText, GraduationCap, Layers3,
+  LayoutDashboard, Radar, Search, ShieldCheck, ShoppingBag, Sparkles, TriangleAlert, Wifi,
 } from 'lucide-react';
-import type { IncidentCaseFile, PlatformRecord } from '../core/types';
+import type { IncidentCaseFile, PlatformRecord, RadarEvent } from '../core/types';
 import { generateClaudeMissionPrompt } from '../core/engine';
 
 type Filter = 'all' | 'verified' | 'attention' | 'pending';
@@ -13,12 +12,11 @@ type Filter = 'all' | 'verified' | 'attention' | 'pending';
 interface ExecutiveOverviewProps {
   platforms: PlatformRecord[];
   incidents: IncidentCaseFile[];
+  events: RadarEvent[];
   onOpenPlatform: (id: string) => void;
   onOpenIncident: (id: string) => void;
   onOpenRadar: () => void;
   onOpenFleet: () => void;
-  onOpenIntelligence: () => void;
-  onOpenOperations: () => void;
 }
 
 const isVerified = (p: PlatformRecord) => p.connectionVerified && p.dataIntegrity === 'Live';
@@ -52,8 +50,8 @@ const formatWhen = (value: string) => {
 };
 
 export function ExecutiveOverview({
-  platforms, incidents, onOpenPlatform, onOpenIncident, onOpenRadar,
-  onOpenFleet, onOpenIntelligence, onOpenOperations,
+  platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar,
+  onOpenFleet,
 }: ExecutiveOverviewProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -63,9 +61,11 @@ export function ExecutiveOverview({
   const attention = fleet.filter(hasIssue);
   const pending = fleet.filter(p => !isVerified(p));
   const activeIncidents = useMemo(() => incidents
-    .filter(i => i.dataIntegrity === 'Live' && !['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"].includes(i.status))
+    .filter(i => i.dataIntegrity === 'Live' && events.some(e =>
+      e.appId.toUpperCase() === i.appId.toUpperCase() && e.fingerprint === i.fingerprint && e.environment === 'production' && e.dataIntegrity === 'Live'
+    ) && !['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"].includes(i.status))
     .sort((a, b) => (a.severity === 'Critical' ? -1 : a.severity === 'High' ? 0 : 1) -
-                    (b.severity === 'Critical' ? -1 : b.severity === 'High' ? 0 : 1)), [incidents]);
+                    (b.severity === 'Critical' ? -1 : b.severity === 'High' ? 0 : 1)), [incidents, events]);
   const firstIncident = activeIncidents[0];
   const selectedPlatform = firstIncident && fleet.find(p => p.codeName.toUpperCase() === firstIncident.appId.toUpperCase());
   const visible = fleet.filter(p => {
@@ -92,36 +92,17 @@ export function ExecutiveOverview({
     <div className="orbit-executive" dir="rtl">
       <section className="orbit-intro" aria-label="ملخص غرفة القيادة">
         <div className="orbit-intro-copy">
-          <span className="orbit-eyebrow"><span className="orbit-eyebrow-dot" /> ORBIT / COMMAND CENTER</span>
-          <h1>كل برامجك. <span>رؤية واحدة.</span></h1>
-          <p>الأهم أمامك، والباقي عند الحاجة. بدون تعقيد أو أرقام غير موثوقة.</p>
-          <div className="orbit-intro-actions">
-            <button type="button" className="orbit-main-button" onClick={onOpenRadar}>
-              <Radar size={17} aria-hidden="true" /> افتح الرادار <ArrowLeft size={16} aria-hidden="true" />
-            </button>
-            <button type="button" className="orbit-quiet-button" onClick={onOpenFleet}>
-              <Layers3 size={17} aria-hidden="true" /> إدارة البرامج
-            </button>
-          </div>
-          <div className="orbit-system-note"><CircleHelp size={15} aria-hidden="true" /> حالة الربط تُعرض كما هي، ولا تعني عدم وجود بلاغات أن المواقع سليمة.</div>
-        </div>
-        <div className="orbit-art" aria-hidden="true">
-          <div className="orbit-art-ring orbit-art-ring-one" />
-          <div className="orbit-art-ring orbit-art-ring-two" />
-          <div className="orbit-art-ring orbit-art-ring-three" />
-          <div className="orbit-art-center"><Radar size={36} strokeWidth={1.6} /></div>
-          <div className="orbit-art-point orbit-art-point-a"><Code2 size={18}/></div>
-          <div className="orbit-art-point orbit-art-point-b"><Eye size={18}/></div>
-          <div className="orbit-art-point orbit-art-point-c"><Activity size={18}/></div>
-          <div className="orbit-art-label">ORBIT INTELLIGENCE</div>
+          <h1>كل مواقعك. <span>بنظرة واحدة.</span></h1>
+          <p>ملخص واضح لحالة مواقعك.</p>
+          <div className="orbit-system-note"><CircleHelp size={15} aria-hidden="true" /> لم يكتمل الربط؟ لا يمكن تأكيد الحالة بعد.</div>
         </div>
       </section>
 
       <section className="orbit-stat-grid" aria-label="أرقام مؤكدة للمراقبة">
-        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-blue"><Layers3 size={19}/></span><span className="orbit-stat-number">{fleet.length}</span><span className="orbit-stat-name">البرامج المسجلة</span><small>تشمل البرامج المحلية</small></div>
-        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-mint"><Wifi size={19}/></span><span className="orbit-stat-number">{verified.length}</span><span className="orbit-stat-name">ربط مباشر مؤكد</span><small>مصدر بيانات Live فقط</small></div>
-        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-coral"><TriangleAlert size={19}/></span><span className="orbit-stat-number">{activeIncidents.length}</span><span className="orbit-stat-name">حوادث مباشرة مفتوحة</span><small>ليست اختبارات أو عينات</small></div>
-        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-amber"><CloudOff size={19}/></span><span className="orbit-stat-number">{pending.length}</span><span className="orbit-stat-name">بانتظار التحقق</span><small>لا نفترض أنها سليمة</small></div>
+        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-blue"><Layers3 size={19}/></span><span className="orbit-stat-number">{fleet.length}</span><span className="orbit-stat-name">المواقع</span></div>
+        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-mint"><Wifi size={19}/></span><span className="orbit-stat-number">{verified.length}</span><span className="orbit-stat-name">مواقع متصلة</span></div>
+        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-coral"><TriangleAlert size={19}/></span><span className="orbit-stat-number">{activeIncidents.length}</span><span className="orbit-stat-name">تنبيهات مؤكدة</span></div>
+        <div className="orbit-stat-card"><span className="orbit-stat-icon orbit-tone-amber"><CloudOff size={19}/></span><span className="orbit-stat-number">{pending.length}</span><span className="orbit-stat-name">بانتظار الربط</span></div>
       </section>
 
       <div className="orbit-overview-columns">
@@ -132,49 +113,40 @@ export function ExecutiveOverview({
           </div>
           {firstIncident ? (
             <div className="orbit-incident-inner">
-              <span className="orbit-incident-pill"><span className="orbit-dot-bad" /> حادثة موثقة · {firstIncident.appId}</span>
+              <span className="orbit-incident-pill"><span className="orbit-dot-bad" /> تنبيه مؤكد · {firstIncident.appId} · موقع فعلي</span>
               <h3>{firstIncident.title}</h3>
               <p>{firstIncident.summary}</p>
               <div className="orbit-incident-meta"><span>آخر رصد: {formatWhen(firstIncident.lastSeen)}</span><span>{firstIncident.occurrenceCount} تكرار</span></div>
               <div className="orbit-incident-actions">
-                <button className="orbit-main-button" type="button" onClick={copyMission} disabled={!selectedPlatform}>
-                  {copied ? <Check size={16}/> : <Copy size={16}/>} {copied ? 'تم نسخ المهمة' : 'انسخ مهمة Claude'}
+                <button className="orbit-main-button" type="button" onClick={() => onOpenIncident(firstIncident.incidentId)}>التفاصيل <ChevronLeft size={15}/></button>
+                <button className="orbit-quiet-button" type="button" onClick={copyMission} disabled={!selectedPlatform}>
+                  {copied ? <Check size={16}/> : <Copy size={16}/>} {copied ? 'تم النسخ' : 'نسخ المهمة'}
                 </button>
-                <button className="orbit-quiet-button" type="button" onClick={() => onOpenIncident(firstIncident.incidentId)}>افتح التفاصيل <ChevronLeft size={15}/></button>
               </div>
             </div>
           ) : (
             <div className="orbit-empty-state">
               <span className="orbit-empty-symbol"><ShieldCheck size={30} strokeWidth={1.5}/></span>
-              <h3>لا توجد حوادث مباشرة مؤكدة في السجلات المعروضة</h3>
-              <p>{pending.length > 0 ? 'لكن بعض البرامج لم يكتمل ربطها. ابدأ بالتحقق حتى تصبح المؤشرات معبّرة عن الواقع.' : 'استمر في متابعة الرادار والتحقق من مصادر المراقبة.'}</p>
-              <button className="orbit-quiet-button" onClick={onOpenFleet} type="button">تحقق من الاتصالات <ArrowLeft size={15}/></button>
+              <h3>لا توجد تنبيهات مؤكدة</h3>
+              <p>{pending.length > 0 ? `باقي ربط ${pending.length} موقعاً.` : 'كل المواقع متصلة حالياً.'}</p>
+              {pending.length > 0 && <button className="orbit-quiet-button" onClick={onOpenFleet} type="button">ربط المواقع <ArrowLeft size={15}/></button>}
             </div>
           )}
         </section>
 
-        <section className="orbit-quick-panel" aria-label="مجالات الفحص">
-          <div className="orbit-panel-heading"><div><span className="orbit-kicker">ثانياً</span><h2>أين تريد النظر؟</h2></div></div>
-          <div className="orbit-quick-list">
-            <button type="button" onClick={onOpenRadar}><span className="orbit-quick-icon orbit-tone-blue"><Radar size={20}/></span><span><strong>الرادار الشامل</strong><small>الأخطاء والإنذارات</small></span><ArrowUpLeft size={18}/></button>
-            <button type="button" onClick={onOpenFleet}><span className="orbit-quick-icon orbit-tone-mint"><Database size={20}/></span><span><strong>برامجي</strong><small>الربط والتحقق</small></span><ArrowUpLeft size={18}/></button>
-            <button type="button" onClick={onOpenIntelligence}><span className="orbit-quick-icon orbit-tone-violet"><Sparkles size={20}/></span><span><strong>الذكاء الهندسي</strong><small>التحليل ومهمات Claude</small></span><ArrowUpLeft size={18}/></button>
-            <button type="button" onClick={onOpenOperations}><span className="orbit-quick-icon orbit-tone-amber"><LockKeyhole size={20}/></span><span><strong>التحقق والحماية</strong><small>الاختبارات والضوابط</small></span><ArrowUpLeft size={18}/></button>
-          </div>
-        </section>
       </div>
 
       <section className="orbit-fleet-section" aria-label="بطاقات البرامج">
         <div className="orbit-fleet-heading">
-          <div><span className="orbit-kicker">نظرة شاملة</span><h2>مدار البرامج <span className="orbit-light-count">{fleet.length}</span></h2><p>كل برنامج في بطاقة واحدة — بدون ازدحام.</p></div>
+          <div><span className="orbit-kicker">نظرة سريعة</span><h2>مواقعي <span className="orbit-light-count">{fleet.length}</span></h2></div>
           <label className="orbit-searchbox"><Search size={17} aria-hidden="true"/><input type="search" aria-label="ابحث عن برنامج" placeholder="ابحث عن برنامج…" value={query} onChange={e => setQuery(e.target.value)}/></label>
         </div>
         <div className="orbit-filter-tabs" role="group" aria-label="تصفية البرامج">
           {([
-            ['all', 'الجميع', fleet.length],
-            ['verified', 'مباشر', verified.length],
-            ['attention', 'تحتاج انتباه', attention.length],
-            ['pending', 'غير متحقق', pending.length],
+            ['all', 'الكل', fleet.length],
+            ['verified', 'متصل', verified.length],
+            ['attention', 'تنبيه', attention.length],
+            ['pending', 'يحتاج ربطاً', pending.length],
           ] as const).map(([value, title, count]) => <button type="button" aria-pressed={filter === value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)} key={value}>{title}<span>{count}</span></button>)}
         </div>
         {visible.length === 0 ? (
@@ -192,26 +164,23 @@ export function ExecutiveOverview({
                   <ArrowUpLeft className="orbit-app-arrow" size={17} aria-hidden="true"/>
                 </div>
                 <strong className="orbit-app-name">{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong>
-                <span className="orbit-app-code" dir="ltr">{p.codeName}</span>
                 <div className="orbit-app-separator"/>
                 <div className="orbit-app-status">
                   <span className={live ? (issue ? 'orbit-status-issue' : 'orbit-status-live') : 'orbit-status-pending'}>
                     <span className="orbit-indicator" />
-                    {live ? (issue ? 'تحتاج متابعة' : 'متصل · ' + (p.healthStatus === 'Healthy' ? 'سليم' : p.healthStatus)) : local ? 'برنامج محلي' : 'الربط غير مؤكد'}
+                    {live ? (issue ? 'يحتاج متابعة' : 'متصل') : local ? 'محلي' : 'يحتاج ربطاً'}
                   </span>
                 </div>
-                <div className="orbit-signal-strip" aria-label="حالة الكود والنشر وتجربة المستخدم">
-                  <span><i className={dot(p.fourState?.ciPassed, live)}/>الكود</span>
-                  <span><i className={dot(p.fourState?.deploymentSucceeded, live)}/>النشر</span>
-                  <span><i className={dot(p.fourState?.userJourneyHealthy, live)}/>التجربة</span>
+                <div className="orbit-signal-strip" aria-label="مؤشرات الموقع">
+                  <span title="جودة الموقع" aria-label="جودة الموقع"><i className={dot(p.fourState?.ciPassed, live)}/><Code2 size={13}/></span>
+                  <span title="آخر تحديث" aria-label="آخر تحديث"><i className={dot(p.fourState?.deploymentSucceeded, live)}/><Rocket size={13}/></span>
+                  <span title="تجربة الزائر" aria-label="تجربة الزائر"><i className={dot(p.fourState?.userJourneyHealthy, live)}/><UserRound size={13}/></span>
                 </div>
               </button>;
             })}
           </div>
         )}
-        <div className="orbit-legend"><span><i className="orbit-dot-good"/> تم التحقق</span><span><i className="orbit-dot-bad"/> يحتاج مراجعة</span><span><i className="orbit-dot-muted"/> غير متاح</span></div>
       </section>
-      <div className="orbit-bottom-note"><ShieldCheck size={16}/><span>ORBIT لا يغيّر مواقعك أو أنظمة الدفع أو الإشعارات تلقائياً.</span><span className="orbit-note-divider"/> <span>التجارب والأرقام غير الموثقة لا تُعرض كحالة إنتاجية.</span></div>
     </div>
   );
 }
