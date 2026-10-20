@@ -230,13 +230,13 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-intelligence-page space-y-6">
       <div className={`rounded-xl border p-6 space-y-2 ${surfaceCls}`}>
         <h1 className="text-xl font-bold tracking-tight">
-          ENGINEERING & CUSTOMER INTELLIGENCE — الذكاء الهندسي المشترك وتجربة المستخدم
+          الذكاء الهندسي
         </h1>
         <p className="text-xs text-slate-400">
-          يشمل أشعة التغييرات (Change Impact X-Ray)، الذكاء العابر للبرامج (Cross-App Intelligence)، كاشف الأعطال الصامتة، الذاكرة الهندسية القابلة للمراجعة والتصحيح، المختبر الموازي (Digital Twin)، وحارس الأمان والخصوصية (Security Guardian).
+          افهم أثر التحديثات، اكتشف الأنماط المتكررة، واحفظ الحلول التي تم التحقق منها.
         </p>
       </div>
 
@@ -245,7 +245,7 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">
-              Change Impact X-Ray & Regression Time Machine (أشعة أثر التغييرات وآلة زمن التراجعات — Sections 13 & 16)
+              أثر التحديثات والتراجعات
             </h2>
             <p className="text-xs text-slate-400">
               يربط التحديثات بالحوادث اللاحقة مع التمييز الصارم بين التزامن الزمني والسبب المؤكد بالدليل.
@@ -954,14 +954,14 @@ export const OperationsAndGovernanceView: React.FC<OperationsAndGovernanceProps>
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-governance-page space-y-6">
       {/* Section 28: Morning Intelligence (ORBIT DAILY BRIEF) & Section 29: Next Best Move */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className={`lg:col-span-6 rounded-xl border p-6 space-y-4 ${surfaceCls}`}>
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-bold text-sky-400">
-                ORBIT DAILY BRIEF — التقرير الصباحي الذكي (Section 28)
+                الموجز اليومي
               </h2>
               <p className="text-xs text-slate-400">
                 ملخص تنفيذي يومي شامل لجميع البرامج ({activePlatforms.length} منصة) قابل للقراءة والنسخ الفوري.
