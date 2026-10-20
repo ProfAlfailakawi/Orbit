@@ -214,16 +214,16 @@ export const DynamicFleetView: React.FC<DynamicFleetViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-fleet-page space-y-6">
       {/* Header & Dynamic Fleet Counters (Zero Hardcoded 11!) */}
       <div className={`rounded-xl border p-6 space-y-4 ${surfaceCls}`}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">
-              DYNAMIC FLEET MANAGEMENT — إدارة البرامج والأسطول المستقبلي (القسم 42)
+              إدارة البرامج
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              نظام ديناميكي غير مقيد بالعدد 11 — أضف، افحص، عدّل، أوقف، أرشف، أو افصل ربط أي برنامج دون تعديل الكود أو إعادة نشر ORBIT.
+              أضف برامجك وتحقق من اتصالاتها وأوقف المراقبة متى احتجت. دون أي تعديل على كودها.
             </p>
           </div>
           <button
@@ -236,7 +236,7 @@ export const DynamicFleetView: React.FC<DynamicFleetViewProps> = ({
             <span>
               {runningLifecycleTest
                 ? 'جاري تنفيذ دورة الاختبار...'
-                : 'تشغيل اختبار دورة الحياة الكامل (إضافة ← إيقاف ← أرشفة ← تفعيل ← فك ربط)'}
+                : 'تجربة إدارة البرامج'}
             </span>
           </button>
         </div>

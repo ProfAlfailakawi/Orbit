@@ -42,6 +42,7 @@ import type {
   IncidentStatus,
   PlatformLifecycleState,
   PlatformRecord,
+  SelfHealthMetrics,
 } from './src/core/types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,20 +50,68 @@ const __dirname = path.dirname(__filename);
 const DATA_SNAPSHOT_PATH = path.join(__dirname, '.orbit-data.json');
 
 // Cost-First zero-billing storage with automatic local disk persistence (.orbit-data.json) + JSON export/import
-let platforms = [...INITIAL_PLATFORMS];
-let events = [...INITIAL_EVENTS];
-let incidents = [...INITIAL_INCIDENTS];
-let alerts = [...INITIAL_ALERTS];
-let silentFailures = [...INITIAL_SILENT_FAILURES];
-let changeImpacts = [...INITIAL_CHANGE_IMPACTS];
-let crossAppPatterns = [...INITIAL_CROSS_APP_PATTERNS];
-let engineeringMemory = [...INITIAL_ENGINEERING_MEMORY];
-let innovations = [...INITIAL_INNOVATION_OPPORTUNITIES];
-let selfHealth = { ...INITIAL_SELF_HEALTH };
-let costGuard = { ...INITIAL_COST_GUARD };
-let discoveredCandidates = [...INITIAL_DISCOVERED_CANDIDATES];
-let featureMatrix = [...INITIAL_FEATURE_MATRIX];
-let acceptanceCriteria = [...INITIAL_ACCEPTANCE_CRITERIA];
+// Seed repositories are an onboarding catalog, not verified health telemetry.
+let platforms: PlatformRecord[] = INITIAL_PLATFORMS.map(p => ({
+  ...p,
+  healthStatus: p.runtimeMode === 'local-only' ? 'Local / Not Running' : 'Monitoring Gap',
+  dataIntegrity: 'Not Configured' as PlatformRecord['dataIntegrity'],
+  monitoringCoveragePct: 0,
+  connectionVerified: false,
+  connectionStatus: 'Pending Credentials',
+  productionUrlVerified: false,
+  lastVerifiedEvidence: '',
+  lastVerifiedTimestamp: '',
+  releaseShield: 'Insufficient Evidence',
+  releaseConfidencePct: 0,
+  recentRuns: [],
+  recentCommits: [],
+  ecgMetrics: [],
+  journeys: [],
+  fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+}));
+let events = [] as typeof INITIAL_EVENTS;
+let incidents = [] as typeof INITIAL_INCIDENTS;
+let alerts = [] as typeof INITIAL_ALERTS;
+let silentFailures = [] as typeof INITIAL_SILENT_FAILURES;
+let changeImpacts = [] as typeof INITIAL_CHANGE_IMPACTS;
+let crossAppPatterns = [] as typeof INITIAL_CROSS_APP_PATTERNS;
+let engineeringMemory = [] as typeof INITIAL_ENGINEERING_MEMORY;
+let innovations = [] as typeof INITIAL_INNOVATION_OPPORTUNITIES;
+let selfHealth: SelfHealthMetrics = {
+  ...INITIAL_SELF_HEALTH,
+  overallStatus: 'Monitoring Unconfirmed' as const,
+  lastSuccessfulIngestion: '',
+  eventProcessingDelayMs: 0,
+  sensorConnectivityCount: 0,
+  missingTelemetryApps: [],
+  alertDeliveryStatus: 'Delayed' as const,
+  storageUsageMb: 0,
+  githubApiRemaining: 0,
+  githubApiLimit: 0,
+  backgroundJobHealth: 'Warning' as const,
+  fleetMonitoringCoveragePct: 0,
+  independentWatchdogStatus: 'Stale' as const,
+};
+let costGuard = {
+  ...INITIAL_COST_GUARD,
+  ingestedEventsCount: 0,
+  deduplicatedSavedEvents: 0,
+  storageUsedMb: 0,
+  githubApiCallsToday: 0,
+  githubApiDailyQuota: 0,
+};
+let discoveredCandidates = [] as typeof INITIAL_DISCOVERED_CANDIDATES;
+let featureMatrix = INITIAL_FEATURE_MATRIX.map(item => ({
+  ...item,
+  status: item.status === 'Implemented & Tested'
+    ? ('Implemented but Not Tested' as const)
+    : item.status,
+}));
+let acceptanceCriteria = INITIAL_ACCEPTANCE_CRITERIA.map(item => ({
+  ...item,
+  status: 'Not Tested' as const,
+  evidenceDetail: 'يلزم اختبار وظيفي مستقل وربط أدلة حقيقية قبل اعتماد هذا البند.',
+}));
 let canaryHistory: CanaryTestResult[] = [];
 let simulatedTelemetryOutage = false;
 
@@ -139,7 +188,7 @@ let auditLogs: AuditLogEntry[] = [
     actor: 'System Watchdog',
     action: 'BOOT_SELF_CHECK',
     target: 'ORBIT Core',
-    detail: 'تم تشغيل نواة ORBIT والتحقق من عزل واستقلال جميع المستودعات الـ 11 (Read-Only Mode).',
+    detail: 'تم تشغيل نواة ORBIT. لم يتم التحقق من حالة البرامج المتصلة بعد.',
   },
 ];
 
@@ -173,6 +222,13 @@ function loadStateFromDisk() {
     if (Array.isArray(parsed.discoveredCandidates)) discoveredCandidates = parsed.discoveredCandidates;
     if (Array.isArray(parsed.canaryHistory)) canaryHistory = parsed.canaryHistory;
     if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs;
+    // Previously persisted examples can masquerade as production. Keep history,
+    // but require new evidence for the live dashboard.
+    events = events.map(e => e.detectionSource === 'Synthetic Canary' || e.environment === 'canary-sandbox'
+      ? { ...e, dataIntegrity: 'Demo' as const } : e);
+    incidents = incidents.map(i => i.appId === 'ORBIT-CANARY'
+      ? { ...i, dataIntegrity: 'Demo' as const } : i);
+
   } catch {
     // Non-blocking fail-open if snapshot doesn't exist or is invalid
   }
@@ -241,6 +297,81 @@ async function startServer() {
     res.json({ authenticated: Boolean(expiry && expiry > Date.now()) });
   });
 
+  // Opt-in server-to-server telemetry (never embed this token in browser code).
+  // Authenticated sensor data is distinct from operator-run Demo simulations.
+  const sensorRate = new Map<string, { count: number; until: number }>();
+  app.post('/api/sensor/ingest', (req, res) => {
+    const expected = process.env.ORBIT_SENSOR_INGEST_TOKEN || '';
+    const authorization = req.get('authorization') || '';
+    const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    if (expected.length < 32 || supplied.length < 32) {
+      return res.status(401).json({ error: 'Sensor authentication required' });
+    }
+    const a = crypto.createHash('sha256').update(supplied).digest();
+    const b = crypto.createHash('sha256').update(expected).digest();
+    if (!crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Sensor authentication rejected' });
+
+    const ip = req.ip || 'unknown';
+    const now = Date.now();
+    const previous = sensorRate.get(ip);
+    const window = previous && previous.until > now ? previous : { count: 0, until: now + 60_000 };
+    window.count += 1;
+    sensorRate.set(ip, window);
+    if (window.count > 120) return res.status(429).json({ error: 'Telemetry rate limit exceeded' });
+    if (sensorRate.size > 1000) for (const [key, item] of sensorRate) if (item.until <= now) sensorRate.delete(key);
+
+    const body = req.body || {};
+    const appId = typeof body.appId === 'string' ? body.appId.toUpperCase().trim() : '';
+    const target = platforms.find(p => p.codeName.toUpperCase() === appId);
+    if (!target) return res.status(404).json({ error: 'Unknown program' });
+    if (target.lifecycleState !== 'active') return res.status(202).json({ accepted: false, reason: 'Monitoring paused for this program' });
+
+    const environment = body.environment;
+    if (!['production', 'staging', 'local'].includes(environment)) return res.status(400).json({ error: 'Invalid environment' });
+    const operationName = body.operationName;
+    const errorCode = body.errorCode;
+    const errorMessage = body.errorMessage;
+    if ([operationName, errorCode, errorMessage].some(v => typeof v !== 'string' || v.length === 0 || v.length > 4000)) {
+      return res.status(400).json({ error: 'Missing or invalid event fields' });
+    }
+
+    const outcome = ingestAndCorrelateEvent({
+      appId,
+      environment,
+      operationName,
+      errorCode,
+      errorMessage,
+      stackTrace: typeof body.stackTrace === 'string' ? body.stackTrace.slice(0, 12000) : '',
+      releaseVersion: typeof body.releaseVersion === 'string' ? body.releaseVersion : '',
+      commitSha: typeof body.commitSha === 'string' ? body.commitSha : '',
+      browserOs: typeof body.browserOs === 'string' ? body.browserOs : '',
+      detectionSource: 'ORBIT Sensor',
+      isSilentMismatch: Boolean(body.isSilentMismatch),
+      isUserVisible: Boolean(body.isUserVisible),
+      latencyMs: typeof body.latencyMs === 'number' ? body.latencyMs : undefined,
+      dataIntegrity: 'Live',
+    }, events, incidents, alerts);
+
+    events = outcome.events;
+    incidents = outcome.incidents;
+    alerts = outcome.alerts;
+    platforms = platforms.map(p => p.id === target.id ? {
+      ...p,
+      dataIntegrity: 'Live',
+      connectionVerified: true,
+      connectionStatus: p.runtimeMode === 'local-only' ? 'Local Session Telemetry' : p.connectionStatus,
+      healthStatus: outcome.incident.severity === 'Critical' || outcome.incident.severity === 'High' ? 'Incident' : 'Monitoring Gap',
+      lastVerifiedTimestamp: new Date().toISOString(),
+      lastVerifiedEvidence: 'Authenticated ORBIT Sensor event received (production health still needs independent checks).',
+    } : p);
+    selfHealth.lastSuccessfulIngestion = new Date().toISOString();
+    costGuard.ingestedEventsCount += 1;
+    if (outcome.isDeduplicated) costGuard.deduplicatedSavedEvents += 1;
+    appendAudit('ORBIT Sensor', 'AUTHENTICATED_SENSOR_INGEST', appId, 'تم استقبال حدث مصادق عليه وتسجيله بعد تنقية بياناته الحساسة.');
+    broadcastRealtimeUpdate('SENSOR_EVENT_INGESTED');
+    return res.status(202).json({ accepted: true, eventId: outcome.event.eventId, incidentId: outcome.incident.incidentId, deduplicated: outcome.isDeduplicated });
+  });
+
   app.use('/api', (req, res, next) => {
     // Sensor ingestion is a separate integration; never allow unauthenticated writes.
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
@@ -276,7 +407,7 @@ async function startServer() {
       ...selfHealth,
       heartbeatTimestamp: new Date().toISOString(),
       fleetMonitoringCoveragePct: avgCoverage,
-      sensorConnectivityCount: activePlatforms.filter((p) => p.connectionVerified).length,
+      sensorConnectivityCount: new Set(events.filter(e => e.detectionSource === 'ORBIT Sensor' && e.dataIntegrity === 'Live' && Date.now() - Date.parse(e.timestamp) < 30 * 60_000).map(e => e.appId)).size,
     };
 
     res.json({
@@ -301,8 +432,7 @@ async function startServer() {
   });
 
   // 3. Read-Only GitHub Sync Probe (Respects Rate Limits & Never Writes to Any Repo)
-  app.post('/api/github/sync', async (req, res) => {
-    const { appId } = req.body || {};
+  async function syncGithubFleet(appId?: string) {
     const token = process.env.GITHUB_READ_ONLY_TOKEN;
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
@@ -318,7 +448,7 @@ async function startServer() {
 
     const syncedResults: Array<{ codeName: string; status: string; integrity: string }> = [];
 
-    for (const plat of targets.slice(0, 4)) {
+    for (const plat of targets.slice(0, 25)) {
       try {
         costGuard.githubApiCallsToday += 1;
         const resp = await fetch(`https://api.github.com/repos/${plat.owner}/${plat.repoName}`, {
@@ -332,14 +462,88 @@ async function startServer() {
 
         if (resp.ok) {
           const repoData = (await resp.json()) as { default_branch?: string; pushed_at?: string };
+          // Independently fetch CI status; a GitHub repo HTTP 200 alone says
+          // nothing about workflows, deployment, uptime or real user journeys.
+          let recentRuns: PlatformRecord['recentRuns'] = [];
+          let githubCiPassed: boolean | null = null;
+          let actionsChecked = false;
+          let recentCommits: PlatformRecord['recentCommits'] = [];
+          const baseUrl = `https://api.github.com/repos/${encodeURIComponent(plat.owner)}/${encodeURIComponent(plat.repoName)}`;
+          try {
+            costGuard.githubApiCallsToday += 1;
+            const runsResponse = await fetch(`${baseUrl}/actions/runs?per_page=5`, {
+              headers,
+              signal: AbortSignal.timeout(4500),
+            });
+            if (runsResponse.ok) {
+              actionsChecked = true;
+              const result = (await runsResponse.json()) as { workflow_runs?: Array<{
+                id?: number; name?: string; head_branch?: string; head_sha?: string;
+                display_title?: string; status?: string; conclusion?: string | null;
+                created_at?: string; run_started_at?: string; updated_at?: string;
+              }> };
+              recentRuns = (result.workflow_runs || []).slice(0, 5).map(run => ({
+                id: String(run.id || ''),
+                workflowName: run.name || 'GitHub workflow',
+                branch: run.head_branch || '',
+                commitSha: run.head_sha || '',
+                commitMessage: run.display_title || '',
+                status: run.status !== 'completed' ? 'in_progress' : run.conclusion === 'success' ? 'success' : 'failure',
+                hasSubJobWarning: false,
+                warningDetails: 'Run-level status only; sub-job warnings have not been checked.',
+                durationSec: 0,
+                timestamp: run.created_at || '',
+                dataIntegrity: 'Live',
+              }));
+              const latestCompleted = (result.workflow_runs || []).find(run => run.status === 'completed');
+              if (latestCompleted) githubCiPassed = latestCompleted.conclusion === 'success';
+            }
+          } catch {
+            // GitHub Actions may be unavailable; keep CI unknown instead of green.
+          }
+          // Commit metadata is also read-only. Without fetching file-level diffs,
+          // risk must remain explicitly unknown.
+          try {
+            costGuard.githubApiCallsToday += 1;
+            const commitsResponse = await fetch(`${baseUrl}/commits?per_page=3`, {
+              headers,
+              signal: AbortSignal.timeout(4500),
+            });
+            if (commitsResponse.ok) {
+              const result = (await commitsResponse.json()) as Array<{
+                sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } };
+              }>;
+              recentCommits = result.slice(0, 3).map(commit => ({
+                sha: commit.sha?.slice(0, 10) || '',
+                author: commit.commit?.author?.name || 'Unknown',
+                message: commit.commit?.message?.split('\\n')[0] || '',
+                timestamp: commit.commit?.author?.date || '',
+                branch: repoData.default_branch || plat.defaultBranch,
+                changedFiles: [],
+                riskLevel: 'Unknown',
+                dataIntegrity: 'Live',
+              }));
+            }
+          } catch {
+            // Do not fall back to seeded or fabricated commit records.
+          }
           platforms = platforms.map((p) =>
             p.id === plat.id
               ? {
                   ...p,
                   defaultBranch: repoData.default_branch || p.defaultBranch,
                   dataIntegrity: 'Live',
+                  connectionVerified: true,
+                  connectionStatus: 'Connected (Read-Only)',
+                  healthStatus: 'Monitoring Gap',
+                  monitoringCoveragePct: 0,
+                  fourState: { ciPassed: githubCiPassed, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+                  recentRuns,
+                  recentCommits,
+                  releaseShield: 'Insufficient Evidence',
+                  releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `تم التحقق الحي من GitHub API (آخر دفع: ${repoData.pushed_at || 'موثق'})`,
+                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}. Deploy/user journey not tested.`,
                 }
               : p
           );
@@ -347,14 +551,14 @@ async function startServer() {
         } else {
           syncedResults.push({
             codeName: plat.codeName,
-            status: `HTTP ${resp.status} (Private Repo / Needs Read-Only Token — Using Cached Snapshot)`,
+            status: `HTTP ${resp.status} (Repository unavailable or private — connection not verified)`,
             integrity: plat.dataIntegrity,
           });
         }
       } catch {
         syncedResults.push({
           codeName: plat.codeName,
-          status: 'Network/Offline Fallback — Using Verified Cached Snapshot',
+          status: 'Network/Offline — repository state unconfirmed',
           integrity: plat.dataIntegrity,
         });
       }
@@ -367,13 +571,34 @@ async function startServer() {
       `تم فحص حالة المستودعات للقراءة فقط (${syncedResults.length} مستودعات).`
     );
 
-    res.json({
-      syncedResults,
-      platforms,
-      selfHealth,
-      costGuard,
-    });
+    if (syncedResults.length) broadcastRealtimeUpdate('GITHUB_READONLY_SYNC');
+    return { syncedResults, platforms, selfHealth, costGuard };
+  }
+
+  app.post('/api/github/sync', async (req, res) => {
+    try {
+      const result = await syncGithubFleet(req.body?.appId);
+      res.json(result);
+    } catch {
+      res.status(503).json({ error: 'تعذر إجراء فحص GitHub الآن.' });
+    }
   });
+
+  // Automatic monitoring is opt-in: a read-only token is required for a sustainable
+  // rate limit budget. Without a token, the operator can request a manual sync.
+  // Never write to or redeploy the monitored repositories.
+  if (process.env.GITHUB_READ_ONLY_TOKEN) {
+    let githubRefreshActive = false;
+    const refresh = async () => {
+      if (githubRefreshActive) return;
+      githubRefreshActive = true;
+      try { await syncGithubFleet(); }
+      catch (err) { console.warn('ORBIT GitHub read-only refresh failed:', err instanceof Error ? err.message : 'unknown'); }
+      finally { githubRefreshActive = false; }
+    };
+    void refresh();
+    setInterval(() => { void refresh(); }, 10 * 60_000).unref();
+  }
 
   // 4. Universal Radar Event Ingestion API
   app.post('/api/radar/ingest', (req, res) => {
@@ -421,7 +646,7 @@ async function startServer() {
     const outcome = ingestAndCorrelateEvent(
       {
         appId: String(appId).toUpperCase(),
-        environment,
+        environment: 'canary-sandbox',
         operationName: String(operationName),
         errorCode: String(errorCode),
         errorMessage: String(errorMessage),
@@ -429,11 +654,11 @@ async function startServer() {
         releaseVersion,
         commitSha,
         browserOs,
-        detectionSource,
+        detectionSource: 'Synthetic Canary',
         isSilentMismatch: Boolean(isSilentMismatch),
         isUserVisible: Boolean(isUserVisible),
         latencyMs: latencyMs ? Number(latencyMs) : undefined,
-        dataIntegrity: 'Live',
+        dataIntegrity: 'Demo',
       },
       events,
       incidents,
@@ -443,20 +668,12 @@ async function startServer() {
     events = outcome.events;
     incidents = outcome.incidents;
     alerts = outcome.alerts;
-    selfHealth.lastSuccessfulIngestion = new Date().toISOString();
     costGuard.ingestedEventsCount += 1;
     if (outcome.isDeduplicated) {
       costGuard.deduplicatedSavedEvents += 1;
     }
 
-    // Update platform health if Critical or High incident occurred
-    if (outcome.incident.severity === 'Critical' || outcome.incident.severity === 'High') {
-      platforms = platforms.map((p) =>
-        p.codeName.toUpperCase() === String(appId).toUpperCase() && p.lifecycleState === 'active'
-          ? { ...p, healthStatus: 'Incident', dataIntegrity: 'Live' }
-          : p
-      );
-    }
+    // Demo events never modify production health or connection verification.
 
     appendAudit(
       outcome.event.detectionSource,
@@ -465,6 +682,7 @@ async function startServer() {
       `البرنامج ${appId}: ${outcome.event.operationName} (${outcome.event.errorCode}) — التكرار #${outcome.incident.occurrenceCount}`
     );
 
+    broadcastRealtimeUpdate('DEMO_RADAR_EVENT');
     res.json({
       event: outcome.event,
       incident: outcome.incident,
@@ -575,8 +793,9 @@ async function startServer() {
         Accept: 'application/vnd.github+json',
         'User-Agent': 'ORBIT-Cockpit-2026',
       };
-      if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+      const readOnlyToken = process.env.GITHUB_READ_ONLY_TOKEN;
+      if (readOnlyToken) {
+        headers.Authorization = `Bearer ${readOnlyToken}`;
       }
       const repoRes = await fetch(`https://api.github.com/repos/${repoSlug}`, {
         headers,
@@ -659,13 +878,12 @@ async function startServer() {
     });
 
     // Probe real GitHub API if repoSlug is present
-    if (newPlatform.repoSlug) {
-      const ghProbe = await probeGitHubRepo(newPlatform.repoSlug);
+    if (newPlatform.owner && newPlatform.repoName) {
+      const ghProbe = await probeGitHubRepo(`${newPlatform.owner}/${newPlatform.repoName}`);
       if (ghProbe.reachable) {
         newPlatform = {
           ...newPlatform,
           defaultBranch: ghProbe.defaultBranch || newPlatform.defaultBranch,
-          latestCommitSha: ghProbe.latestCommitSha || newPlatform.latestCommitSha,
           techStack:
             ghProbe.language && !newPlatform.techStack.includes(ghProbe.language)
               ? [ghProbe.language, ...newPlatform.techStack]
@@ -686,37 +904,33 @@ async function startServer() {
     res.json({ platform: newPlatform, platforms, auditLogs });
   });
 
-  // 7b. Verify Connection for a Program
+  // 7b. Verify only the repository connection — never infer production health.
   app.post('/api/fleet/:id/verify', async (req, res) => {
     const { id } = req.params;
-    const target = platforms.find((p) => p.id === id || p.codeName === id);
-    if (!target) {
-      res.status(404).json({ error: 'البرنامج غير موجود.' });
-      return;
+    const target = platforms.find(p => p.id === id || p.codeName === id);
+    if (!target) return res.status(404).json({ error: 'البرنامج غير موجود.' });
+    if (target.runtimeMode !== 'github-web' && target.runtimeMode !== 'github-local') {
+      return res.status(422).json({ error: 'هذا البرنامج يحتاج حساساً أو اختباراً مباشراً؛ لا يمكن توثيق اتصاله عبر GitHub فقط.' });
     }
 
-    let verified = verifyPlatformConnection(target);
-    const ghProbe = await probeGitHubRepo(verified.repoSlug);
-    if (ghProbe.reachable) {
-      verified = {
-        ...verified,
-        defaultBranch: ghProbe.defaultBranch || verified.defaultBranch,
-        latestCommitSha: ghProbe.latestCommitSha || verified.latestCommitSha,
-      };
+    const slug = target.owner + '/' + target.repoName;
+    const ghProbe = await probeGitHubRepo(slug);
+    if (!ghProbe.reachable) {
+      appendAudit('ORBIT Connection Guard', 'FLEET_VERIFY_UNCONFIRMED', target.codeName, 'تعذر الوصول إلى GitHub API؛ لم يتم اعتماد اتصال مزعوم.');
+      return res.status(503).json({ error: 'تعذر تأكيد الاتصال بالمستودع عبر GitHub حالياً. لم تتغير حالة مراقبة البرنامج.' });
     }
-    platforms = platforms.map((p) => (p.id === target.id ? verified : p));
 
-    appendAudit(
-      'ProfAlfailakawi',
-      'FLEET_VERIFY_CONNECTION',
-      verified.codeName,
-      ghProbe.reachable
-        ? `نجاح فحص الاتصال الحي مع GitHub API (${verified.repoSlug}) والتحقق من المصادر للبرنامج ${verified.codeName}.`
-        : `نجاح فحص الاتصال والتحقق من المصادر للبرنامج ${verified.codeName}.`
-    );
-    broadcastRealtimeUpdate('FLEET_VERIFIED');
-
-    res.json({ platform: verified, platforms, auditLogs, githubLiveReachable: ghProbe.reachable });
+    const verified = verifyPlatformConnection(target, { repositoryReachable: true });
+    const nextPlatform: PlatformRecord = {
+      ...verified,
+      defaultBranch: ghProbe.defaultBranch || verified.defaultBranch,
+      techStack: ghProbe.language && !verified.techStack.includes(ghProbe.language)
+        ? [ghProbe.language, ...verified.techStack] : verified.techStack,
+    };
+    platforms = platforms.map(p => p.id === target.id ? nextPlatform : p);
+    appendAudit('ORBIT Read-Only Probe', 'FLEET_GITHUB_ACCESS_VERIFIED', nextPlatform.codeName, 'تم تأكيد الوصول إلى بيانات GitHub، أما تشغيل الموقع وتجربة المستخدم فلا تزال غير موثقة.');
+    broadcastRealtimeUpdate('FLEET_GITHUB_ACCESS_VERIFIED');
+    return res.json({ platform: nextPlatform, platforms, auditLogs, githubLiveReachable: true, productionVerified: false });
   });
 
   // 7c. Lifecycle State Change (active | paused | archived | unlinked)
@@ -986,14 +1200,14 @@ async function startServer() {
       const outcome = ingestAndCorrelateEvent(
         {
           appId,
-          environment: 'ci-github-actions',
+          environment: 'canary-sandbox',
           operationName: 'github.workflow_run.substep_check',
           errorCode: 'CI_PASS_WITH_CONTINUE_ON_ERROR_WARNING',
           errorMessage: `رصد Eye 3 عبر Webhook موثق: الـ Workflow سُجّل ناجحاً ظاهرياً رغم فشل خطوة فرعية بـ continue-on-error في ${appId}.`,
           detectionSource: 'GitHub Actions',
           isSilentMismatch: true,
           isUserVisible: false,
-          dataIntegrity: 'Live',
+          dataIntegrity: 'Demo',
         },
         events,
         incidents,
@@ -1146,7 +1360,7 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`ORBIT Mission Control Server listening on http://0.0.0.0:${PORT}`);
   });

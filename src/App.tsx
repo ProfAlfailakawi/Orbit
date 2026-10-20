@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Settings2,
   Sun,
   Terminal,
   Unlock,
@@ -80,6 +81,8 @@ import type {
   SilentFailureSignal,
 } from './core/types';
 import { DynamicFleetView } from './components/DynamicFleetView';
+import { ExecutiveOverview } from './components/ExecutiveOverview';
+import { WorkspaceOverview } from './components/WorkspaceOverview';
 import {
   EngineeringIntelligenceView,
   OperationsAndGovernanceView,
@@ -114,7 +117,7 @@ export default function App() {
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
   const [cockpitDeck, setCockpitDeck] = useState<CockpitDeckTab>('incidents');
   const [selectedPlatformId, setSelectedPlatformId] = useState<string | null>(null);
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>('INC-MIRAS-101');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
@@ -124,30 +127,26 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Application State synchronized with Express Backend & Firebase Cloud
-  const [platforms, setPlatforms] = useState<PlatformRecord[]>(INITIAL_PLATFORMS);
-  const [events, setEvents] = useState<RadarEvent[]>(INITIAL_EVENTS);
-  const [incidents, setIncidents] = useState<IncidentCaseFile[]>(INITIAL_INCIDENTS);
-  const [alerts, setAlerts] = useState<AlertNotification[]>(INITIAL_ALERTS);
+  const [platforms, setPlatforms] = useState<PlatformRecord[]>([]);
+  const [events, setEvents] = useState<RadarEvent[]>([]);
+  const [incidents, setIncidents] = useState<IncidentCaseFile[]>([]);
+  const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [silentFailures, setSilentFailures] =
-    useState<SilentFailureSignal[]>(INITIAL_SILENT_FAILURES);
+    useState<SilentFailureSignal[]>([]);
   const [changeImpacts, setChangeImpacts] =
-    useState<ChangeImpactAnalysis[]>(INITIAL_CHANGE_IMPACTS);
-  const [crossAppPatterns] = useState<CrossAppPattern[]>(INITIAL_CROSS_APP_PATTERNS);
+    useState<ChangeImpactAnalysis[]>([]);
+  const [crossAppPatterns, setCrossAppPatterns] = useState<CrossAppPattern[]>([]);
   const [engineeringMemory, setEngineeringMemory] = useState<EngineeringMemoryEntry[]>(
-    INITIAL_ENGINEERING_MEMORY
+    []
   );
-  const [innovations] = useState<InnovationOpportunity[]>(
-    INITIAL_INNOVATION_OPPORTUNITIES
-  );
+  const [innovations, setInnovations] = useState<InnovationOpportunity[]>([]);
   const [selfHealth, setSelfHealth] = useState<SelfHealthMetrics>(INITIAL_SELF_HEALTH);
   const [costGuard, setCostGuard] = useState<CostGuardMetrics>(INITIAL_COST_GUARD);
   const [discoveredCandidates, setDiscoveredCandidates] = useState<DiscoveredRepoCandidate[]>(
-    INITIAL_DISCOVERED_CANDIDATES
+    []
   );
-  const [featureMatrix] = useState<FeatureMatrixItem[]>(INITIAL_FEATURE_MATRIX);
-  const [acceptanceCriteria] = useState<AcceptanceCriterionResult[]>(
-    INITIAL_ACCEPTANCE_CRITERIA
-  );
+  const [featureMatrix, setFeatureMatrix] = useState<FeatureMatrixItem[]>([]);
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState<AcceptanceCriterionResult[]>([]);
   const [canaryHistory, setCanaryHistory] = useState<CanaryTestResult[]>([]);
   const [auditLogs, setAuditLogs] = useState<
     Array<{
@@ -184,6 +183,10 @@ export default function App() {
       setAlerts(data.alerts);
       setSilentFailures(data.silentFailures);
       setChangeImpacts(data.changeImpacts);
+      setCrossAppPatterns(data.crossAppPatterns || []);
+      setInnovations(data.innovations || []);
+      setFeatureMatrix(data.featureMatrix || []);
+      setAcceptanceCriteria(data.acceptanceCriteria || []);
       setEngineeringMemory(data.engineeringMemory);
       setSelfHealth(data.selfHealth);
       setCostGuard(data.costGuard);
@@ -212,6 +215,10 @@ export default function App() {
               if (data.events) setEvents(data.events);
               if (data.incidents) setIncidents(data.incidents);
               if (data.alerts) setAlerts(data.alerts);
+              if (data.crossAppPatterns) setCrossAppPatterns(data.crossAppPatterns);
+              if (data.innovations) setInnovations(data.innovations);
+              if (data.featureMatrix) setFeatureMatrix(data.featureMatrix);
+              if (data.acceptanceCriteria) setAcceptanceCriteria(data.acceptanceCriteria);
               if (data.engineeringMemory) setEngineeringMemory(data.engineeringMemory);
               if (data.selfHealth) setSelfHealth(data.selfHealth);
               if (data.costGuard) setCostGuard(data.costGuard);
@@ -447,12 +454,15 @@ export default function App() {
         body: JSON.stringify({ appId: appCode }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'تعذر مزامنة GitHub.');
       if (data.platforms) setPlatforms(data.platforms);
       if (data.auditLogs) setAuditLogs(data.auditLogs);
-      setSyncBanner(data.message || 'تمت مزامنة GitHub بنجاح (Read-Only)');
-      setTimeout(() => setSyncBanner(null), 4000);
-    } catch {
-      // ignore
+      const checked = Array.isArray(data.syncedResults) ? data.syncedResults.length : 0;
+      const successful = Array.isArray(data.syncedResults)
+        ? data.syncedResults.filter((item: { integrity: string }) => item.integrity === 'Live').length : 0;
+      setSyncBanner(`تم فحص ${checked} مستودعات؛ تأكد الوصول إلى ${successful}. هذا لا يثبت عمل المواقع الإنتاجية.`);
+    } catch (error) {
+      setSyncBanner(error instanceof Error ? error.message : 'تعذر الوصول إلى GitHub.');
     }
   };
 
@@ -465,11 +475,11 @@ export default function App() {
     isUserVisible: boolean;
     environment: string;
   }) => {
-    const res = await fetch('/api/events/ingest', {
+    const res = await fetch('/api/radar/ingest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Orbit-Idempotency-Key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        'X-Idempotency-Key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       },
       body: JSON.stringify(payload),
     });
@@ -484,12 +494,13 @@ export default function App() {
     incidentId: string,
     nextStatus: IncidentStatus,
     technicallyVerified: boolean,
-    note: string
+    note: string,
+    addToMemory = false
   ) => {
     const res = await fetch(`/api/incidents/${incidentId}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nextStatus, technicallyVerified, note }),
+      body: JSON.stringify({ nextStatus, technicalVerificationPassed: technicallyVerified, note, addToMemory }),
     });
     const data = await res.json();
     if (data.incidents) setIncidents(data.incidents);
@@ -500,7 +511,7 @@ export default function App() {
   const handleRequestAiAnalysis = async (incidentId: string) => {
     setLoadingAi(true);
     try {
-      const res = await fetch('/api/ai/analyze-incident', {
+      const res = await fetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ incidentId }),
@@ -536,10 +547,16 @@ export default function App() {
   };
 
   const handleVerifyConnection = async (id: string) => {
-    const res = await fetch(`/api/fleet/${id}/verify`, { method: 'POST' });
-    const data = await res.json();
-    if (data.platforms) setPlatforms(data.platforms);
-    if (data.auditLogs) setAuditLogs(data.auditLogs);
+    try {
+      const res = await fetch(`/api/fleet/${encodeURIComponent(id)}/verify`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'تعذر التحقق من الاتصال.');
+      if (data.platforms) setPlatforms(data.platforms);
+      if (data.auditLogs) setAuditLogs(data.auditLogs);
+      setSyncBanner('تم تأكيد الوصول إلى GitHub فقط؛ أداء الموقع والمستخدمين ما زال يحتاج فحصاً مستقلاً.');
+    } catch (error) {
+      setSyncBanner(error instanceof Error ? error.message : 'تعذر التحقق من الاتصال.');
+    }
   };
 
   const handleLifecycleChange = async (id: string, nextLifecycle: PlatformLifecycleState) => {
@@ -602,15 +619,17 @@ export default function App() {
   };
 
   const handleSaveMemory = async (payload: {
+    id?: string;
     appId: string;
+    incidentId: string;
     problemTitle: string;
-    symptom: string;
-    verifiedRootCause: string;
-    verifiedFix: string;
-    wrongHypothesisExcluded: string;
-    recoveryDurationMinutes: number;
-    preventionRule: string;
-    isVerified: boolean;
+    confirmedRootCause: string;
+    disprovenHypotheses: string[];
+    verifiedFixSummary: string;
+    preventionTestAdded: string;
+    lessonsLearned: string;
+    recurringPatternTag: string;
+    isConfirmedByEvidence: boolean;
   }): Promise<{ accepted: boolean; error?: string }> => {
     const res = await fetch('/api/memory/save', {
       method: 'POST',
@@ -770,221 +789,68 @@ export default function App() {
   return (
     <div
       dir="rtl"
-      className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
+      className={`orbit-shell ${isDark ? 'orbit-dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
         isDark ? 'bg-[#070B14] text-slate-100' : 'bg-[#F4F7FB] text-slate-900'
       }`}
     >
       <OfflineConnectivityBanner />
 
-      {/* Strict 3-Zone Top Bar Contract (frontend-design Section 2) */}
-      <header
-        className={`sticky top-0 z-40 flex items-center justify-between gap-2 sm:gap-8 px-4 sm:px-8 py-3.5 border-b backdrop-blur-md ${
-          isDark ? 'border-slate-800/80 bg-[#070B14]/90' : 'border-slate-200 bg-white/90'
-        }`}
-      >
-        {/* Zone 1: Single text element wordmark */}
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            setSelectedPlatformId(null);
-            setActiveNav('mission-control');
-          }}
-          className="text-lg font-bold tracking-tight whitespace-nowrap shrink-0"
-        >
-          ORBIT | أوربت
-        </a>
-
-        {/* Zone 2: 5 concise single-line text navigation links */}
-        <nav
-          aria-label="التنقل الرئيسي"
-          className="hidden md:flex items-center gap-7 text-sm font-medium"
-        >
-          {(
-            [
-              { id: 'mission-control', label: 'غرفة القيادة' },
-              { id: 'universal-radar', label: 'الرادار الشامل' },
-              { id: 'fleet-manager', label: 'إدارة الأسطول' },
-              { id: 'intelligence', label: 'الذكاء الهندسي' },
-              { id: 'operations', label: 'الحماية والحوكمة' },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setSelectedPlatformId(null);
-                setActiveNav(item.id);
-              }}
-              className={`transition-colors whitespace-nowrap shrink-0 pb-1 ${
-                activeNav === item.id && !selectedPlatformId
-                  ? 'text-sky-400 border-b-2 border-sky-400 font-semibold'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-100'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {item.label}
+      <header className="orbit-header">
+        <div className="orbit-header-content">
+          <button type="button" className="orbit-brand" onClick={() => { setSelectedPlatformId(null); setActiveNav('mission-control'); }} aria-label="العودة إلى غرفة القيادة">
+            <span className="orbit-brand-mark"><Radar size={24} strokeWidth={1.7}/></span>
+            <span className="orbit-brand-text"><strong>أوربت</strong><small>ORBIT</small></span>
+          </button>
+          <nav aria-label="التنقل الرئيسي" className="orbit-desktop-nav">
+            {([
+              { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
+              { id: 'universal-radar', name: 'الرادار', Icon: Radar },
+              { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
+              { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
+              { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
+            ] as const).map(({ id, name, Icon }) => (
+              <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
+                onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
+                className={activeNav === id && !selectedPlatformId ? 'orbit-nav-link active' : 'orbit-nav-link'}>
+                <Icon size={16} strokeWidth={1.75}/>{name}
+              </button>
+            ))}
+          </nav>
+          <div className="orbit-header-controls">
+            <span className="orbit-header-evidence"><span/> قيد التحقق</span>
+            <details className="orbit-tools-menu">
+              <summary aria-label="أدوات وإعدادات"><Settings2 size={18}/><span>الأدوات</span></summary>
+              <div className="orbit-tools-popover">
+                <button type="button" onClick={() => { void handleSyncGithub(); }}><RefreshCw size={17}/> مزامنة GitHub</button>
+                <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Firebase'}</button>
+                {firebaseUser && <button type="button" onClick={() => { void signOutGoogleOperator(); }}><Lock size={17}/> خروج من Google</button>}
+                <button type="button" onClick={() => setIsDark(!isDark)}><Moon size={17}/> {isDark ? 'المظهر الفاتح' : 'المظهر الداكن'}</button>
+                <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={17}/> فحص ORBIT الذاتي</button>
+                <div className="orbit-tools-install"><PWAInstallButton isDark={isDark}/></div>
+              </div>
+            </details>
+            <button type="button" className="orbit-lock-control" title="قفل الجلسة" aria-label="قفل الجلسة"
+              onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}>
+              <Lock size={17}/>
+            </button>
+          </div>
+        </div>
+        <nav aria-label="التنقل على الهاتف" className="orbit-mobile-nav">
+          {([
+            { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
+            { id: 'universal-radar', name: 'الرادار', Icon: Radar },
+            { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
+            { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
+            { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
+          ] as const).map(({ id, name, Icon }) => (
+            <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
+              onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
+              className={activeNav === id && !selectedPlatformId ? 'orbit-mobile-tab active' : 'orbit-mobile-tab'}>
+              <Icon size={19} strokeWidth={1.75}/><span>{name}</span>
             </button>
           ))}
         </nav>
-
-        {/* Zone 3: Primary Action */}
-        <div className="flex items-center gap-2 shrink-0">
-          <PWAInstallButton isDark={isDark} />
-          <button
-            type="button"
-            onClick={handleRunCanary}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-950 bg-sky-400 rounded-xl hover:bg-sky-300 transition-colors whitespace-nowrap shrink-0"
-          >
-            فحص الكناري الذاتي
-          </button>
-        </div>
       </header>
-
-      {/* Mobile Navigation Bar */}
-      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto px-3 py-2 border-b border-slate-800/80 bg-slate-950/60">
-        {(
-          [
-            { id: 'mission-control', label: 'غرفة القيادة' },
-            { id: 'universal-radar', label: 'الرادار الشامل' },
-            { id: 'fleet-manager', label: 'إدارة الأسطول' },
-            { id: 'intelligence', label: 'الذكاء الهندسي' },
-            { id: 'operations', label: 'الحماية والحوكمة' },
-          ] as const
-        ).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              setSelectedPlatformId(null);
-              setActiveNav(item.id);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 ${
-              activeNav === item.id && !selectedPlatformId
-                ? 'bg-sky-500 text-slate-950 font-semibold'
-                : 'text-slate-400'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Minimalist Icon & Search Strip */}
-      <div
-        className={`border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
-          isDark ? 'border-slate-800/60 bg-[#0A0F1D]/80' : 'border-slate-200 bg-slate-100/70'
-        }`}
-      >
-        <div className="flex flex-wrap items-center gap-3 text-slate-400 font-mono">
-          <span>ProfAlfailakawi</span>
-          <span>·</span>
-          <span className="tabular-nums text-slate-200 font-semibold">{activeFleet.length} منصة</span>
-          <span>·</span>
-          <span className="text-emerald-400">Read-Only 100%</span>
-          <span>·</span>
-          <span className="tabular-nums text-sky-400">{selfHealth.eventProcessingDelayMs}ms</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2" />
-            <input
-              type="search"
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="ابحث عن برنامج أو حادثة..."
-              aria-label="بحث شامل في البرامج والحوادث"
-              className={`rounded-xl border pr-8 pl-3 py-1 text-xs w-48 sm:w-60 ${
-                isDark
-                  ? 'border-slate-800 bg-slate-900/90 text-slate-100'
-                  : 'border-slate-300 bg-white text-slate-900'
-              }`}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => handleSyncGithub()}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 transition-colors whitespace-nowrap shrink-0 ${
-              isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
-            <span>مزامنة GitHub</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleManualCloudSync}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 transition-colors whitespace-nowrap shrink-0 ${
-              firebaseUser
-                ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40'
-                : isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-700'
-            }`}
-            title={
-              firebaseUser
-                ? `متصل بـ Firebase Firestore (${firebaseUser.email})${
-                    cloudSyncedAt
-                      ? ` — آخر مزامنة: ${new Date(cloudSyncedAt).toLocaleTimeString('ar-KW')}`
-                      : ''
-                  }`
-                : 'اضغط لتسجيل الدخول بـ Google وتفعيل الحفظ السحابي في Firebase'
-            }
-          >
-            <Cloud className={`w-3.5 h-3.5 ${firebaseUser ? 'text-emerald-400' : 'text-sky-400'}`} />
-            <span>
-              {firebaseUser
-                ? `سحابة Firebase (${firebaseUser.email?.split('@')[0]})`
-                : 'ربط سحابة Firebase'}
-            </span>
-          </button>
-
-          {firebaseUser && (
-            <button
-              type="button"
-              onClick={() => void signOutGoogleOperator()}
-              className="rounded-xl border border-slate-800 px-2.5 py-1 text-[11px] text-slate-400 hover:text-rose-300 whitespace-nowrap shrink-0"
-            >
-              خروج
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsDark(!isDark)}
-            aria-label="تبديل المظهر الداكن أو الفاتح"
-            className={`p-1.5 rounded-xl border ${
-              isDark ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-300 hover:bg-slate-200'
-            }`}
-          >
-            {isDark ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}
-            aria-label="قفل الجلسة"
-            className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 ${
-              isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-400'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-600'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>قفل</span>
-          </button>
-        </div>
-      </div>
 
       {/* Sync / Action Feedback Banner */}
       {syncBanner && (
@@ -1003,11 +869,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Seed snapshots are examples, never verified production telemetry. */}
-      <div role="status" className={`mx-auto max-w-[1440px] px-4 sm:px-8 py-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
-        <AlertTriangle className="w-5 h-5 shrink-0" />
-        <span>تنبيه: تحتوي ORBIT حالياً على بيانات توضيحية ومخزنة. لا تعتبر نسب الصحة أو الحوادث دليلاً مباشراً على حالة برامجك حتى يكتمل ربط المصادر والتحقق منها.</span>
-      </div>
+      {(activeNav !== 'mission-control' || Boolean(selectedPlatformId)) && (
+        <div role="status" className="orbit-evidence-note mx-auto max-w-[1440px]">
+          <AlertTriangle size={15} />
+          <span>بعض بيانات هذه الصفحة توضيحية أو مخزنة؛ تحقق من المصدر قبل اتخاذ قرار إنتاجي.</span>
+        </div>
+      )}
 
       {/* Main Content Container */}
       <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
@@ -1032,6 +899,30 @@ export default function App() {
             isDark={isDark}
           />
         ) : activeNav === 'universal-radar' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="radar"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-radar') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-radar" className="orbit-advanced orbit-specialist-advanced">
+              <summary>الرادار المتقدم والتشخيص · اختياري</summary>
+              <div className="pt-3 space-y-6">
           <UniversalRadarView
             platforms={activeFleet}
             events={events}
@@ -1046,12 +937,13 @@ export default function App() {
                 params.incidentId,
                 params.nextStatus,
                 params.technicalVerificationPassed,
-                params.note
+                params.note,
+                params.addToMemory
               );
             }}
             onRunCanary={handleRunCanary}
             onRequestAiDiagnosis={async (incidentId) => {
-              const res = await fetch('/api/ai/analyze-incident', {
+              const res = await fetch('/api/ai/diagnose', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ incidentId }),
@@ -1062,7 +954,34 @@ export default function App() {
             }}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'fleet-manager' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="fleet"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-fleet') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-fleet" className="orbit-advanced orbit-specialist-advanced">
+              <summary>إضافة أو تعديل أو أرشفة البرامج · إدارة متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <DynamicFleetView
             platforms={platforms}
             discoveredCandidates={discoveredCandidates}
@@ -1075,7 +994,34 @@ export default function App() {
             onSelectPlatform={(id) => setSelectedPlatformId(id)}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'intelligence' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="intelligence"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-intelligence') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-intelligence" className="orbit-advanced orbit-specialist-advanced">
+              <summary>التحليلات والذاكرة والمختبر · أدوات متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <EngineeringIntelligenceView
             platforms={activeFleet}
             changeImpacts={changeImpacts}
@@ -1096,7 +1042,34 @@ export default function App() {
             onSaveMemory={handleSaveMemory}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'operations' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="operations"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-operations') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-operations" className="orbit-advanced orbit-specialist-advanced">
+              <summary>فحوص الحماية والتقارير والتجارب · أدوات متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <OperationsAndGovernanceView
             platforms={activeFleet}
             incidents={incidents}
@@ -1117,11 +1090,30 @@ export default function App() {
             onSimulateWebhook={handleSimulateWebhook}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : (
           /* =================================================================
              MISSION CONTROL — INFOGRAPHIC, ICON-FIRST, MINIMAL-TEXT DESIGN
              ================================================================= */
           <div className="space-y-6">
+            <ExecutiveOverview
+              platforms={platforms}
+              incidents={incidents}
+              onOpenPlatform={(id) => setSelectedPlatformId(id)}
+              onOpenIncident={(id) => {
+                setSelectedIncidentId(id);
+                setActiveNav('universal-radar');
+              }}
+              onOpenRadar={() => setActiveNav('universal-radar')}
+              onOpenFleet={() => setActiveNav('fleet-manager')}
+              onOpenIntelligence={() => setActiveNav('intelligence')}
+              onOpenOperations={() => setActiveNav('operations')}
+            />
+            <details className="orbit-advanced">
+              <summary>المؤشرات والتحليلات التفصيلية · عرض اختياري</summary>
+              <div className="space-y-6 pt-3">
             {/* ROW 1: 3 VISUAL INFOGRAPHIC HERO CARDS */}
             <section
               aria-label="ملخص المؤشرات البصرية"
@@ -1170,7 +1162,7 @@ export default function App() {
                     <Eye className="w-4 h-4 text-sky-400" />
                     <span>العيون الثلاث</span>
                   </span>
-                  <span className="font-mono text-[11px] text-emerald-400">نشطة</span>
+                  <span className="font-mono text-[11px] text-amber-400">بيانات أولية</span>
                 </div>
 
                 <div className="space-y-3 my-2">
@@ -1180,10 +1172,10 @@ export default function App() {
                         <Code2 className="w-3.5 h-3.5 text-emerald-400" />
                         <span>الكود والمستودع</span>
                       </span>
-                      <span className="font-mono tabular-nums text-emerald-400">96%</span>
+                      <span className="font-mono tabular-nums text-emerald-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-400 w-[96%]" />
+                      <div className="h-full rounded-full bg-emerald-400 w-[0%]" />
                     </div>
                   </div>
 
@@ -1193,10 +1185,10 @@ export default function App() {
                         <Activity className="w-3.5 h-3.5 text-sky-400" />
                         <span>رحلة المستخدم</span>
                       </span>
-                      <span className="font-mono tabular-nums text-sky-400">88%</span>
+                      <span className="font-mono tabular-nums text-sky-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-sky-400 w-[88%]" />
+                      <div className="h-full rounded-full bg-sky-400 w-[0%]" />
                     </div>
                   </div>
 
@@ -1206,10 +1198,10 @@ export default function App() {
                         <Terminal className="w-3.5 h-3.5 text-amber-400" />
                         <span>السجل الصامت</span>
                       </span>
-                      <span className="font-mono tabular-nums text-amber-400">91%</span>
+                      <span className="font-mono tabular-nums text-amber-400">—</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-400 w-[91%]" />
+                      <div className="h-full rounded-full bg-amber-400 w-[0%]" />
                     </div>
                   </div>
                 </div>
@@ -1236,7 +1228,7 @@ export default function App() {
                             رادار الـ 5 ثوانٍ · {topCriticalIncident.incidentId}
                           </div>
                           <div className="text-sm font-bold text-white mt-0.5">
-                            {topCriticalIncident.appId} — تعثر رفع المرفقات (504)
+                            {topCriticalIncident.appId} — {topCriticalIncident.title || "حادثة تحتاج مراجعة"}
                           </div>
                         </div>
                       </div>
@@ -1286,7 +1278,7 @@ export default function App() {
                           لا توجد حوادث حرجة نشطة
                         </div>
                         <div className="text-xs text-slate-400">
-                          جميع البرامج الـ {activeFleet.length} مستقرة وموثقة
+                          لا توجد حوادث حرجة في البيانات المعروضة؛ يلزم التحقق المباشر
                         </div>
                       </div>
                     </div>
@@ -1639,14 +1631,16 @@ export default function App() {
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-200 truncate">{ac.title}</div>
-                        <div className="text-[11px] text-slate-400 truncate">{ac.evidenceSummary}</div>
+                        <div className="font-semibold text-slate-200 truncate">{ac.titleAr}</div>
+                        <div className="text-[11px] text-slate-400 truncate">{ac.evidenceDetail}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </section>
+              </div>
+            </details>
           </div>
         )}
       </main>

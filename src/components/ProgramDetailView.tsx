@@ -37,23 +37,23 @@ import {
 } from './Primitives';
 
 const PROGRAM_TABS = [
-  { id: 'overview', labelAr: 'نظرة عامة (Overview)' },
-  { id: 'radar', labelAr: 'الرادار المباشر (Live Radar)' },
-  { id: 'client-errors', labelAr: 'أخطاء الواجهة (Client Errors)' },
-  { id: 'backend-errors', labelAr: 'أخطاء الخادم (Backend Errors)' },
-  { id: 'journeys', labelAr: 'رحلات المستخدم (Journeys)' },
-  { id: 'deployments', labelAr: 'النشر والبيئات (Deployments)' },
-  { id: 'actions', labelAr: 'اختبارات GitHub Actions' },
-  { id: 'commits', labelAr: 'سجل التحديثات (Commits)' },
-  { id: 'performance', labelAr: 'الأداء والنبض (Digital ECG)' },
-  { id: 'security', labelAr: 'الأمان والخصوصية (Security)' },
-  { id: 'feature-dna', labelAr: 'بصمة المزايا (Feature DNA)' },
-  { id: 'release-shield', labelAr: 'درع الإصدار (Release Shield)' },
-  { id: 'incidents', labelAr: 'الحوادث (Incidents)' },
-  { id: 'memory', labelAr: 'الذاكرة الهندسية (Memory)' },
-  { id: 'innovation', labelAr: 'فرص التطوير (Innovation)' },
-  { id: 'coverage', labelAr: 'تغطية المراقبة والأنظمة الحالية' },
-  { id: 'reports', labelAr: 'التقارير (Reports)' },
+  { id: 'overview', labelAr: 'نظرة عامة' },
+  { id: 'radar', labelAr: 'الرادار' },
+  { id: 'client-errors', labelAr: 'الواجهة' },
+  { id: 'backend-errors', labelAr: 'الخادم' },
+  { id: 'journeys', labelAr: 'رحلات المستخدم' },
+  { id: 'deployments', labelAr: 'النشر' },
+  { id: 'actions', labelAr: 'الاختبارات' },
+  { id: 'commits', labelAr: 'التحديثات' },
+  { id: 'performance', labelAr: 'نبض الأداء' },
+  { id: 'security', labelAr: 'الأمان' },
+  { id: 'feature-dna', labelAr: 'بصمة المزايا' },
+  { id: 'release-shield', labelAr: 'حماية الإصدار' },
+  { id: 'incidents', labelAr: 'الحوادث' },
+  { id: 'memory', labelAr: 'الذاكرة' },
+  { id: 'innovation', labelAr: 'فرص التطوير' },
+  { id: 'coverage', labelAr: 'التغطية' },
+  { id: 'reports', labelAr: 'التقارير' },
 ] as const;
 
 type ProgramTabId = (typeof PROGRAM_TABS)[number]['id'];
@@ -152,7 +152,7 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-program-page space-y-6">
       {/* Header & Navigation Bar */}
       <div className={`rounded-xl border p-6 ${surfaceCls}`}>
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800/60">

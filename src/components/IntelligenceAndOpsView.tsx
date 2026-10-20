@@ -230,13 +230,13 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-intelligence-page space-y-6">
       <div className={`rounded-xl border p-6 space-y-2 ${surfaceCls}`}>
         <h1 className="text-xl font-bold tracking-tight">
-          ENGINEERING & CUSTOMER INTELLIGENCE — الذكاء الهندسي المشترك وتجربة المستخدم
+          الذكاء الهندسي
         </h1>
         <p className="text-xs text-slate-400">
-          يشمل أشعة التغييرات (Change Impact X-Ray)، الذكاء العابر للبرامج (Cross-App Intelligence)، كاشف الأعطال الصامتة، الذاكرة الهندسية القابلة للمراجعة والتصحيح، المختبر الموازي (Digital Twin)، وحارس الأمان والخصوصية (Security Guardian).
+          افهم أثر التحديثات، اكتشف الأنماط المتكررة، واحفظ الحلول التي تم التحقق منها.
         </p>
       </div>
 
@@ -245,7 +245,7 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">
-              Change Impact X-Ray & Regression Time Machine (أشعة أثر التغييرات وآلة زمن التراجعات — Sections 13 & 16)
+              أثر التحديثات والتراجعات
             </h2>
             <p className="text-xs text-slate-400">
               يربط التحديثات بالحوادث اللاحقة مع التمييز الصارم بين التزامن الزمني والسبب المؤكد بالدليل.
@@ -911,25 +911,42 @@ export const OperationsAndGovernanceView: React.FC<OperationsAndGovernanceProps>
 
   const activePlatforms = platforms.filter((p) => p.lifecycleState !== 'unlinked');
 
-  const dailyBriefText = `# ORBIT DAILY BRIEF — التقرير الذكي اليومي (${new Date().toISOString().slice(0, 10)})
-====================================================================
-• إجمالي البرامج المراقبة حالياً: ${activePlatforms.length} برنامج
-• ما تغير خلال آخر 24 ساعة: تحديثان في MIRAS (7c91e04) وORDER (e41b992) + نجاح بناء TEBYAN (3b19d8a).
-• الحوادث النشطة (${incidents.filter((i) => i.status !== 'Resolved').length}):
-  1. [INC-MIRAS-101 | Critical]: تعثر رفع مرفقات (>10MB) على Safari iOS (14 تكراراً / 9 جلسات).
-  2. [INC-ORDER-102 | High]: فشل صامت في إشعارات الإيصال الثانوية رغم سلامة حفظ الطلبات.
-• البرامج المستقرة الموثقة: TEBYAN, ADMIN, DR.AHMAD, SCHEDULE, MAJAL, ACADEMICOS, MIZAN.
-• البرامج المحلية (Local Session): ALFA (سليم في آخر جلسة تشغيل، غير مشغل حالياً).
-• فجوات المراقبة: NAHJ (تغطية 44% — يحتاج اختبارات قبول لرحلة المستخدم).
-• أهم 3 أولويات اليوم:
-  1. مراجعة مهمة Claude الجراحية لإعادة مهلة رفع الأجزاء في MIRAS.
-  2. مراجعة معالجة الطابور الثانوي في ORDER لمنع الأعطال الصامتة.
-  3. تفعيل اختبارات رحلة المستخدم الأساسية في NAHJ.
-• أفضل 3 فرص تطوير (Innovation Radar):
-  1. توحيد عقد رسائل الخطأ المرئية للمستخدم عبر البرامج.
-  2. دعم الرفع المجزأ القابل للاستئناف في MIRAS.
-  3. إضافة نمط Outbox خفيف لطابور الإشعارات في ORDER.
-`;
+  const liveIncidents = incidents
+    .filter(i => i.dataIntegrity === 'Live' &&
+      !['Resolved', 'Expected Behavior', 'False Positive', "Won't Fix"].includes(i.status))
+    .sort((x, y) => (x.severity === 'Critical' ? -1 : x.severity === 'High' ? 0 : 1) -
+                    (y.severity === 'Critical' ? -1 : y.severity === 'High' ? 0 : 1));
+  const verifiedRepoCount = activePlatforms.filter(p => p.connectionVerified && p.dataIntegrity === 'Live').length;
+  const pendingCount = activePlatforms.length - verifiedRepoCount;
+  const recentChanges = activePlatforms.flatMap(p => (p.recentCommits || [])
+    .filter(c => c.dataIntegrity === 'Live' && Date.now() - Date.parse(c.timestamp) <= 86_400_000)
+    .map(c => ({ codeName: p.codeName, message: c.message, sha: c.sha }))).slice(0, 6);
+  const topRealIncident = liveIncidents[0];
+
+  const dailyBriefText = [
+    `# ORBIT — الموجز اليومي (${new Date().toISOString().slice(0, 10)})`,
+    `البرامج المسجلة: ${activePlatforms.length}`,
+    `المستودعات التي جرى التحقق من اتصالها: ${verifiedRepoCount}`,
+    `البرامج التي تحتاج تحققاً إضافياً: ${pendingCount}`,
+    `الحوادث المباشرة المفتوحة: ${liveIncidents.length}`,
+    '——',
+    'الحوادث الموثقة:',
+    ...((liveIncidents.length ? liveIncidents.slice(0, 5).map(i =>
+      `• ${i.appId} — ${i.title} [${i.severity}]، آخر رصد: ${i.lastSeen}`)
+      : ['• لا توجد حوادث مباشرة مؤكدة ضمن البيانات المتاحة. غياب البلاغات لا يثبت السلامة.'])),
+    '——',
+    'التحديثات الحقيقية المسجلة خلال 24 ساعة:',
+    ...(recentChanges.length ? recentChanges.map(c => `• ${c.codeName} ${c.sha} — ${c.message}`)
+      : ['• لا توجد تحديثات موثقة وصلتنا في آخر 24 ساعة.']),
+    '——',
+    'الخطوة التالية:',
+    topRealIncident
+      ? `• افحص أدلة الحادثة ${topRealIncident.incidentId} ثم انسخ مهمة Claude للمراجعة، دون تعديل إنتاجي تلقائي.`
+      : pendingCount > 0
+      ? `• أكمل ربط ${pendingCount} برنامجاً والتحقق من مصادر GitHub والحساسات؛ لا تفترض سلامتها.`
+      : '• راجع تغطية اختبارات المستخدم والنشر، إذ إن اتصال GitHub لا يثبت سلامة كل وظيفة.',
+    'هذا التقرير مبني على البيانات الحالية في ORBIT فقط. لا تُدرج عينات Demo في عداد الحوادث الحقيقية.',
+  ].join('\\n');
 
   const copyBrief = () => {
     navigator.clipboard.writeText(dailyBriefText);
@@ -954,14 +971,14 @@ export const OperationsAndGovernanceView: React.FC<OperationsAndGovernanceProps>
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-governance-page space-y-6">
       {/* Section 28: Morning Intelligence (ORBIT DAILY BRIEF) & Section 29: Next Best Move */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className={`lg:col-span-6 rounded-xl border p-6 space-y-4 ${surfaceCls}`}>
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-bold text-sky-400">
-                ORBIT DAILY BRIEF — التقرير الصباحي الذكي (Section 28)
+                الموجز اليومي
               </h2>
               <p className="text-xs text-slate-400">
                 ملخص تنفيذي يومي شامل لجميع البرامج ({activePlatforms.length} منصة) قابل للقراءة والنسخ الفوري.
@@ -983,47 +1000,28 @@ export const OperationsAndGovernanceView: React.FC<OperationsAndGovernanceProps>
 
         <div className={`lg:col-span-6 rounded-xl border p-6 space-y-4 ${surfaceCls}`}>
           <div>
-            <h2 className="text-base font-bold text-emerald-400">
-              NEXT BEST MOVE — مستشار ترتيب القرارات الهندسية (Section 29)
-            </h2>
-            <p className="text-xs text-slate-400">
-              يجيب بالدليل الهندسي عن الأسئلة الستة الحاسمة لترتيب أولويات التدخل.
-            </p>
+            <h2 className="text-base font-bold">الخطوة التالية</h2>
+            <p className="text-xs text-slate-400">توصية واحدة مبنية على الحالة التي نقدر نثبتها.</p>
           </div>
-          <div className="space-y-2.5 text-xs">
-            <div className="rounded-lg border border-slate-800 p-3.5 space-y-1">
-              <div className="font-semibold text-rose-400">1. ما أهم مشكلة الآن؟</div>
-              <p className="text-slate-200">
-                حادثة <strong>INC-MIRAS-101</strong> (تعثر رفع مرفقات التكليفات الكبيرة &gt;10MB على Safari iOS).
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-800 p-3.5 space-y-1">
-              <div className="font-semibold text-sky-400">2. لماذا هي الأهم؟ وما أثر تأجيلها؟</div>
-              <p className="text-slate-200">
-                لأنها تمس رحلة الطالب الأساسية مباشرة (انخفاض النجاح إلى 91.4%)؛ وتأجيلها يؤدي لتكرار فشل التسليمات في أوقات الذروة.
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-800 p-3.5 space-y-1">
-              <div className="font-semibold text-emerald-400">3. ما أقل إجراء آمن؟ وما الاختبار الذي ينقصنا؟</div>
-              <p className="text-slate-200">
-                رفع مهلة الجزء الواحد إلى 45 ثانية في <code>SubmissionUploader.tsx</code> فقط، مع إلغاء{' '}
-                <code>continue-on-error</code> من اختبار Safari WebKit في GitHub Actions.
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-800 p-3.5 flex items-center justify-between gap-2">
-              <div>
-                <div className="font-semibold text-amber-300">4. ما التطوير التالي الذي يحقق أكبر فائدة؟</div>
-                <p className="text-slate-300">تفعيل الرفع القابل للاستئناف (Resumable Upload) + إغلاق فجوة مراقبة NAHJ.</p>
+          {topRealIncident ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <span className="text-xs text-rose-500 font-bold">حادثة موثقة · {topRealIncident.appId}</span>
+                <h3 className="mt-2 font-bold">{topRealIncident.title}</h3>
+                <p className="text-xs text-slate-500">{topRealIncident.summary}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => onSelectIncident('INC-MIRAS-101')}
-                className="px-3 py-1.5 rounded-lg bg-sky-500 text-slate-950 font-semibold whitespace-nowrap shrink-0"
-              >
-                استعراض القضية
-              </button>
+              <button type="button" className="rounded-xl bg-sky-500 text-white px-4 py-2 text-sm"
+                onClick={() => onSelectIncident(topRealIncident.incidentId)}>فتح الحادثة ونسخ مهمة Claude</button>
+              <p className="text-xs text-slate-500">راجع الدليل والتأثير واختبارات التراجع قبل أي إصلاح.</p>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 p-5 space-y-3">
+              <div className="text-3xl font-bold text-sky-600">{pendingCount} <span className="text-xs text-slate-400 font-normal">تحتاج إلى تحقق</span></div>
+              <h3 className="font-bold">ابدأ بتأكيد مصادر المراقبة</h3>
+              <p className="text-xs text-slate-500">لا توجد حوادث إنتاجية مؤكدة حالياً، لكن هذا ليس تصريح سلامة. تأكد من GitHub والحساسات ثم اختبر رحلات المستخدم.</p>
+              <div className="flex items-center gap-3 text-xs text-slate-400"><span>GitHub: {verifiedRepoCount}/{activePlatforms.length}</span><span>إصلاحات تلقائية: معطّلة</span></div>
+            </div>
+          )}
         </div>
       </div>
 
