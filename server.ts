@@ -50,17 +50,17 @@ const DATA_SNAPSHOT_PATH = path.join(__dirname, '.orbit-data.json');
 
 // Cost-First zero-billing storage with automatic local disk persistence (.orbit-data.json) + JSON export/import
 let platforms = [...INITIAL_PLATFORMS];
-let events = [...INITIAL_EVENTS];
-let incidents = [...INITIAL_INCIDENTS];
-let alerts = [...INITIAL_ALERTS];
-let silentFailures = [...INITIAL_SILENT_FAILURES];
-let changeImpacts = [...INITIAL_CHANGE_IMPACTS];
-let crossAppPatterns = [...INITIAL_CROSS_APP_PATTERNS];
-let engineeringMemory = [...INITIAL_ENGINEERING_MEMORY];
-let innovations = [...INITIAL_INNOVATION_OPPORTUNITIES];
+let events = [] as typeof INITIAL_EVENTS;
+let incidents = [] as typeof INITIAL_INCIDENTS;
+let alerts = [] as typeof INITIAL_ALERTS;
+let silentFailures = [] as typeof INITIAL_SILENT_FAILURES;
+let changeImpacts = [] as typeof INITIAL_CHANGE_IMPACTS;
+let crossAppPatterns = [] as typeof INITIAL_CROSS_APP_PATTERNS;
+let engineeringMemory = [] as typeof INITIAL_ENGINEERING_MEMORY;
+let innovations = [] as typeof INITIAL_INNOVATION_OPPORTUNITIES;
 let selfHealth = { ...INITIAL_SELF_HEALTH };
 let costGuard = { ...INITIAL_COST_GUARD };
-let discoveredCandidates = [...INITIAL_DISCOVERED_CANDIDATES];
+let discoveredCandidates = [] as typeof INITIAL_DISCOVERED_CANDIDATES;
 let featureMatrix = [...INITIAL_FEATURE_MATRIX];
 let acceptanceCriteria = [...INITIAL_ACCEPTANCE_CRITERIA];
 let canaryHistory: CanaryTestResult[] = [];
@@ -139,7 +139,7 @@ let auditLogs: AuditLogEntry[] = [
     actor: 'System Watchdog',
     action: 'BOOT_SELF_CHECK',
     target: 'ORBIT Core',
-    detail: 'تم تشغيل نواة ORBIT والتحقق من عزل واستقلال جميع المستودعات الـ 11 (Read-Only Mode).',
+    detail: 'تم تشغيل نواة ORBIT. لم يتم التحقق من حالة البرامج المتصلة بعد.',
   },
 ];
 
