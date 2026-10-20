@@ -788,7 +788,7 @@ export default function App() {
   return (
     <div
       dir="rtl"
-      className={`orbit-shell min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
+      className={`orbit-shell ${isDark ? 'orbit-dark' : ''} min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
         isDark ? 'bg-[#070B14] text-slate-100' : 'bg-[#F4F7FB] text-slate-900'
       }`}
     >
