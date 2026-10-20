@@ -53,7 +53,7 @@ const DATA_SNAPSHOT_PATH = path.join(__dirname, '.orbit-data.json');
 let platforms: PlatformRecord[] = INITIAL_PLATFORMS.map(p => ({
   ...p,
   healthStatus: p.runtimeMode === 'local-only' ? 'Local / Not Running' : 'Monitoring Gap',
-  dataIntegrity: 'Unverified' as PlatformRecord['dataIntegrity'],
+  dataIntegrity: 'Not Configured' as PlatformRecord['dataIntegrity'],
   monitoringCoveragePct: 0,
   connectionVerified: false,
   connectionStatus: 'Pending Credentials',
