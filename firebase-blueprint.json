@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "OrbitWorkspaceSnapshot": {
+      "title": "OrbitWorkspaceSnapshot",
+      "description": "Cloud-persisted state snapshot for ORBIT Sovereign Engineering Intelligence & Fleet Management",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the sovereign operator",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address of the sovereign operator",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "workspaceName": {
+          "type": "string",
+          "description": "Human-readable workspace title",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "fleetCount": {
+          "type": "number",
+          "description": "Number of monitored platforms in the fleet"
+        },
+        "payloadJson": {
+          "type": "string",
+          "description": "Serialized fleet platforms, incidents, memories, and audit records",
+          "minLength": 2,
+          "maxLength": 900000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of initial snapshot creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest snapshot sync"
+        }
+      },
+      "required": [
+        "ownerUid",
+        "ownerEmail",
+        "workspaceName",
+        "fleetCount",
+        "payloadJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/orbit_snapshots/{snapshotId}": {
+      "schema": {
+        "$ref": "#/entities/OrbitWorkspaceSnapshot"
+      },
+      "description": "Stores operator-owned ORBIT fleet and telemetry state snapshots for multi-device synchronization"
+    }
+  }
+}

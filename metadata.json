@@ -1,0 +1,6 @@
+{
+  "name": "ORBIT | أوربت — غرفة العمليات الذكية",
+  "description": "المركز العصبي الذكي لمراقبة وفحص وحماية وتطوير 11 منصة برمجية على GitHub باستقلالية تامة وبدون تدخل تلقائي في الإنتاج.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
