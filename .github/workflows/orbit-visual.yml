@@ -1,0 +1,43 @@
+name: ORBIT browser and visual smoke
+on:
+  push:
+    branches: [orbit/security-foundation-20261020]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PORT: 3100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate disposable test credential
+        run: echo "ORBIT_OPERATOR_PASSKEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start ORBIT preview
+        run: |
+          nohup npm run dev > /tmp/orbit-preview.log 2>&1 < /dev/null &
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3100/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/orbit-preview.log
+          exit 1
+      - name: Browser smoke check
+        run: node scripts/visual-smoke.mjs
+      - name: Save visual artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-visual-screenshots
+          path: test-artifacts/
+          retention-days: 7
