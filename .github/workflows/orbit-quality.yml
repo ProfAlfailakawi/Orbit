@@ -1,0 +1,25 @@
+name: ORBIT quality gate
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, orbit/security-foundation-20261020]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: TypeScript check
+        run: npm run lint
+      - name: Core engine tests
+        run: npm test
+      - name: Production build
+        run: npm run build
