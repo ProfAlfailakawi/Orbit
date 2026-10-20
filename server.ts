@@ -331,7 +331,7 @@ async function startServer() {
       ...selfHealth,
       heartbeatTimestamp: new Date().toISOString(),
       fleetMonitoringCoveragePct: avgCoverage,
-      sensorConnectivityCount: activePlatforms.filter((p) => p.connectionVerified).length,
+      sensorConnectivityCount: new Set(events.filter(e => e.detectionSource === 'ORBIT Sensor' && e.dataIntegrity === 'Live' && Date.now() - Date.parse(e.timestamp) < 30 * 60_000).map(e => e.appId)).size,
     };
 
     res.json({
@@ -373,7 +373,7 @@ async function startServer() {
 
     const syncedResults: Array<{ codeName: string; status: string; integrity: string }> = [];
 
-    for (const plat of targets.slice(0, 4)) {
+    for (const plat of targets.slice(0, 25)) {
       try {
         costGuard.githubApiCallsToday += 1;
         const resp = await fetch(`https://api.github.com/repos/${plat.owner}/${plat.repoName}`, {
@@ -393,8 +393,15 @@ async function startServer() {
                   ...p,
                   defaultBranch: repoData.default_branch || p.defaultBranch,
                   dataIntegrity: 'Live',
+                  connectionVerified: true,
+                  connectionStatus: 'Connected (Read-Only)',
+                  healthStatus: 'Monitoring Gap',
+                  monitoringCoveragePct: 0,
+                  fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+                  releaseShield: 'Insufficient Evidence',
+                  releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `تم التحقق الحي من GitHub API (آخر دفع: ${repoData.pushed_at || 'موثق'})`,
+                  lastVerifiedEvidence: `GitHub repository API HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}). Production health not checked.`,
                 }
               : p
           );
@@ -402,14 +409,14 @@ async function startServer() {
         } else {
           syncedResults.push({
             codeName: plat.codeName,
-            status: `HTTP ${resp.status} (Private Repo / Needs Read-Only Token — Using Cached Snapshot)`,
+            status: `HTTP ${resp.status} (Repository unavailable or private — connection not verified)`,
             integrity: plat.dataIntegrity,
           });
         }
       } catch {
         syncedResults.push({
           codeName: plat.codeName,
-          status: 'Network/Offline Fallback — Using Verified Cached Snapshot',
+          status: 'Network/Offline — repository state unconfirmed',
           integrity: plat.dataIntegrity,
         });
       }
