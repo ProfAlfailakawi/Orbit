@@ -134,22 +134,18 @@ export default function App() {
     useState<SilentFailureSignal[]>([]);
   const [changeImpacts, setChangeImpacts] =
     useState<ChangeImpactAnalysis[]>([]);
-  const [crossAppPatterns] = useState<CrossAppPattern[]>([]);
+  const [crossAppPatterns, setCrossAppPatterns] = useState<CrossAppPattern[]>([]);
   const [engineeringMemory, setEngineeringMemory] = useState<EngineeringMemoryEntry[]>(
     []
   );
-  const [innovations] = useState<InnovationOpportunity[]>(
-    []
-  );
+  const [innovations, setInnovations] = useState<InnovationOpportunity[]>([]);
   const [selfHealth, setSelfHealth] = useState<SelfHealthMetrics>(INITIAL_SELF_HEALTH);
   const [costGuard, setCostGuard] = useState<CostGuardMetrics>(INITIAL_COST_GUARD);
   const [discoveredCandidates, setDiscoveredCandidates] = useState<DiscoveredRepoCandidate[]>(
     []
   );
-  const [featureMatrix] = useState<FeatureMatrixItem[]>(INITIAL_FEATURE_MATRIX);
-  const [acceptanceCriteria] = useState<AcceptanceCriterionResult[]>(
-    INITIAL_ACCEPTANCE_CRITERIA
-  );
+  const [featureMatrix, setFeatureMatrix] = useState<FeatureMatrixItem[]>([]);
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState<AcceptanceCriterionResult[]>([]);
   const [canaryHistory, setCanaryHistory] = useState<CanaryTestResult[]>([]);
   const [auditLogs, setAuditLogs] = useState<
     Array<{
@@ -186,6 +182,10 @@ export default function App() {
       setAlerts(data.alerts);
       setSilentFailures(data.silentFailures);
       setChangeImpacts(data.changeImpacts);
+      setCrossAppPatterns(data.crossAppPatterns || []);
+      setInnovations(data.innovations || []);
+      setFeatureMatrix(data.featureMatrix || []);
+      setAcceptanceCriteria(data.acceptanceCriteria || []);
       setEngineeringMemory(data.engineeringMemory);
       setSelfHealth(data.selfHealth);
       setCostGuard(data.costGuard);
@@ -214,6 +214,10 @@ export default function App() {
               if (data.events) setEvents(data.events);
               if (data.incidents) setIncidents(data.incidents);
               if (data.alerts) setAlerts(data.alerts);
+              if (data.crossAppPatterns) setCrossAppPatterns(data.crossAppPatterns);
+              if (data.innovations) setInnovations(data.innovations);
+              if (data.featureMatrix) setFeatureMatrix(data.featureMatrix);
+              if (data.acceptanceCriteria) setAcceptanceCriteria(data.acceptanceCriteria);
               if (data.engineeringMemory) setEngineeringMemory(data.engineeringMemory);
               if (data.selfHealth) setSelfHealth(data.selfHealth);
               if (data.costGuard) setCostGuard(data.costGuard);
