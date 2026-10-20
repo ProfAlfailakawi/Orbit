@@ -211,7 +211,7 @@ test('Section 42 Dynamic Fleet Management: add, verify, pause, archive, reactiva
       nameAr: 'ميراث التعليمي',
       description: 'المنصة التعليمية',
       runtimeMode: 'github-web',
-    })
+    }), { repositoryReachable: true }
   );
 
   const newTestApp = inspectRepositoryCapabilities({
@@ -226,16 +226,20 @@ test('Section 42 Dynamic Fleet Management: add, verify, pause, archive, reactiva
   assert.equal(newTestApp.healthStatus, 'Unknown');
   assert.equal(newTestApp.dataIntegrity, 'Not Configured');
 
-  const verifiedTestApp = verifyPlatformConnection(newTestApp);
+  const rejectedWithoutEvidence = verifyPlatformConnection(newTestApp);
+  assert.equal(rejectedWithoutEvidence.connectionVerified, false);
+  assert.equal(rejectedWithoutEvidence.healthStatus, 'Monitoring Gap');
+
+  const verifiedTestApp = verifyPlatformConnection(newTestApp, { repositoryReachable: true });
   assert.equal(verifiedTestApp.connectionVerified, true);
-  assert.equal(verifiedTestApp.healthStatus, 'Healthy');
+  assert.equal(verifiedTestApp.healthStatus, 'Monitoring Gap');
   assert.equal(verifiedTestApp.dataIntegrity, 'Live');
 
   let fleet = [existingApp, verifiedTestApp];
 
   fleet = transitionPlatformLifecycle(fleet, 'PILOTX', 'paused');
   assert.equal(fleet.find((p) => p.codeName === 'PILOTX')?.healthStatus, 'Paused');
-  assert.equal(fleet.find((p) => p.codeName === 'MIRAS')?.healthStatus, 'Healthy');
+  assert.equal(fleet.find((p) => p.codeName === 'MIRAS')?.healthStatus, 'Monitoring Gap');
 
   const pilotIngest = ingestAndCorrelateEvent(
     {
@@ -253,11 +257,11 @@ test('Section 42 Dynamic Fleet Management: add, verify, pause, archive, reactiva
   assert.equal(pilotIngest.incidents.length, 1);
 
   fleet = transitionPlatformLifecycle(fleet, 'PILOTX', 'active');
-  assert.equal(fleet.find((p) => p.codeName === 'PILOTX')?.healthStatus, 'Healthy');
+  assert.equal(fleet.find((p) => p.codeName === 'PILOTX')?.healthStatus, 'Monitoring Gap');
 
   fleet = transitionPlatformLifecycle(fleet, 'PILOTX', 'unlinked');
   assert.equal(fleet.find((p) => p.codeName === 'PILOTX')?.lifecycleState, 'unlinked');
-  assert.equal(fleet.find((p) => p.codeName === 'MIRAS')?.healthStatus, 'Healthy');
+  assert.equal(fleet.find((p) => p.codeName === 'MIRAS')?.healthStatus, 'Monitoring Gap');
 
   const failedPurge = purgePlatformHistory('PILOTX', 'WRONG-TOKEN', {
     events: pilotIngest.events,
