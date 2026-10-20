@@ -82,7 +82,7 @@ export function WorkspaceOverview({
   const fleet = useMemo(() => platforms.filter(p => p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived'), [platforms]);
   const connected = fleet.filter(getLive);
   const pending = fleet.filter(p => !getLive(p));
-  const local = fleet.filter(p => p.runtimeMode === 'local-only');
+  const local = fleet.filter(p => p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local');
   const openCases = useMemo(() => liveIncidents(incidents).sort((a, b) =>
     (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4)), [incidents]);
   const verifiedMemory = engineeringMemory.filter(m => m.verifiedBy && m.incidentId && incidents.some(i => i.incidentId === m.incidentId && i.dataIntegrity === 'Live'));
@@ -178,7 +178,7 @@ export function WorkspaceOverview({
                   <span className="orbit-workspace-fleet-icon"><Layers3 size={21}/></span>
                   <span className="orbit-workspace-fleet-text"><strong>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong><small dir="ltr">{p.codeName}</small></span>
                   <span className={getLive(p) ? 'orbit-workspace-mini-state live' : 'orbit-workspace-mini-state'}>
-                    {getLive(p) ? 'اتصال موثّق' : p.runtimeMode === 'local-only' ? 'محلي' : 'غير مؤكد'}
+                    {getLive(p) ? 'اتصال موثّق' : (p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local') ? 'محلي' : 'غير مؤكد'}
                   </span>
                   <ArrowUpLeft size={16} className="orbit-workspace-fleet-arrow"/>
                 </button>
