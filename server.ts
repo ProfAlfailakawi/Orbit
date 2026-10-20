@@ -593,8 +593,9 @@ async function startServer() {
         Accept: 'application/vnd.github+json',
         'User-Agent': 'ORBIT-Cockpit-2026',
       };
-      if (process.env.GITHUB_TOKEN) {
-        headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+      const readOnlyToken = process.env.GITHUB_READ_ONLY_TOKEN;
+      if (readOnlyToken) {
+        headers.Authorization = `Bearer ${readOnlyToken}`;
       }
       const repoRes = await fetch(`https://api.github.com/repos/${repoSlug}`, {
         headers,
@@ -703,36 +704,33 @@ async function startServer() {
     res.json({ platform: newPlatform, platforms, auditLogs });
   });
 
-  // 7b. Verify Connection for a Program
+  // 7b. Verify only the repository connection — never infer production health.
   app.post('/api/fleet/:id/verify', async (req, res) => {
     const { id } = req.params;
-    const target = platforms.find((p) => p.id === id || p.codeName === id);
-    if (!target) {
-      res.status(404).json({ error: 'البرنامج غير موجود.' });
-      return;
+    const target = platforms.find(p => p.id === id || p.codeName === id);
+    if (!target) return res.status(404).json({ error: 'البرنامج غير موجود.' });
+    if (target.runtimeMode !== 'github-web' && target.runtimeMode !== 'github-local') {
+      return res.status(422).json({ error: 'هذا البرنامج يحتاج حساساً أو اختباراً مباشراً؛ لا يمكن توثيق اتصاله عبر GitHub فقط.' });
     }
 
-    let verified = verifyPlatformConnection(target);
-    const ghProbe = await probeGitHubRepo(`${verified.owner}/${verified.repoName}`);
-    if (ghProbe.reachable) {
-      verified = {
-        ...verified,
-        defaultBranch: ghProbe.defaultBranch || verified.defaultBranch,
-      };
+    const slug = target.owner + '/' + target.repoName;
+    const ghProbe = await probeGitHubRepo(slug);
+    if (!ghProbe.reachable) {
+      appendAudit('ORBIT Connection Guard', 'FLEET_VERIFY_UNCONFIRMED', target.codeName, 'تعذر الوصول إلى GitHub API؛ لم يتم اعتماد اتصال مزعوم.');
+      return res.status(503).json({ error: 'تعذر تأكيد الاتصال بالمستودع عبر GitHub حالياً. لم تتغير حالة مراقبة البرنامج.' });
     }
-    platforms = platforms.map((p) => (p.id === target.id ? verified : p));
 
-    appendAudit(
-      'ProfAlfailakawi',
-      'FLEET_VERIFY_CONNECTION',
-      verified.codeName,
-      ghProbe.reachable
-        ? `نجاح فحص الاتصال الحي مع GitHub API (${verified.owner}/${verified.repoName}) والتحقق من المصادر للبرنامج ${verified.codeName}.`
-        : `نجاح فحص الاتصال والتحقق من المصادر للبرنامج ${verified.codeName}.`
-    );
-    broadcastRealtimeUpdate('FLEET_VERIFIED');
-
-    res.json({ platform: verified, platforms, auditLogs, githubLiveReachable: ghProbe.reachable });
+    const verified = verifyPlatformConnection(target, { repositoryReachable: true });
+    const nextPlatform: PlatformRecord = {
+      ...verified,
+      defaultBranch: ghProbe.defaultBranch || verified.defaultBranch,
+      techStack: ghProbe.language && !verified.techStack.includes(ghProbe.language)
+        ? [ghProbe.language, ...verified.techStack] : verified.techStack,
+    };
+    platforms = platforms.map(p => p.id === target.id ? nextPlatform : p);
+    appendAudit('ORBIT Read-Only Probe', 'FLEET_GITHUB_ACCESS_VERIFIED', nextPlatform.codeName, 'تم تأكيد الوصول إلى بيانات GitHub، أما تشغيل الموقع وتجربة المستخدم فلا تزال غير موثقة.');
+    broadcastRealtimeUpdate('FLEET_GITHUB_ACCESS_VERIFIED');
+    return res.json({ platform: nextPlatform, platforms, auditLogs, githubLiveReachable: true, productionVerified: false });
   });
 
   // 7c. Lifecycle State Change (active | paused | archived | unlinked)
@@ -1162,7 +1160,7 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`ORBIT Mission Control Server listening on http://0.0.0.0:${PORT}`);
   });
