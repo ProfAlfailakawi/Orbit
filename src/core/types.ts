@@ -184,6 +184,9 @@ export interface PlatformRecord {
   owner: string;
   repoName: string;
   repoUrl: string;
+  /** GitHub repository slug, when a repository is linked. */
+  repoSlug?: string;
+  latestCommitSha?: string;
   defaultBranch: string;
   techStack: string[];
   runtimeMode: AppRuntimeMode;
