@@ -447,6 +447,7 @@ export default function App() {
         body: JSON.stringify({ appId: appCode }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'تعذرت مزامنة GitHub');
       if (data.platforms) setPlatforms(data.platforms);
       if (data.auditLogs) setAuditLogs(data.auditLogs);
       setSyncBanner(data.message || 'تمت مزامنة GitHub بنجاح (Read-Only)');
@@ -465,11 +466,11 @@ export default function App() {
     isUserVisible: boolean;
     environment: string;
   }) => {
-    const res = await fetch('/api/events/ingest', {
+    const res = await fetch('/api/radar/ingest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Orbit-Idempotency-Key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        'x-idempotency-key': `UI-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       },
       body: JSON.stringify(payload),
     });
@@ -489,7 +490,7 @@ export default function App() {
     const res = await fetch(`/api/incidents/${incidentId}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nextStatus, technicallyVerified, note }),
+      body: JSON.stringify({ nextStatus, technicalVerificationPassed: technicallyVerified, note }),
     });
     const data = await res.json();
     if (data.incidents) setIncidents(data.incidents);
