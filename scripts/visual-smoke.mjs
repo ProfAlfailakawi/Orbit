@@ -41,16 +41,16 @@ try {
   await page.screenshot({ path: 'test-artifacts/orbit-desktop.png', fullPage: true });
   const nav = page.locator('.orbit-desktop-nav .orbit-nav-link');
   await nav.nth(1).click();
-  await page.locator('.orbit-radar-page').waitFor();
+  await page.locator('.orbit-workspace-overview[data-mode="radar"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-radar.png', fullPage: true });
   await nav.nth(2).click();
-  await page.locator('.orbit-fleet-page').waitFor();
+  await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
   await nav.nth(3).click();
-  await page.locator('.orbit-intelligence-page').waitFor();
+  await page.locator('.orbit-workspace-overview[data-mode="intelligence"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
   await nav.nth(4).click();
-  await page.locator('.orbit-governance-page').waitFor();
+  await page.locator('.orbit-workspace-overview[data-mode="operations"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-governance.png', fullPage: true });
   await nav.first().click();
   await page.locator('.orbit-executive').waitFor();
@@ -70,6 +70,13 @@ try {
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
 
   await page.locator('.orbit-mobile-tab').nth(1).click();
+  await page.locator('.orbit-workspace-overview[data-mode="radar"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-mobile-radar.png', fullPage: true });
+  await page.locator('#orbit-advanced-radar > summary').click();
+  await page.locator('.orbit-radar-page').waitFor();
+  await page.locator('.orbit-mobile-tab').nth(2).click();
+  await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-mobile-fleet.png', fullPage: true });
   await page.locator('.orbit-mobile-tab').first().click();
   await page.locator('.orbit-tools-menu > summary').click();
   assert.equal(await page.locator('.orbit-tools-popover').isVisible(), true, 'Utility menu should open');
@@ -78,6 +85,21 @@ try {
   await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
   await page.getByRole('button', { name: 'المظهر الفاتح' }).click();
   assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 0, 'Light appearance not restored');
+  const unauthorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
+    data: { appId: 'MIRAS', environment: 'production', operationName: 'ci.test', errorCode: 'CI_SMOKE', errorMessage: 'isolated smoke test' },
+  });
+  assert.equal(unauthorizedSensor.status(), 401, 'Sensor must reject requests without bearer authentication');
+  const sensorToken = process.env.ORBIT_SENSOR_INGEST_TOKEN || '';
+  assert.ok(sensorToken.length >= 32, 'CI sensor token missing');
+  const authorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
+    headers: { Authorization: 'Bearer ' + sensorToken },
+    data: { appId: 'MIRAS', environment: 'staging', operationName: 'ci.visual.smoke', errorCode: 'CI_SMOKE', errorMessage: 'Synthetic browser-only verification of opt-in secure sensor' },
+  });
+  assert.equal(authorizedSensor.status(), 202, 'Authenticated staging sensor must accept a test event');
+  const updatedState = await page.request.get(base + '/api/state');
+  const newState = await updatedState.json();
+  assert.ok(newState.events.some(event => event.appId === 'MIRAS' && event.dataIntegrity === 'Live'), 'Authenticated sensor event should be Live');
+
   await page.locator('.orbit-lock-control').click();
   await page.waitForSelector('#orbit-passkey-input', { state: 'visible', timeout: 10000 });
   const loggedOut = await page.request.get(base + '/api/state');
