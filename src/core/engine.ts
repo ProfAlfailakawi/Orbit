@@ -820,46 +820,41 @@ export function inspectRepositoryCapabilities(input: {
   };
 }
 
-export function verifyPlatformConnection(platform: PlatformRecord): PlatformRecord {
-  const now = new Date().toISOString();
-  const isLocal =
-    platform.runtimeMode === 'github-local' || platform.runtimeMode === 'local-only';
-  const updatedFourState: FourStateSeparation = {
-    ciPassed:
-      platform.runtimeMode === 'non-github-web' ||
-      platform.runtimeMode === 'local-only'
-        ? null
-        : true,
-    deploymentSucceeded: isLocal ? null : true,
-    siteReachable: isLocal ? null : true,
-    userJourneyHealthy: true,
-  };
-
-  const nextCoverage = Math.max(platform.monitoringCoveragePct, 78);
-  const nextHealth = evaluatePlatformHealth({
-    lifecycleState: platform.lifecycleState,
-    runtimeMode: platform.runtimeMode,
-    connectionVerified: true,
-    monitoringCoveragePct: nextCoverage,
-    fourState: updatedFourState,
-    activeIncidentSeverities: [],
-    isLocalSessionActive: isLocal ? true : undefined,
-  });
+export function verifyPlatformConnection(
+  platform: PlatformRecord,
+  evidence?: { repositoryReachable: boolean; checkedAt?: string }
+): PlatformRecord {
+  // A repository metadata response proves repository access, NOT production health.
+  // Without external evidence we MUST NOT infer CI, deploy, site uptime or user journeys.
+  const isGitHub = platform.runtimeMode === 'github-web' || platform.runtimeMode === 'github-local';
+  if (!isGitHub || !evidence?.repositoryReachable) {
+    return {
+      ...platform,
+      connectionVerified: false,
+      connectionStatus: 'Pending Credentials',
+      dataIntegrity: 'Not Configured',
+      monitoringCoveragePct: 0,
+      healthStatus: platform.runtimeMode === 'local-only' ? 'Local / Not Running' : 'Monitoring Gap',
+      fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+      releaseShield: 'Insufficient Evidence',
+      releaseConfidencePct: 0,
+      lastVerifiedEvidence: '',
+      lastVerifiedTimestamp: '',
+    };
+  }
 
   return {
     ...platform,
     connectionVerified: true,
-    connectionStatus: isLocal ? 'Local Session Telemetry' : 'Connected (Read-Only)',
+    connectionStatus: 'Connected (Read-Only)',
     dataIntegrity: 'Live',
-    monitoringCoveragePct: nextCoverage,
-    fourState: updatedFourState,
-    healthStatus: nextHealth,
-    releaseShield: 'Ready',
-    releaseConfidencePct: 92,
-    lastVerifiedEvidence: isLocal
-      ? 'تم التحقق من جلسة التشغيل المحلية واستقبال نبض الحساس بنجاح'
-      : 'تم التحقق من قراءة المستودع وفحص نقاط الاستجابة بنجاح',
-    lastVerifiedTimestamp: now,
+    monitoringCoveragePct: 0,
+    healthStatus: 'Monitoring Gap',
+    fourState: { ciPassed: null, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+    releaseShield: 'Insufficient Evidence',
+    releaseConfidencePct: 0,
+    lastVerifiedEvidence: 'GitHub REST repository metadata read succeeded; production monitoring not verified.',
+    lastVerifiedTimestamp: evidence.checkedAt || new Date().toISOString(),
   };
 }
 
@@ -957,7 +952,7 @@ export function executeSyntheticCanary(
       releaseVersion: 'v2026.10-canary',
       commitSha: 'canary01',
       detectionSource: 'Synthetic Canary',
-      dataIntegrity: 'Live',
+      dataIntegrity: 'Demo',
     },
     existingEvents,
     existingIncidents,
@@ -976,7 +971,7 @@ export function executeSyntheticCanary(
       releaseVersion: 'v2026.10-canary',
       commitSha: 'canary01',
       detectionSource: 'Synthetic Canary',
-      dataIntegrity: 'Live',
+      dataIntegrity: 'Demo',
     },
     firstPass.events,
     firstPass.incidents,
