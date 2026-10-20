@@ -38,3 +38,124 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+
+/* ORBIT / Visual System 2.0 — calm, Arabic-first executive cockpit.
+   Presentation-only changes: no monitoring, payment or deployment side effects. */
+.orbit-shell {
+  --orbit-ink: #18263a;
+  --orbit-muted: #708096;
+  --orbit-accent: #366f86;
+  --orbit-line: #e7edf0;
+  --orbit-paper: #f6f8f8;
+  --orbit-card: #ffffff;
+  background: var(--orbit-paper) !important;
+  color: var(--orbit-ink) !important;
+  min-height: 100vh;
+  font-feature-settings: "kern" 1;
+}
+.orbit-shell .orbit-header {
+  background: rgba(255,255,255,.94) !important;
+  border-color: var(--orbit-line) !important;
+  box-shadow: 0 3px 24px rgba(20,46,65,.035);
+  padding-block: 1.15rem !important;
+}
+.orbit-wordmark {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.22rem;
+  letter-spacing: -.065em;
+  color: #18354a;
+}
+.orbit-wordmark-ar {
+  font-size: .77rem;
+  font-weight: 500;
+  color: #78909b;
+  margin-inline-start: .7rem;
+  padding-inline-start: .7rem;
+  border-inline-start: 1px solid #dbe4e7;
+}
+.orbit-shell .orbit-navigation {
+  gap: 1.6rem !important;
+  color: #697d8b !important;
+}
+.orbit-shell .orbit-navigation button {
+  font-size: .82rem;
+  border-radius: .5rem;
+  transition: color .2s ease, background .2s ease;
+}
+.orbit-shell .orbit-navigation button:hover { color: #245b73 !important; }
+.orbit-shell .orbit-utility {
+  background: #f9fbfb !important;
+  border-color: var(--orbit-line) !important;
+  color: #71808c !important;
+}
+.orbit-shell .orbit-utility .text-slate-200,
+.orbit-shell .orbit-utility .text-slate-400 { color: #748596 !important; }
+.orbit-shell main { max-width: 1560px; margin-inline: auto; padding-block: 2rem; }
+.orbit-shell section,
+.orbit-shell article {
+  scroll-margin-top: 6rem;
+}
+.orbit-shell [class*="rounded-xl"],
+.orbit-shell [class*="rounded-2xl"] { border-radius: 18px; }
+.orbit-shell [class*="border-slate-800"],
+.orbit-shell [class*="border-slate-700"],
+.orbit-shell [class*="border-slate-200"] { border-color: var(--orbit-line) !important; }
+.orbit-shell [class*="bg-slate-950"],
+.orbit-shell [class*="bg-slate-900"],
+.orbit-shell [class*="bg-[#0D1322]"],
+.orbit-shell [class*="bg-[#0A0F1D]"] {
+  background-color: var(--orbit-card) !important;
+}
+.orbit-shell [class*="bg-sky-950"],
+.orbit-shell [class*="bg-emerald-950"] { background-color: #f0f7f6 !important; }
+.orbit-shell [class*="text-slate-100"],
+.orbit-shell [class*="text-slate-200"],
+.orbit-shell [class*="text-slate-900"] { color: var(--orbit-ink) !important; }
+.orbit-shell [class*="text-slate-300"],
+.orbit-shell [class*="text-slate-400"] { color: var(--orbit-muted) !important; }
+.orbit-shell [class*="text-sky-400"],
+.orbit-shell [class*="text-sky-300"] { color: var(--orbit-accent) !important; }
+.orbit-shell [class*="text-emerald-300"],
+.orbit-shell [class*="text-emerald-400"] { color: #318071 !important; }
+.orbit-shell [class*="bg-sky-400"],
+.orbit-shell [class*="bg-sky-500"] {
+  background-color: #d7e9e9 !important;
+  color: #174a5b !important;
+}
+.orbit-shell [class*="border-sky-400"],
+.orbit-shell [class*="border-sky-500"] { border-color: #a6cdcf !important; }
+.orbit-shell button { transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+.orbit-shell button:focus-visible,
+.orbit-shell a:focus-visible { outline: 3px solid #8fbdbf; outline-offset: 3px; }
+.orbit-shell button:active { transform: scale(.985); }
+.orbit-shell input, .orbit-shell select {
+  background: #fff !important;
+  color: var(--orbit-ink) !important;
+  border-color: #dde6e9 !important;
+}
+.orbit-shell pre {
+  background: #f4f7f8 !important;
+  color: #425569 !important;
+  border-color: #e3ebee !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.orbit-shell .font-mono { letter-spacing: -.025em; }
+.orbit-shell [class*="shadow"] { box-shadow: 0 6px 30px rgba(31,60,78,.045) !important; }
+.orbit-shell [class*="bg-rose-950"] { background: #fff3f1 !important; }
+.orbit-shell [class*="text-rose-300"] { color: #b94e4e !important; }
+.orbit-shell [class*="text-amber-300"] { color: #9b711b !important; }
+@media (max-width: 767px) {
+  .orbit-shell main { padding-block: 1rem; }
+  .orbit-shell .orbit-header { padding-inline: 1rem !important; }
+  .orbit-shell .orbit-utility { padding-inline: 1rem !important; }
+  .orbit-shell [class*="grid-cols-4"] { gap: .65rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-shell *, .orbit-shell *::before, .orbit-shell *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
