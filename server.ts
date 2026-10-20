@@ -187,17 +187,78 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
 
-  // 1. Operator Passkey Authentication
+  // Secure operator session. No built-in credentials and no client-side bypass.
+  const operatorPasskey = process.env.ORBIT_OPERATOR_PASSKEY;
+  const sessionSecret = crypto.randomBytes(32).toString('hex');
+  const sessions = new Map<string, number>();
+  const loginAttempts = new Map<string, { count: number; until: number }>();
+  const cookieName = 'orbit_operator_session';
+
   app.post('/api/auth/verify', (req, res) => {
-    const { passkey } = req.body || {};
-    const expected = process.env.ORBIT_OPERATOR_PASSKEY || 'orbit-2026-admin';
-    if (passkey === expected) {
-      appendAudit('ProfAlfailakawi', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تم تسجيل الدخول الآمن إلى غرفة العمليات.');
-      res.json({ authenticated: true, operator: 'ProfAlfailakawi', role: 'Principal Owner (Final Decision Maker)' });
-    } else {
-      appendAudit('Unknown', 'AUTH_LOGIN_FAILED', 'ORBIT Console', 'محاولة دخول برمز غير مطابق.');
-      res.status(401).json({ authenticated: false, error: 'رمز الدخول غير صحيح' });
+    const address = req.ip || 'unknown';
+    const now = Date.now();
+    const attempt = loginAttempts.get(address);
+    if (attempt && attempt.until > now && attempt.count >= 5) {
+      return res.status(429).json({ authenticated: false, error: 'محاولات كثيرة. حاول لاحقاً.' });
     }
+    if (!operatorPasskey || operatorPasskey.length < 16) {
+      return res.status(503).json({ authenticated: false, error: 'يجب إعداد ORBIT_OPERATOR_PASSKEY آمن على الخادم.' });
+    }
+    const supplied = typeof req.body?.passkey === 'string' ? req.body.passkey : '';
+    const left = crypto.createHash('sha256').update(supplied).digest();
+    const right = crypto.createHash('sha256').update(operatorPasskey).digest();
+    if (!crypto.timingSafeEqual(left, right)) {
+      const count = (attempt && attempt.until > now ? attempt.count : 0) + 1;
+      loginAttempts.set(address, { count, until: now + 15 * 60_000 });
+      appendAudit('Unknown', 'AUTH_LOGIN_FAILED', 'ORBIT Console', 'محاولة دخول غير ناجحة.');
+      return res.status(401).json({ authenticated: false, error: 'رمز الدخول غير صحيح' });
+    }
+    loginAttempts.delete(address);
+    const token = crypto.createHmac('sha256', sessionSecret).update(crypto.randomBytes(32)).digest('hex');
+    sessions.set(token, now + 8 * 60 * 60_000);
+    res.cookie(cookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api',
+      maxAge: 8 * 60 * 60_000,
+    });
+    appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
+    return res.json({ authenticated: true, operator: 'Operator' });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
+    if (cookie) sessions.delete(cookie.slice(cookieName.length + 1));
+    res.clearCookie(cookieName, { path: '/api', sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+    res.json({ authenticated: false });
+  });
+
+  app.get('/api/auth/session', (req, res) => {
+    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
+    const token = cookie?.slice(cookieName.length + 1) || '';
+    const expiry = sessions.get(token);
+    res.json({ authenticated: Boolean(expiry && expiry > Date.now()) });
+  });
+
+  app.use('/api', (req, res, next) => {
+    // Sensor ingestion is a separate integration; never allow unauthenticated writes.
+    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
+    const token = cookie?.slice(cookieName.length + 1) || '';
+    const expiry = sessions.get(token);
+    if (!expiry || expiry <= Date.now()) return res.status(401).json({ error: 'Authentication required' });
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const origin = req.get('origin');
+      const host = req.get('host');
+      if (origin) {
+        try {
+          if (!host || new URL(origin).host !== host) return res.status(403).json({ error: 'Origin rejected' });
+        } catch {
+          return res.status(403).json({ error: 'Invalid origin' });
+        }
+      }
+    }
+    next();
   });
 
   // 2. Full Mission Control State Endpoint

@@ -110,7 +110,7 @@ type MainNavId =
 type CockpitDeckTab = 'incidents' | 'commits' | 'memory' | 'acceptance';
 
 export default function App() {
-  const [isDark, setIsDark] = useState<boolean>(true);
+  const [isDark, setIsDark] = useState<boolean>(false);
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
   const [cockpitDeck, setCockpitDeck] = useState<CockpitDeckTab>('incidents');
   const [selectedPlatformId, setSelectedPlatformId] = useState<string | null>(null);
@@ -119,8 +119,8 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Authentication Gate State
-  const [isLocked, setIsLocked] = useState<boolean>(false);
-  const [passkeyInput, setPasskeyInput] = useState<string>('orbit-2026-admin');
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [passkeyInput, setPasskeyInput] = useState<string>('');
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Application State synchronized with Express Backend & Firebase Cloud
@@ -196,6 +196,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (isLocked) return;
     fetchServerState();
     const timer = setInterval(fetchServerState, 12000);
 
@@ -230,6 +231,12 @@ export default function App() {
       clearInterval(timer);
       if (es) es.close();
     };
+  }, [isLocked]);
+
+  useEffect(() => {
+    fetch('/api/auth/session').then(r => r.json()).then(data => {
+      if (data.authenticated) setIsLocked(false);
+    }).catch(() => {});
   }, []);
 
   // Firebase Auth & Real-Time Firestore Multi-Device Sync
@@ -241,8 +248,7 @@ export default function App() {
         unsubSnapshot();
         unsubSnapshot = null;
       }
-      if (user) {
-        setIsLocked(false);
+      if (user && !isLocked) {
         unsubSnapshot = subscribeToCloudSnapshot(user.uid, (cloudData, syncedIso) => {
           hydratingFromCloudRef.current = true;
           if (Array.isArray(cloudData.platforms) && cloudData.platforms.length > 0) {
@@ -354,16 +360,12 @@ export default function App() {
         setAuthError(data.error || 'رمز الدخول غير صحيح.');
       }
     } catch {
-      if (passkeyInput === 'orbit-2026-admin') {
-        setIsLocked(false);
-        setAuthError(null);
-      } else {
-        setAuthError('رمز الدخول غير صحيح.');
-      }
+      setAuthError('تعذر التحقق من الخادم. لا يمكن الدخول دون مصادقة.');
     }
   };
 
   const handleGoogleSignIn = async () => {
+    if (isLocked) { setAuthError('سجّل الدخول إلى ORBIT أولاً قبل ربط Google.'); return; }
     try {
       const user = await signInWithGoogleOperator();
       const syncRes = await syncStateToFirestore({
@@ -970,7 +972,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setIsLocked(true)}
+            onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}
             aria-label="قفل الجلسة"
             className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 ${
               isDark
@@ -1000,6 +1002,12 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {/* Seed snapshots are examples, never verified production telemetry. */}
+      <div role="status" className={`mx-auto max-w-[1440px] px-4 sm:px-8 py-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
+        <AlertTriangle className="w-5 h-5 shrink-0" />
+        <span>تنبيه: تحتوي ORBIT حالياً على بيانات توضيحية ومخزنة. لا تعتبر نسب الصحة أو الحوادث دليلاً مباشراً على حالة برامجك حتى يكتمل ربط المصادر والتحقق منها.</span>
+      </div>
 
       {/* Main Content Container */}
       <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
