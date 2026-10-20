@@ -126,7 +126,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Application State synchronized with Express Backend & Firebase Cloud
-  const [platforms, setPlatforms] = useState<PlatformRecord[]>(INITIAL_PLATFORMS);
+  const [platforms, setPlatforms] = useState<PlatformRecord[]>([]);
   const [events, setEvents] = useState<RadarEvent[]>([]);
   const [incidents, setIncidents] = useState<IncidentCaseFile[]>([]);
   const [alerts, setAlerts] = useState<AlertNotification[]>([]);
