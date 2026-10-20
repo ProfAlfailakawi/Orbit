@@ -119,8 +119,8 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Authentication Gate State
-  const [isLocked, setIsLocked] = useState<boolean>(false);
-  const [passkeyInput, setPasskeyInput] = useState<string>('orbit-2026-admin');
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [passkeyInput, setPasskeyInput] = useState<string>('');
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Application State synchronized with Express Backend & Firebase Cloud
@@ -196,6 +196,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (isLocked) return;
     fetchServerState();
     const timer = setInterval(fetchServerState, 12000);
 
@@ -230,6 +231,12 @@ export default function App() {
       clearInterval(timer);
       if (es) es.close();
     };
+  }, [isLocked]);
+
+  useEffect(() => {
+    fetch('/api/auth/session').then(r => r.json()).then(data => {
+      if (data.authenticated) setIsLocked(false);
+    }).catch(() => {});
   }, []);
 
   // Firebase Auth & Real-Time Firestore Multi-Device Sync
@@ -241,8 +248,7 @@ export default function App() {
         unsubSnapshot();
         unsubSnapshot = null;
       }
-      if (user) {
-        setIsLocked(false);
+      if (user && !isLocked) {
         unsubSnapshot = subscribeToCloudSnapshot(user.uid, (cloudData, syncedIso) => {
           hydratingFromCloudRef.current = true;
           if (Array.isArray(cloudData.platforms) && cloudData.platforms.length > 0) {
@@ -354,12 +360,7 @@ export default function App() {
         setAuthError(data.error || 'رمز الدخول غير صحيح.');
       }
     } catch {
-      if (passkeyInput === 'orbit-2026-admin') {
-        setIsLocked(false);
-        setAuthError(null);
-      } else {
-        setAuthError('رمز الدخول غير صحيح.');
-      }
+      setAuthError('تعذر التحقق من الخادم. لا يمكن الدخول دون مصادقة.');
     }
   };
 
