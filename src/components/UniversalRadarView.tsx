@@ -161,16 +161,16 @@ export const UniversalRadarView: React.FC<UniversalRadarViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="orbit-subpage orbit-radar-page space-y-6">
       {/* Top Control & Three-Eyes Filter Bar */}
       <div className={`rounded-xl border p-6 space-y-4 ${surfaceCls}`}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">
-              UNIVERSAL RADAR — الرادار المركزي الشامل ومحرك الأدلة
+              الرادار الشامل
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              يغطي الطبقات الثلاث (Three Eyes Observability) مع Fingerprinting وتجميع التكرارات وتنقية البيانات الحساسة تلقائياً.
+              الحوادث والأدلة في مكان واحد. نميّز بين البلاغ الحقيقي والتجربة.
             </p>
           </div>
           <button
@@ -179,7 +179,7 @@ export const UniversalRadarView: React.FC<UniversalRadarViewProps> = ({
             className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 transition-colors"
           >
             <Play className="w-3.5 h-3.5" />
-            <span>تشغيل حدث الكناري الاختباري (Synthetic Canary)</span>
+            <span>تجربة الرادار الآمنة</span>
           </button>
         </div>
 
@@ -188,9 +188,9 @@ export const UniversalRadarView: React.FC<UniversalRadarViewProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             {(
               [
-                { id: 'ALL', label: 'جميع الطبقات (All Three Eyes)' },
-                { id: 'Eye 1: Client Experience', label: 'Eye 1 — تجربة العميل والواجهة' },
-                { id: 'Eye 2: Server & Infrastructure', label: 'Eye 2 — الخادم والبنية التحتية' },
+                { id: 'ALL', label: 'جميع المصادر' },
+                { id: 'Eye 1: Client Experience', label: 'تجربة المستخدم' },
+                { id: 'Eye 2: Server & Infrastructure', label: 'الخادم' },
                 { id: 'Eye 3: Code & Deployment', label: 'Eye 3 — الكود وGitHub Actions' },
               ] as const
             ).map((eye) => (
