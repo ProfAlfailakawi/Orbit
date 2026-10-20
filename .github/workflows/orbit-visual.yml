@@ -18,7 +18,9 @@ jobs:
         with:
           node-version: '22'
       - name: Generate disposable test credential
-        run: echo "ORBIT_OPERATOR_PASSKEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+        run: |
+          echo "ORBIT_OPERATOR_PASSKEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "ORBIT_SENSOR_INGEST_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
