@@ -770,7 +770,7 @@ export default function App() {
   return (
     <div
       dir="rtl"
-      className={`min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
+      className={`orbit-shell min-h-screen w-full max-w-full overflow-x-hidden transition-colors ${
         isDark ? 'bg-[#070B14] text-slate-100' : 'bg-[#F4F7FB] text-slate-900'
       }`}
     >
@@ -873,7 +873,7 @@ export default function App() {
 
       {/* Minimalist Icon & Search Strip */}
       <div
-        className={`border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
+        className={`orbit-quiet-strip border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
           isDark ? 'border-slate-800/60 bg-[#0A0F1D]/80' : 'border-slate-200 bg-slate-100/70'
         }`}
       >
@@ -882,7 +882,7 @@ export default function App() {
           <span>·</span>
           <span className="tabular-nums text-slate-200 font-semibold">{activeFleet.length} منصة</span>
           <span>·</span>
-          <span className="text-emerald-400">Read-Only 100%</span>
+          <span className="text-slate-500">مراقبة — التحقق مطلوب</span>
           <span>·</span>
           <span className="tabular-nums text-sky-400">{selfHealth.eventProcessingDelayMs}ms</span>
         </div>
@@ -1004,7 +1004,7 @@ export default function App() {
       )}
 
       {/* Seed snapshots are examples, never verified production telemetry. */}
-      <div role="status" className={`mx-auto max-w-[1440px] px-4 sm:px-8 py-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
+      <div role="status" className={`orbit-data-notice mx-auto max-w-[1440px] my-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
         <AlertTriangle className="w-5 h-5 shrink-0" />
         <span>تنبيه: تحتوي ORBIT حالياً على بيانات توضيحية ومخزنة. لا تعتبر نسب الصحة أو الحوادث دليلاً مباشراً على حالة برامجك حتى يكتمل ربط المصادر والتحقق منها.</span>
       </div>
@@ -1122,6 +1122,14 @@ export default function App() {
              MISSION CONTROL — INFOGRAPHIC, ICON-FIRST, MINIMAL-TEXT DESIGN
              ================================================================= */
           <div className="space-y-6">
+            <section className="orbit-welcome" aria-label="مرحباً في أوربت">
+              <div>
+                <div className="text-[11px] font-semibold tracking-widest text-blue-600 mb-1">ORBIT · MISSION CONTROL</div>
+                <h1>برامجك، في مدار واحد.</h1>
+                <p>صورة واضحة. تنبيه مفهوم. وحل جاهز للنسخ إلى Claude.</p>
+              </div>
+              <div className="orbit-orb" aria-hidden="true"><Radar className="w-9 h-9" /></div>
+            </section>
             {/* ROW 1: 3 VISUAL INFOGRAPHIC HERO CARDS */}
             <section
               aria-label="ملخص المؤشرات البصرية"
@@ -1170,7 +1178,7 @@ export default function App() {
                     <Eye className="w-4 h-4 text-sky-400" />
                     <span>العيون الثلاث</span>
                   </span>
-                  <span className="font-mono text-[11px] text-emerald-400">نشطة</span>
+                  <span className="font-mono text-[11px] text-amber-400">بيانات أولية</span>
                 </div>
 
                 <div className="space-y-3 my-2">
@@ -1236,7 +1244,7 @@ export default function App() {
                             رادار الـ 5 ثوانٍ · {topCriticalIncident.incidentId}
                           </div>
                           <div className="text-sm font-bold text-white mt-0.5">
-                            {topCriticalIncident.appId} — تعثر رفع المرفقات (504)
+                            {topCriticalIncident.appId} — {topCriticalIncident.titleAr || "حادثة تحتاج مراجعة"}
                           </div>
                         </div>
                       </div>
@@ -1286,7 +1294,7 @@ export default function App() {
                           لا توجد حوادث حرجة نشطة
                         </div>
                         <div className="text-xs text-slate-400">
-                          جميع البرامج الـ {activeFleet.length} مستقرة وموثقة
+                          لا توجد حوادث حرجة في البيانات المعروضة؛ يلزم التحقق المباشر
                         </div>
                       </div>
                     </div>
