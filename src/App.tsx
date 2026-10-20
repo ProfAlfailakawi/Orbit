@@ -114,7 +114,7 @@ export default function App() {
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
   const [cockpitDeck, setCockpitDeck] = useState<CockpitDeckTab>('incidents');
   const [selectedPlatformId, setSelectedPlatformId] = useState<string | null>(null);
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>('INC-MIRAS-101');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
@@ -125,24 +125,24 @@ export default function App() {
 
   // Application State synchronized with Express Backend & Firebase Cloud
   const [platforms, setPlatforms] = useState<PlatformRecord[]>(INITIAL_PLATFORMS);
-  const [events, setEvents] = useState<RadarEvent[]>(INITIAL_EVENTS);
-  const [incidents, setIncidents] = useState<IncidentCaseFile[]>(INITIAL_INCIDENTS);
-  const [alerts, setAlerts] = useState<AlertNotification[]>(INITIAL_ALERTS);
+  const [events, setEvents] = useState<RadarEvent[]>([]);
+  const [incidents, setIncidents] = useState<IncidentCaseFile[]>([]);
+  const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [silentFailures, setSilentFailures] =
-    useState<SilentFailureSignal[]>(INITIAL_SILENT_FAILURES);
+    useState<SilentFailureSignal[]>([]);
   const [changeImpacts, setChangeImpacts] =
-    useState<ChangeImpactAnalysis[]>(INITIAL_CHANGE_IMPACTS);
-  const [crossAppPatterns] = useState<CrossAppPattern[]>(INITIAL_CROSS_APP_PATTERNS);
+    useState<ChangeImpactAnalysis[]>([]);
+  const [crossAppPatterns] = useState<CrossAppPattern[]>([]);
   const [engineeringMemory, setEngineeringMemory] = useState<EngineeringMemoryEntry[]>(
-    INITIAL_ENGINEERING_MEMORY
+    []
   );
   const [innovations] = useState<InnovationOpportunity[]>(
-    INITIAL_INNOVATION_OPPORTUNITIES
+    []
   );
   const [selfHealth, setSelfHealth] = useState<SelfHealthMetrics>(INITIAL_SELF_HEALTH);
   const [costGuard, setCostGuard] = useState<CostGuardMetrics>(INITIAL_COST_GUARD);
   const [discoveredCandidates, setDiscoveredCandidates] = useState<DiscoveredRepoCandidate[]>(
-    INITIAL_DISCOVERED_CANDIDATES
+    []
   );
   const [featureMatrix] = useState<FeatureMatrixItem[]>(INITIAL_FEATURE_MATRIX);
   const [acceptanceCriteria] = useState<AcceptanceCriterionResult[]>(
