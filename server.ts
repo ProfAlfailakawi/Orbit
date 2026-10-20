@@ -659,8 +659,8 @@ async function startServer() {
     });
 
     // Probe real GitHub API if repoSlug is present
-    if (newPlatform.repoSlug) {
-      const ghProbe = await probeGitHubRepo(newPlatform.repoSlug);
+    if (newPlatform.repoName && newPlatform.owner) {
+      const ghProbe = await probeGitHubRepo(newPlatform.repoSlug || `${newPlatform.owner}/${newPlatform.repoName}`);
       if (ghProbe.reachable) {
         newPlatform = {
           ...newPlatform,
@@ -696,7 +696,7 @@ async function startServer() {
     }
 
     let verified = verifyPlatformConnection(target);
-    const ghProbe = await probeGitHubRepo(verified.repoSlug);
+    const ghProbe = await probeGitHubRepo(verified.repoSlug || `${verified.owner}/${verified.repoName}`);
     if (ghProbe.reachable) {
       verified = {
         ...verified,
@@ -711,7 +711,7 @@ async function startServer() {
       'FLEET_VERIFY_CONNECTION',
       verified.codeName,
       ghProbe.reachable
-        ? `نجاح فحص الاتصال الحي مع GitHub API (${verified.repoSlug}) والتحقق من المصادر للبرنامج ${verified.codeName}.`
+        ? `نجاح فحص الاتصال الحي مع GitHub API (${verified.repoSlug || `${verified.owner}/${verified.repoName}`}) والتحقق من المصادر للبرنامج ${verified.codeName}.`
         : `نجاح فحص الاتصال والتحقق من المصادر للبرنامج ${verified.codeName}.`
     );
     broadcastRealtimeUpdate('FLEET_VERIFIED');
@@ -986,7 +986,7 @@ async function startServer() {
       const outcome = ingestAndCorrelateEvent(
         {
           appId,
-          environment: 'ci-github-actions',
+          environment: 'production',
           operationName: 'github.workflow_run.substep_check',
           errorCode: 'CI_PASS_WITH_CONTINUE_ON_ERROR_WARNING',
           errorMessage: `رصد Eye 3 عبر Webhook موثق: الـ Workflow سُجّل ناجحاً ظاهرياً رغم فشل خطوة فرعية بـ continue-on-error في ${appId}.`,
