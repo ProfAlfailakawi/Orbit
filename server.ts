@@ -42,6 +42,7 @@ import type {
   IncidentStatus,
   PlatformLifecycleState,
   PlatformRecord,
+  SelfHealthMetrics,
 } from './src/core/types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -76,7 +77,7 @@ let changeImpacts = [] as typeof INITIAL_CHANGE_IMPACTS;
 let crossAppPatterns = [] as typeof INITIAL_CROSS_APP_PATTERNS;
 let engineeringMemory = [] as typeof INITIAL_ENGINEERING_MEMORY;
 let innovations = [] as typeof INITIAL_INNOVATION_OPPORTUNITIES;
-let selfHealth = {
+let selfHealth: SelfHealthMetrics = {
   ...INITIAL_SELF_HEALTH,
   overallStatus: 'Monitoring Unconfirmed' as const,
   lastSuccessfulIngestion: '',
