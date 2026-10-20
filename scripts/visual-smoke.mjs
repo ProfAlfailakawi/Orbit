@@ -30,13 +30,36 @@ try {
   assert.equal(response.status(), 200, 'Authenticated dashboard must reach backend');
   const state = await response.json();
   assert.ok(Array.isArray(state.platforms), 'Fleet state missing');
+  assert.ok(state.acceptanceCriteria.every(item => item.status !== 'Pass'), 'Unverified acceptance must not be declared passed');
+  const canary = await page.request.post(base + '/api/canary/run');
+  assert.equal(canary.status(), 200, 'Isolated canary endpoint should run');
+  const canaryData = await canary.json();
+  assert.ok(canaryData.events.filter(item => item.appId === 'ORBIT-CANARY').every(item => item.dataIntegrity === 'Demo'), 'Synthetic canary must remain Demo');
+
   assert.equal(state.incidents.some(i => i.appId === 'ORBIT-CANARY' && i.dataIntegrity === 'Live'), false, 'Test incidents must not be treated as live');
 
   await page.screenshot({ path: 'test-artifacts/orbit-desktop.png', fullPage: true });
+  const nav = page.locator('.orbit-desktop-nav .orbit-nav-link');
+  await nav.nth(1).click();
+  await page.locator('.orbit-radar-page').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-radar.png', fullPage: true });
+  await nav.nth(2).click();
+  await page.locator('.orbit-fleet-page').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
+  await nav.nth(3).click();
+  await page.locator('.orbit-intelligence-page').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
+  await nav.nth(4).click();
+  await page.locator('.orbit-governance-page').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-governance.png', fullPage: true });
+  await nav.first().click();
+  await page.locator('.orbit-executive').waitFor();
   await page.locator('.orbit-filter-tabs button').last().click();
   await page.locator('.orbit-filter-tabs button').first().click();
   await page.locator('.orbit-app-card').first().click();
   assert.equal(await page.locator('.orbit-executive').count(), 0, 'Program detail navigation not working');
+  await page.locator('.orbit-program-page').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-program.png', fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.orbit-mobile-tab').first().click();
@@ -50,6 +73,11 @@ try {
   await page.locator('.orbit-mobile-tab').first().click();
   await page.locator('.orbit-tools-menu > summary').click();
   assert.equal(await page.locator('.orbit-tools-popover').isVisible(), true, 'Utility menu should open');
+  await page.getByRole('button', { name: 'المظهر الداكن' }).click();
+  assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 1, 'Dark appearance not applied');
+  await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
+  await page.getByRole('button', { name: 'المظهر الفاتح' }).click();
+  assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 0, 'Light appearance not restored');
   await page.locator('.orbit-lock-control').click();
   await page.waitForSelector('#orbit-passkey-input', { state: 'visible', timeout: 10000 });
   const loggedOut = await page.request.get(base + '/api/state');
