@@ -76,11 +76,41 @@ let changeImpacts = [] as typeof INITIAL_CHANGE_IMPACTS;
 let crossAppPatterns = [] as typeof INITIAL_CROSS_APP_PATTERNS;
 let engineeringMemory = [] as typeof INITIAL_ENGINEERING_MEMORY;
 let innovations = [] as typeof INITIAL_INNOVATION_OPPORTUNITIES;
-let selfHealth = { ...INITIAL_SELF_HEALTH };
-let costGuard = { ...INITIAL_COST_GUARD };
+let selfHealth = {
+  ...INITIAL_SELF_HEALTH,
+  overallStatus: 'Monitoring Unconfirmed' as const,
+  lastSuccessfulIngestion: '',
+  eventProcessingDelayMs: 0,
+  sensorConnectivityCount: 0,
+  missingTelemetryApps: [],
+  alertDeliveryStatus: 'Delayed' as const,
+  storageUsageMb: 0,
+  githubApiRemaining: 0,
+  githubApiLimit: 0,
+  backgroundJobHealth: 'Warning' as const,
+  fleetMonitoringCoveragePct: 0,
+  independentWatchdogStatus: 'Stale' as const,
+};
+let costGuard = {
+  ...INITIAL_COST_GUARD,
+  ingestedEventsCount: 0,
+  deduplicatedSavedEvents: 0,
+  storageUsedMb: 0,
+  githubApiCallsToday: 0,
+  githubApiDailyQuota: 0,
+};
 let discoveredCandidates = [] as typeof INITIAL_DISCOVERED_CANDIDATES;
-let featureMatrix = [...INITIAL_FEATURE_MATRIX];
-let acceptanceCriteria = [...INITIAL_ACCEPTANCE_CRITERIA];
+let featureMatrix = INITIAL_FEATURE_MATRIX.map(item => ({
+  ...item,
+  status: item.status === 'Implemented & Tested'
+    ? ('Implemented but Not Tested' as const)
+    : item.status,
+}));
+let acceptanceCriteria = INITIAL_ACCEPTANCE_CRITERIA.map(item => ({
+  ...item,
+  status: 'Not Tested' as const,
+  evidenceDetail: 'يلزم اختبار وظيفي مستقل وربط أدلة حقيقية قبل اعتماد هذا البند.',
+}));
 let canaryHistory: CanaryTestResult[] = [];
 let simulatedTelemetryOutage = false;
 
@@ -191,6 +221,13 @@ function loadStateFromDisk() {
     if (Array.isArray(parsed.discoveredCandidates)) discoveredCandidates = parsed.discoveredCandidates;
     if (Array.isArray(parsed.canaryHistory)) canaryHistory = parsed.canaryHistory;
     if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs;
+    // Previously persisted examples can masquerade as production. Keep history,
+    // but require new evidence for the live dashboard.
+    events = events.map(e => e.detectionSource === 'Synthetic Canary' || e.environment === 'canary-sandbox'
+      ? { ...e, dataIntegrity: 'Demo' as const } : e);
+    incidents = incidents.map(i => i.appId === 'ORBIT-CANARY'
+      ? { ...i, dataIntegrity: 'Demo' as const } : i);
+
   } catch {
     // Non-blocking fail-open if snapshot doesn't exist or is invalid
   }
