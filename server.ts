@@ -559,7 +559,7 @@ async function startServer() {
     const outcome = ingestAndCorrelateEvent(
       {
         appId: String(appId).toUpperCase(),
-        environment,
+        environment: 'canary-sandbox',
         operationName: String(operationName),
         errorCode: String(errorCode),
         errorMessage: String(errorMessage),
@@ -567,13 +567,11 @@ async function startServer() {
         releaseVersion,
         commitSha,
         browserOs,
-        detectionSource,
+        detectionSource: 'Synthetic Canary',
         isSilentMismatch: Boolean(isSilentMismatch),
         isUserVisible: Boolean(isUserVisible),
         latencyMs: latencyMs ? Number(latencyMs) : undefined,
         dataIntegrity: 'Demo',
-        detectionSource: 'Synthetic Canary',
-        environment: 'canary-sandbox',
       },
       events,
       incidents,
@@ -583,21 +581,12 @@ async function startServer() {
     events = outcome.events;
     incidents = outcome.incidents;
     alerts = outcome.alerts;
-    selfHealth.lastSuccessfulIngestion = new Date().toISOString();
     costGuard.ingestedEventsCount += 1;
     if (outcome.isDeduplicated) {
       costGuard.deduplicatedSavedEvents += 1;
     }
 
-    // Update platform health if Critical or High incident occurred
-    if (outcome.incident.severity === 'Critical' || outcome.incident.severity === 'High') {
-      platforms = platforms.map((p) =>
-        p.codeName.toUpperCase() === String(appId).toUpperCase() && p.lifecycleState === 'active'
-          ? p // Manually injected demonstrations must never mark production as broken.
-          : p
-          : p
-      );
-    }
+    // Demo events never modify production health or connection verification.
 
     appendAudit(
       outcome.event.detectionSource,
