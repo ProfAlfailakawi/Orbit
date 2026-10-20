@@ -432,8 +432,7 @@ async function startServer() {
   });
 
   // 3. Read-Only GitHub Sync Probe (Respects Rate Limits & Never Writes to Any Repo)
-  app.post('/api/github/sync', async (req, res) => {
-    const { appId } = req.body || {};
+  async function syncGithubFleet(appId?: string) {
     const token = process.env.GITHUB_READ_ONLY_TOKEN;
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
@@ -572,13 +571,34 @@ async function startServer() {
       `تم فحص حالة المستودعات للقراءة فقط (${syncedResults.length} مستودعات).`
     );
 
-    res.json({
-      syncedResults,
-      platforms,
-      selfHealth,
-      costGuard,
-    });
+    if (syncedResults.length) broadcastRealtimeUpdate('GITHUB_READONLY_SYNC');
+    return { syncedResults, platforms, selfHealth, costGuard };
+  }
+
+  app.post('/api/github/sync', async (req, res) => {
+    try {
+      const result = await syncGithubFleet(req.body?.appId);
+      res.json(result);
+    } catch {
+      res.status(503).json({ error: 'تعذر إجراء فحص GitHub الآن.' });
+    }
   });
+
+  // Automatic monitoring is opt-in: a read-only token is required for a sustainable
+  // rate limit budget. Without a token, the operator can request a manual sync.
+  // Never write to or redeploy the monitored repositories.
+  if (process.env.GITHUB_READ_ONLY_TOKEN) {
+    let githubRefreshActive = false;
+    const refresh = async () => {
+      if (githubRefreshActive) return;
+      githubRefreshActive = true;
+      try { await syncGithubFleet(); }
+      catch (err) { console.warn('ORBIT GitHub read-only refresh failed:', err instanceof Error ? err.message : 'unknown'); }
+      finally { githubRefreshActive = false; }
+    };
+    void refresh();
+    setInterval(() => { void refresh(); }, 10 * 60_000).unref();
+  }
 
   // 4. Universal Radar Event Ingestion API
   app.post('/api/radar/ingest', (req, res) => {
