@@ -172,7 +172,7 @@ export interface CommitRecord {
   timestamp: string;
   branch: string;
   changedFiles: string[];
-  riskLevel: 'Low' | 'Medium' | 'High';
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Unknown';
   dataIntegrity: DataIntegrityState;
 }
 
