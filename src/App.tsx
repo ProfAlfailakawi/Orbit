@@ -602,15 +602,17 @@ export default function App() {
   };
 
   const handleSaveMemory = async (payload: {
+    id?: string;
     appId: string;
+    incidentId: string;
     problemTitle: string;
-    symptom: string;
-    verifiedRootCause: string;
-    verifiedFix: string;
-    wrongHypothesisExcluded: string;
-    recoveryDurationMinutes: number;
-    preventionRule: string;
-    isVerified: boolean;
+    confirmedRootCause: string;
+    disprovenHypotheses: string[];
+    verifiedFixSummary: string;
+    preventionTestAdded: string;
+    lessonsLearned: string;
+    recurringPatternTag: string;
+    isConfirmedByEvidence: boolean;
   }): Promise<{ accepted: boolean; error?: string }> => {
     const res = await fetch('/api/memory/save', {
       method: 'POST',
@@ -1647,8 +1649,8 @@ export default function App() {
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-200 truncate">{ac.title}</div>
-                        <div className="text-[11px] text-slate-400 truncate">{ac.evidenceSummary}</div>
+                        <div className="font-semibold text-slate-200 truncate">{ac.titleAr}</div>
+                        <div className="text-[11px] text-slate-400 truncate">{ac.evidenceDetail}</div>
                       </div>
                     </div>
                   ))}
