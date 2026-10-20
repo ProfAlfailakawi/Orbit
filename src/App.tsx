@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Settings2,
   Sun,
   Terminal,
   Unlock,
@@ -779,215 +780,62 @@ export default function App() {
     >
       <OfflineConnectivityBanner />
 
-      {/* Strict 3-Zone Top Bar Contract (frontend-design Section 2) */}
-      <header
-        className={`sticky top-0 z-40 flex items-center justify-between gap-2 sm:gap-8 px-4 sm:px-8 py-3.5 border-b backdrop-blur-md ${
-          isDark ? 'border-slate-800/80 bg-[#070B14]/90' : 'border-slate-200 bg-white/90'
-        }`}
-      >
-        {/* Zone 1: Single text element wordmark */}
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            setSelectedPlatformId(null);
-            setActiveNav('mission-control');
-          }}
-          className="text-lg font-bold tracking-tight whitespace-nowrap shrink-0"
-        >
-          ORBIT | أوربت
-        </a>
-
-        {/* Zone 2: 5 concise single-line text navigation links */}
-        <nav
-          aria-label="التنقل الرئيسي"
-          className="hidden md:flex items-center gap-7 text-sm font-medium"
-        >
-          {(
-            [
-              { id: 'mission-control', label: 'غرفة القيادة' },
-              { id: 'universal-radar', label: 'الرادار الشامل' },
-              { id: 'fleet-manager', label: 'إدارة الأسطول' },
-              { id: 'intelligence', label: 'الذكاء الهندسي' },
-              { id: 'operations', label: 'الحماية والحوكمة' },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setSelectedPlatformId(null);
-                setActiveNav(item.id);
-              }}
-              className={`transition-colors whitespace-nowrap shrink-0 pb-1 ${
-                activeNav === item.id && !selectedPlatformId
-                  ? 'text-sky-400 border-b-2 border-sky-400 font-semibold'
-                  : isDark
-                  ? 'text-slate-400 hover:text-slate-100'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {item.label}
+      <header className="orbit-header">
+        <div className="orbit-header-content">
+          <button type="button" className="orbit-brand" onClick={() => { setSelectedPlatformId(null); setActiveNav('mission-control'); }} aria-label="العودة إلى غرفة القيادة">
+            <span className="orbit-brand-mark"><Radar size={24} strokeWidth={1.7}/></span>
+            <span className="orbit-brand-text"><strong>أوربت</strong><small>ORBIT</small></span>
+          </button>
+          <nav aria-label="التنقل الرئيسي" className="orbit-desktop-nav">
+            {([
+              { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
+              { id: 'universal-radar', name: 'الرادار', Icon: Radar },
+              { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
+              { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
+              { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
+            ] as const).map(({ id, name, Icon }) => (
+              <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
+                onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
+                className={activeNav === id && !selectedPlatformId ? 'orbit-nav-link active' : 'orbit-nav-link'}>
+                <Icon size={16} strokeWidth={1.75}/>{name}
+              </button>
+            ))}
+          </nav>
+          <div className="orbit-header-controls">
+            <span className="orbit-header-evidence"><span/> قيد التحقق</span>
+            <details className="orbit-tools-menu">
+              <summary aria-label="أدوات وإعدادات"><Settings2 size={18}/><span>الأدوات</span></summary>
+              <div className="orbit-tools-popover">
+                <button type="button" onClick={() => { void handleSyncGithub(); }}><RefreshCw size={17}/> مزامنة GitHub</button>
+                <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Firebase'}</button>
+                {firebaseUser && <button type="button" onClick={() => { void signOutGoogleOperator(); }}><Lock size={17}/> خروج من Google</button>}
+                <button type="button" onClick={() => setIsDark(!isDark)}><Moon size={17}/> {isDark ? 'المظهر الفاتح' : 'المظهر الداكن'}</button>
+                <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={17}/> فحص ORBIT الذاتي</button>
+                <div className="orbit-tools-install"><PWAInstallButton isDark={isDark}/></div>
+              </div>
+            </details>
+            <button type="button" className="orbit-lock-control" title="قفل الجلسة" aria-label="قفل الجلسة"
+              onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}>
+              <Lock size={17}/>
+            </button>
+          </div>
+        </div>
+        <nav aria-label="التنقل على الهاتف" className="orbit-mobile-nav">
+          {([
+            { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
+            { id: 'universal-radar', name: 'الرادار', Icon: Radar },
+            { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
+            { id: 'intelligence', name: 'الذكاء', Icon: BrainCircuit },
+            { id: 'operations', name: 'الحماية', Icon: ShieldCheck },
+          ] as const).map(({ id, name, Icon }) => (
+            <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
+              onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
+              className={activeNav === id && !selectedPlatformId ? 'orbit-mobile-tab active' : 'orbit-mobile-tab'}>
+              <Icon size={19} strokeWidth={1.75}/><span>{name}</span>
             </button>
           ))}
         </nav>
-
-        {/* Zone 3: Primary Action */}
-        <div className="flex items-center gap-2 shrink-0">
-          <PWAInstallButton isDark={isDark} />
-          <button
-            type="button"
-            onClick={handleRunCanary}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-950 bg-sky-400 rounded-xl hover:bg-sky-300 transition-colors whitespace-nowrap shrink-0"
-          >
-            فحص الكناري الذاتي
-          </button>
-        </div>
       </header>
-
-      {/* Mobile Navigation Bar */}
-      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto px-3 py-2 border-b border-slate-800/80 bg-slate-950/60">
-        {(
-          [
-            { id: 'mission-control', label: 'غرفة القيادة' },
-            { id: 'universal-radar', label: 'الرادار الشامل' },
-            { id: 'fleet-manager', label: 'إدارة الأسطول' },
-            { id: 'intelligence', label: 'الذكاء الهندسي' },
-            { id: 'operations', label: 'الحماية والحوكمة' },
-          ] as const
-        ).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              setSelectedPlatformId(null);
-              setActiveNav(item.id);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 ${
-              activeNav === item.id && !selectedPlatformId
-                ? 'bg-sky-500 text-slate-950 font-semibold'
-                : 'text-slate-400'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Minimalist Icon & Search Strip */}
-      <div
-        className={`orbit-quiet-strip border-b px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs ${
-          isDark ? 'border-slate-800/60 bg-[#0A0F1D]/80' : 'border-slate-200 bg-slate-100/70'
-        }`}
-      >
-        <div className="flex flex-wrap items-center gap-3 text-slate-400 font-mono">
-          <span>ProfAlfailakawi</span>
-          <span>·</span>
-          <span className="tabular-nums text-slate-200 font-semibold">{activeFleet.length} منصة</span>
-          <span>·</span>
-          <span className="text-slate-500">مراقبة — التحقق مطلوب</span>
-          <span>·</span>
-          <span className="tabular-nums text-sky-400">{selfHealth.eventProcessingDelayMs}ms</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2" />
-            <input
-              type="search"
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="ابحث عن برنامج أو حادثة..."
-              aria-label="بحث شامل في البرامج والحوادث"
-              className={`rounded-xl border pr-8 pl-3 py-1 text-xs w-48 sm:w-60 ${
-                isDark
-                  ? 'border-slate-800 bg-slate-900/90 text-slate-100'
-                  : 'border-slate-300 bg-white text-slate-900'
-              }`}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => handleSyncGithub()}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 transition-colors whitespace-nowrap shrink-0 ${
-              isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
-            <span>مزامنة GitHub</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleManualCloudSync}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 transition-colors whitespace-nowrap shrink-0 ${
-              firebaseUser
-                ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40'
-                : isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-300'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-700'
-            }`}
-            title={
-              firebaseUser
-                ? `متصل بـ Firebase Firestore (${firebaseUser.email})${
-                    cloudSyncedAt
-                      ? ` — آخر مزامنة: ${new Date(cloudSyncedAt).toLocaleTimeString('ar-KW')}`
-                      : ''
-                  }`
-                : 'اضغط لتسجيل الدخول بـ Google وتفعيل الحفظ السحابي في Firebase'
-            }
-          >
-            <Cloud className={`w-3.5 h-3.5 ${firebaseUser ? 'text-emerald-400' : 'text-sky-400'}`} />
-            <span>
-              {firebaseUser
-                ? `سحابة Firebase (${firebaseUser.email?.split('@')[0]})`
-                : 'ربط سحابة Firebase'}
-            </span>
-          </button>
-
-          {firebaseUser && (
-            <button
-              type="button"
-              onClick={() => void signOutGoogleOperator()}
-              className="rounded-xl border border-slate-800 px-2.5 py-1 text-[11px] text-slate-400 hover:text-rose-300 whitespace-nowrap shrink-0"
-            >
-              خروج
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsDark(!isDark)}
-            aria-label="تبديل المظهر الداكن أو الفاتح"
-            className={`p-1.5 rounded-xl border ${
-              isDark ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-300 hover:bg-slate-200'
-            }`}
-          >
-            {isDark ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}
-            aria-label="قفل الجلسة"
-            className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 ${
-              isDark
-                ? 'border-slate-800 hover:bg-slate-800 text-slate-400'
-                : 'border-slate-300 hover:bg-slate-200 text-slate-600'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>قفل</span>
-          </button>
-        </div>
-      </div>
 
       {/* Sync / Action Feedback Banner */}
       {syncBanner && (
@@ -1006,11 +854,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Seed snapshots are examples, never verified production telemetry. */}
-      <div role="status" className={`orbit-data-notice mx-auto max-w-[1440px] my-3 flex items-start gap-3 text-sm ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>
-        <AlertTriangle className="w-5 h-5 shrink-0" />
-        <span>تنبيه: تحتوي ORBIT حالياً على بيانات توضيحية ومخزنة. لا تعتبر نسب الصحة أو الحوادث دليلاً مباشراً على حالة برامجك حتى يكتمل ربط المصادر والتحقق منها.</span>
-      </div>
+      {(activeNav !== 'mission-control' || Boolean(selectedPlatformId)) && (
+        <div role="status" className="orbit-evidence-note mx-auto max-w-[1440px]">
+          <AlertTriangle size={15} />
+          <span>بعض بيانات هذه الصفحة توضيحية أو مخزنة؛ تحقق من المصدر قبل اتخاذ قرار إنتاجي.</span>
+        </div>
+      )}
 
       {/* Main Content Container */}
       <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
