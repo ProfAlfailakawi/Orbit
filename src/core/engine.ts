@@ -13,6 +13,7 @@ import type {
   PlatformLifecycleState,
   PlatformRecord,
   RadarEvent,
+  SelfHealthMetrics,
 } from './types.ts';
 
 export const MANDATORY_CLAUDE_GUARDRAIL =
