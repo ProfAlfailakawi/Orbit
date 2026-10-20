@@ -1244,7 +1244,7 @@ export default function App() {
                             رادار الـ 5 ثوانٍ · {topCriticalIncident.incidentId}
                           </div>
                           <div className="text-sm font-bold text-white mt-0.5">
-                            {topCriticalIncident.appId} — {topCriticalIncident.titleAr || "حادثة تحتاج مراجعة"}
+                            {topCriticalIncident.appId} — {topCriticalIncident.title || "حادثة تحتاج مراجعة"}
                           </div>
                         </div>
                       </div>
