@@ -82,6 +82,7 @@ import type {
 } from './core/types';
 import { DynamicFleetView } from './components/DynamicFleetView';
 import { ExecutiveOverview } from './components/ExecutiveOverview';
+import { WorkspaceOverview } from './components/WorkspaceOverview';
 import {
   EngineeringIntelligenceView,
   OperationsAndGovernanceView,
@@ -898,6 +899,30 @@ export default function App() {
             isDark={isDark}
           />
         ) : activeNav === 'universal-radar' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="radar"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-radar') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-radar" className="orbit-advanced orbit-specialist-advanced">
+              <summary>الرادار المتقدم والتشخيص · اختياري</summary>
+              <div className="pt-3 space-y-6">
           <UniversalRadarView
             platforms={activeFleet}
             events={events}
@@ -929,7 +954,34 @@ export default function App() {
             }}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'fleet-manager' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="fleet"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-fleet') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-fleet" className="orbit-advanced orbit-specialist-advanced">
+              <summary>إضافة أو تعديل أو أرشفة البرامج · إدارة متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <DynamicFleetView
             platforms={platforms}
             discoveredCandidates={discoveredCandidates}
@@ -942,7 +994,34 @@ export default function App() {
             onSelectPlatform={(id) => setSelectedPlatformId(id)}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'intelligence' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="intelligence"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-intelligence') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-intelligence" className="orbit-advanced orbit-specialist-advanced">
+              <summary>التحليلات والذاكرة والمختبر · أدوات متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <EngineeringIntelligenceView
             platforms={activeFleet}
             changeImpacts={changeImpacts}
@@ -963,7 +1042,34 @@ export default function App() {
             onSaveMemory={handleSaveMemory}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : activeNav === 'operations' ? (
+          <div className="space-y-5">
+            <WorkspaceOverview
+              mode="operations"
+              platforms={platforms}
+              incidents={incidents}
+              events={events}
+              engineeringMemory={engineeringMemory}
+              changeImpacts={changeImpacts}
+              silentFailures={silentFailures}
+              alerts={alerts}
+              acceptanceCriteria={acceptanceCriteria}
+              selfHealth={selfHealth}
+              canaryHistory={canaryHistory}
+              openAdvanced={() => {
+                const el = document.getElementById('orbit-advanced-operations') as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+              }}
+              openPlatform={(id) => setSelectedPlatformId(id)}
+              openIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+              syncGithub={() => { void handleSyncGithub(); }}
+            />
+            <details id="orbit-advanced-operations" className="orbit-advanced orbit-specialist-advanced">
+              <summary>فحوص الحماية والتقارير والتجارب · أدوات متقدمة</summary>
+              <div className="pt-3 space-y-6">
           <OperationsAndGovernanceView
             platforms={activeFleet}
             incidents={incidents}
@@ -984,6 +1090,9 @@ export default function App() {
             onSimulateWebhook={handleSimulateWebhook}
             isDark={isDark}
           />
+              </div>
+            </details>
+          </div>
         ) : (
           /* =================================================================
              MISSION CONTROL — INFOGRAPHIC, ICON-FIRST, MINIMAL-TEXT DESIGN
