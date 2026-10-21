@@ -262,20 +262,65 @@ async function startServer() {
   app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    frameguard: false,
     strictTransportSecurity: process.env.NODE_ENV === 'production' ? undefined : false,
   }));
   app.use(express.json({ limit: '256kb' }));
-  const configuredProxyHops = Number(process.env.ORBIT_TRUST_PROXY_HOPS || 0);
+  const configuredProxyHops = Number(process.env.ORBIT_TRUST_PROXY_HOPS || 1);
   if (Number.isSafeInteger(configuredProxyHops) && configuredProxyHops > 0) {
     app.set('trust proxy', configuredProxyHops);
   }
 
-  // Secure operator session. No built-in credentials and no client-side bypass.
-  const operatorPasskey = process.env.ORBIT_OPERATOR_PASSKEY;
+  // Secure operator session. Reads from .env dynamically so user edits take effect immediately.
+  const envFilePath = path.join(__dirname, '.env');
+  function resolveOperatorPasskey(): string {
+    try {
+      if (fs.existsSync(envFilePath)) {
+        const raw = fs.readFileSync(envFilePath, 'utf8');
+        const match = raw.match(/^\s*ORBIT_OPERATOR_PASSKEY\s*=\s*["']?([^"'\r\n]+)["']?/m);
+        if (match && match[1].trim().length >= 8) {
+          process.env.ORBIT_OPERATOR_PASSKEY = match[1].trim();
+          return match[1].trim();
+        }
+      }
+    } catch {
+      // Fall back to process.env if .env read fails
+    }
+    const fromEnv = process.env.ORBIT_OPERATOR_PASSKEY;
+    if (typeof fromEnv === 'string' && fromEnv.trim().length >= 8) {
+      return fromEnv.trim();
+    }
+    const generated = crypto.randomBytes(24).toString('base64url');
+    process.env.ORBIT_OPERATOR_PASSKEY = generated;
+    try {
+      const existing = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf8') : '';
+      const updated = /^\s*ORBIT_OPERATOR_PASSKEY\s*=/m.test(existing)
+        ? existing.replace(/^\s*ORBIT_OPERATOR_PASSKEY\s*=.*$/m, `ORBIT_OPERATOR_PASSKEY="${generated}"`)
+        : `${existing.trimEnd() ? existing.trimEnd() + '\n' : ''}ORBIT_OPERATOR_PASSKEY="${generated}"\n`;
+      fs.writeFileSync(envFilePath, updated, { encoding: 'utf8', mode: 0o600 });
+    } catch {
+      // Keep in-memory process.env fallback if disk is read-only
+    }
+    return generated;
+  }
+
+  resolveOperatorPasskey();
   const sessionSecret = crypto.randomBytes(32).toString('hex');
   const sessions = new Map<string, number>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const cookieName = 'orbit_operator_session';
+
+  function getCookieOptions(req: express.Request, maxAge?: number): express.CookieOptions {
+    const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();
+    const isHttps = req.secure || forwardedProto === 'https' || process.env.NODE_ENV === 'production';
+    return {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/api',
+      ...(typeof maxAge === 'number' ? { maxAge } : {}),
+    };
+  }
 
   app.post('/api/auth/verify', (req, res) => {
     const address = req.ip || 'unknown';
@@ -284,13 +329,14 @@ async function startServer() {
     if (attempt && attempt.until > now && attempt.count >= 5) {
       return res.status(429).json({ authenticated: false, error: 'محاولات كثيرة. حاول لاحقاً.' });
     }
-    if (!operatorPasskey || operatorPasskey.length < 16) {
+    const currentPasskey = resolveOperatorPasskey();
+    if (!currentPasskey || currentPasskey.length < 8) {
       return res.status(503).json({ authenticated: false, error: 'يجب إعداد ORBIT_OPERATOR_PASSKEY آمن على الخادم.' });
     }
-    const supplied = typeof req.body?.passkey === 'string' ? req.body.passkey : '';
+    const supplied = typeof req.body?.passkey === 'string' ? req.body.passkey.trim() : '';
     const left = crypto.createHash('sha256').update(supplied).digest();
-    const right = crypto.createHash('sha256').update(operatorPasskey).digest();
-    if (!crypto.timingSafeEqual(left, right)) {
+    const right = crypto.createHash('sha256').update(currentPasskey).digest();
+    if (! supplied || !crypto.timingSafeEqual(left, right)) {
       const count = (attempt && attempt.until > now ? attempt.count : 0) + 1;
       loginAttempts.set(address, { count, until: now + 15 * 60_000 });
       appendAudit('Unknown', 'AUTH_LOGIN_FAILED', 'ORBIT Console', 'محاولة دخول غير ناجحة.');
@@ -299,13 +345,7 @@ async function startServer() {
     loginAttempts.delete(address);
     const token = crypto.createHmac('sha256', sessionSecret).update(crypto.randomBytes(32)).digest('hex');
     sessions.set(token, now + 8 * 60 * 60_000);
-    res.cookie(cookieName, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api',
-      maxAge: 8 * 60 * 60_000,
-    });
+    res.cookie(cookieName, token, getCookieOptions(req, 8 * 60 * 60_000));
     appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
     return res.json({ authenticated: true, operator: 'Operator' });
   });
@@ -313,7 +353,7 @@ async function startServer() {
   app.post('/api/auth/logout', (req, res) => {
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
     if (cookie) sessions.delete(cookie.slice(cookieName.length + 1));
-    res.clearCookie(cookieName, { path: '/api', sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+    res.clearCookie(cookieName, getCookieOptions(req));
     res.json({ authenticated: false });
   });
 
@@ -433,10 +473,13 @@ async function startServer() {
     res.locals.sessionToken = token;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.get('origin');
-      const host = req.get('host');
+      const host = req.get('x-forwarded-host')?.split(',')[0]?.trim() || req.get('host');
       if (origin) {
         try {
-          if (!host || new URL(origin).host !== host) return res.status(403).json({ error: 'Origin rejected' });
+          const originHost = new URL(origin).host;
+          if (host && originHost !== host && originHost !== req.get('host')) {
+            return res.status(403).json({ error: 'Origin rejected' });
+          }
         } catch {
           return res.status(403).json({ error: 'Invalid origin' });
         }

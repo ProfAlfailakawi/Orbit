@@ -349,15 +349,31 @@ export default function App() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     try {
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
         body: JSON.stringify({ passkey: passkeyInput }),
       });
-      const data = await res.json();
-      if (data.authenticated) {
+      const text = await res.text();
+      let data: { authenticated?: boolean; error?: string } | null = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+      if (!data) {
+        setAuthError('تعذر التحقق من الخادم. لا يمكن الدخول دون مصادقة.');
+        return;
+      }
+      if (res.ok && data.authenticated) {
         setIsLocked(false);
+        setPasskeyInput('');
         setAuthError(null);
         await fetchServerState();
       } else {
@@ -725,32 +741,48 @@ export default function App() {
     return (
       <div
         dir="rtl"
-        className={`min-h-screen flex items-center justify-center p-6 ${
-          isDark ? 'bg-[#070B14] text-slate-100' : 'bg-slate-50 text-slate-900'
+        className={`orbit-shell ${isDark ? 'orbit-dark' : ''} min-h-screen flex items-center justify-center p-6 ${
+          isDark ? 'bg-[#070B14] text-slate-100' : 'bg-[#F4F7FB] text-slate-900'
         }`}
       >
         <form
           onSubmit={handleLoginSubmit}
-          className={`w-full max-w-md rounded-2xl border p-8 space-y-5 ${surfaceCls}`}
+          className={`w-full max-w-md rounded-3xl border p-8 space-y-5 shadow-sm ${
+            isDark
+              ? 'border-slate-800 bg-[#141f31] text-slate-100'
+              : 'border-slate-200 bg-white text-slate-900'
+          }`}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+          <div className="flex items-center gap-3.5">
+            <div className="orbit-brand-mark shrink-0">
               <Radar className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">ORBIT | أوربت</h1>
-              <p className="text-xs text-slate-400">بوابة التحكم السيادية · قراءة فقط</p>
+              <h1 className="text-2xl font-extrabold tracking-tight">ORBIT | أوربت</h1>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                بوابة التحكم السيادية · قراءة فقط
+              </p>
             </div>
           </div>
 
           {authError && (
-            <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3 text-xs text-rose-300">
+            <div
+              role="alert"
+              className={`rounded-xl border p-3.5 text-xs font-semibold ${
+                isDark
+                  ? 'border-rose-400/40 bg-rose-950/60 text-rose-200'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}
+            >
               {authError}
             </div>
           )}
 
-          <div className="space-y-1.5 text-xs">
-            <label htmlFor="orbit-passkey-input" className="block text-slate-300 font-medium">
+          <div className="space-y-2 text-xs">
+            <label
+              htmlFor="orbit-passkey-input"
+              className={`block font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}
+            >
               رمز المشغل الآمن (Operator Passkey):
             </label>
             <input
@@ -758,13 +790,17 @@ export default function App() {
               type="password"
               value={passkeyInput}
               onChange={(e) => setPasskeyInput(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm font-mono text-slate-100"
+              className={`w-full rounded-xl border px-4 py-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 ${
+                isDark
+                  ? 'border-slate-700 bg-slate-900 text-slate-100 focus:bg-slate-950'
+                  : 'border-slate-300 bg-slate-50 text-slate-900 focus:bg-white'
+              }`}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-sky-400 transition-colors"
+            className="orbit-main-button w-full"
           >
             <Unlock className="w-4 h-4" />
             <span>دخول غرفة العمليات (Unlock ORBIT)</span>
@@ -773,7 +809,11 @@ export default function App() {
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-2.5 text-xs font-bold text-emerald-300 hover:bg-emerald-900/40 transition-colors"
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-colors ${
+              isDark
+                ? 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
           >
             <Cloud className="w-4 h-4" />
             <span>دخول ومزامنة سحابية عبر Google</span>
