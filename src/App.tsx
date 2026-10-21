@@ -9,9 +9,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowUpLeft,
-  BrainCircuit,
   CheckCircle2,
-  Code2,
   Compass,
   Copy,
   Cpu,
@@ -19,7 +17,6 @@ import {
   Eye,
   FolderGit2,
   GitCommit,
-  Layers,
   Laptop,
   Lock,
   Play,
@@ -27,7 +24,6 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
-  ShieldCheck,
   Sparkles,
   Sun,
   Terminal,
@@ -80,7 +76,6 @@ import {
 } from './components/IntelligenceAndOpsView';
 import {
   OfflineConnectivityBanner,
-  PWAInstallButton,
 } from './components/PWAInstallButton';
 import {
   DataIntegrityTag,
@@ -759,23 +754,6 @@ export default function App() {
             <span className="orbit-brand-text"><strong>أوربت <span className="one-brand-one">ONE</span></strong><small>مراقبة كل برامجك</small></span>
           </button>
           <div className="orbit-header-controls one-unified-controls">
-            <details className="orbit-tools-menu one-quiet-settings">
-              <summary aria-label="الإعدادات" title="الإعدادات"><span>الإعدادات</span></summary>
-              <div className="orbit-tools-popover">
-                <div className="one-settings-divider"/>
-                <details className="one-specialist-only">
-                  <summary><Code2 size={17}/> للمختص التقني فقط</summary>
-                  <div className="one-specialist-menu">
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('universal-radar'); }}><Radar size={16}/> تشخيص الحوادث</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}><Layers size={16}/> إعدادات البرامج</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={16}/> التحليلات</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={16}/> الحماية والاختبارات</button>
-                    <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={16}/> فحص أوربت الذاتي</button>
-                  </div>
-                </details>
-                <div className="orbit-tools-install"><PWAInstallButton isDark={isDark}/></div>
-              </div>
-            </details>
             <button type="button" className="orbit-lock-control" title="قفل الجلسة" aria-label="قفل الجلسة"
               onClick={() => { void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => { clearOrbitSessionToken(); setIsLocked(true); }); }}>
               <Lock size={17}/>
