@@ -236,6 +236,8 @@ function loadStateFromDisk() {
     if (Array.isArray(parsed.events)) events = parsed.events;
     if (Array.isArray(parsed.incidents)) incidents = parsed.incidents;
     if (Array.isArray(parsed.alerts)) alerts = parsed.alerts;
+    if (Array.isArray(parsed.silentFailures)) silentFailures = parsed.silentFailures;
+    if (Array.isArray(parsed.crossAppPatterns)) crossAppPatterns = parsed.crossAppPatterns;
     if (Array.isArray(parsed.engineeringMemory)) engineeringMemory = parsed.engineeringMemory;
     if (Array.isArray(parsed.discoveredCandidates)) discoveredCandidates = parsed.discoveredCandidates;
     if (Array.isArray(parsed.canaryHistory)) canaryHistory = parsed.canaryHistory;
@@ -473,14 +475,14 @@ async function startServer() {
       silentFailures = [{
         id: 'TRUTH-' + outcome.event.eventId,
         appId,
-        patternType: 'Fake Success Toast without DB Commit',
+        patternType: 'Fake Success Toast without DB Commit' as const,
         operationName,
         detectedAt: new Date().toISOString(),
         evidenceSummary: 'Authenticated app-scoped sensor reports UI success with explicit authoritative non-commit.',
         expectedOutcome: 'Successful operation must be confirmed by the server.',
         actualOutcome: 'The server explicitly reported non-commit.',
-        confidence: 'High',
-        dataIntegrity: 'Live',
+        confidence: 'High' as const,
+        dataIntegrity: 'Live' as const,
       }, ...silentFailures].slice(0, 120);
     }
     boundedTelemetryState();
