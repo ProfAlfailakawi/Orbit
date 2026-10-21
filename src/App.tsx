@@ -687,7 +687,7 @@ export default function App() {
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight">ORBIT | أوربت</h1>
               <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                بوابة التحكم السيادية · قراءة فقط
+                دخول خاص · قراءة فقط
               </p>
             </div>
           </div>
@@ -710,7 +710,7 @@ export default function App() {
               htmlFor="orbit-passkey-input"
               className={`block font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}
             >
-              رمز المشغل الآمن (Operator Passkey):
+              رمز الدخول
             </label>
             <input
               id="orbit-passkey-input"
@@ -730,7 +730,7 @@ export default function App() {
             className="orbit-main-button w-full"
           >
             <Unlock className="w-4 h-4" />
-            <span>دخول غرفة العمليات (Unlock ORBIT)</span>
+            <span>دخول غرفة العمليات</span>
           </button>
 
         </form>

@@ -26,6 +26,7 @@ import type {
   RadarEvent,
   SilentFailureSignal,
 } from '../core/types';
+import { buildFleetReportForClaude } from '../core/guardian';
 import {
   DataIntegrityTag,
   HealthStatusIndicator,
@@ -33,18 +34,17 @@ import {
   RadialGauge,
   ReleaseShieldLabel,
   SeverityLabel,
-  ThreeEyesInfographicRow,
 } from './Primitives';
 
 const PROGRAM_TABS = [
   { id: 'overview', labelAr: 'ملخص' },
-  { id: 'radar', labelAr: 'مراقبة مباشرة' },
+  { id: 'radar', labelAr: 'سجل الأحداث' },
   { id: 'client-errors', labelAr: 'أخطاء الموقع' },
   { id: 'backend-errors', labelAr: 'أخطاء الخادم' },
   { id: 'journeys', labelAr: 'تجربة الزائر' },
-  { id: 'deployments', labelAr: 'التحديثات' },
+  { id: 'deployments', labelAr: 'النشر' },
   { id: 'actions', labelAr: 'الاختبارات' },
-  { id: 'commits', labelAr: 'التحديثات' },
+  { id: 'commits', labelAr: 'التعديلات' },
   { id: 'performance', labelAr: 'السرعة' },
   { id: 'security', labelAr: 'الحماية' },
   { id: 'feature-dna', labelAr: 'المزايا' },
@@ -140,14 +140,14 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
     : 'border-slate-200 bg-white text-slate-900';
 
   const copyProgramReport = () => {
-    const text = `# تقرير صحة البرنامج — ${platform.codeName} (${platform.nameAr})
+    const text = buildFleetReportForClaude([platform], incidents) + `\n\n# تقرير صحة البرنامج — ${platform.codeName} (${platform.nameAr})
 - المستودع: ${platform.owner}/${platform.repoName} (${platform.defaultBranch})
 - الحالة الفعلية: ${platform.healthStatus} | نزاهة البيانات: ${platform.dataIntegrity}
 - تغطية المراقبة: ${platform.monitoringCoveragePct}% | درع الإصدار: ${platform.releaseShield}
 - آخر دليل مؤكد: ${platform.lastVerifiedEvidence} (${platform.lastVerifiedTimestamp})
 - الحوادث النشطة: ${appIncidents.length} | الأحداث المسجلة: ${appEvents.length}
 `;
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text).catch(() => {});
     setCopiedReport(true);
     setTimeout(() => setCopiedReport(false), 2000);
   };
@@ -175,6 +175,14 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={copyProgramReport}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedReport ? 'تم النسخ — الصقه في كلود' : 'انسخ تقرير المشكلة لكلود'}</span>
+            </button>
             {!platform.connectionVerified && (
               <button
                 type="button"
@@ -227,17 +235,12 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
                 <h1 className="text-2xl font-bold tracking-tight">{platform.nameAr}</h1>
                 <HealthStatusIndicator status={platform.healthStatus} />
               </div>
-              <div className="max-w-md">
-                <ThreeEyesInfographicRow fourState={platform.fourState} />
-              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 font-mono">
                 <span>
                   {platform.owner}/{platform.repoName}
                 </span>
                 <span>·</span>
                 <span>{platform.defaultBranch}</span>
-                <span>·</span>
-                <span>{platform.runtimeMode}</span>
                 {platform.productionUrl && (
                   <>
                     <span>·</span>
@@ -335,7 +338,7 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
               <span>المزيد</span>
               <select aria-label="أقسام إضافية" value={PRIMARY_PROGRAM_TABS.includes(activeTab) ? '' : activeTab}
                 onChange={(event) => { if (event.target.value) setActiveTab(event.target.value as ProgramTabId); }}>
-                <option value="">أقسام إضافية</option>
+                <option value="">تفاصيل تقنية</option>
                 {PROGRAM_TABS.filter(t => !PRIMARY_PROGRAM_TABS.includes(t.id)).map(t => <option key={t.id} value={t.id}>{t.labelAr}</option>)}
               </select>
             </label>
