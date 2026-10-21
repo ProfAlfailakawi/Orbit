@@ -29,7 +29,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Settings2,
   Sun,
   Terminal,
   Unlock,
@@ -369,7 +368,7 @@ export default function App() {
       const checked = Array.isArray(data.syncedResults) ? data.syncedResults.length : 0;
       const successful = Array.isArray(data.syncedResults)
         ? data.syncedResults.filter((item: { integrity: string }) => item.integrity === 'Live').length : 0;
-      setSyncBanner(`تم فحص ${checked} مستودعات؛ تأكد الوصول إلى ${successful}. هذا لا يثبت عمل المواقع الإنتاجية.`);
+      setSyncBanner(`اكتمل فحص GitHub: تم تأكيد الوصول إلى ${successful} من ${checked} مستودعاً. فحص GitHub لا يؤكد عمل المواقع الإنتاجية.`);
     } catch (error) {
       setSyncBanner(error instanceof Error ? error.message : 'تعذر الوصول إلى GitHub.');
     } finally {
@@ -760,9 +759,8 @@ export default function App() {
             <span className="orbit-brand-text"><strong>أوربت <span className="one-brand-one">ONE</span></strong><small>مراقبة كل برامجك</small></span>
           </button>
           <div className="orbit-header-controls one-unified-controls">
-            <span className="one-header-subtitle">نظرة واحدة. بدون ضوضاء.</span>
             <details className="orbit-tools-menu one-quiet-settings">
-              <summary aria-label="الإعدادات" title="الإعدادات"><Settings2 size={19}/></summary>
+              <summary aria-label="الإعدادات" title="الإعدادات"><span>الإعدادات</span></summary>
               <div className="orbit-tools-popover">
                 <div className="one-settings-divider"/>
                 <details className="one-specialist-only">
@@ -788,15 +786,15 @@ export default function App() {
 
       {/* Sync / Action Feedback Banner */}
       {syncBanner && (
-        <div className="bg-sky-500/15 border-b border-sky-500/30 px-6 py-2 text-xs text-sky-300 flex items-center justify-between">
+        <div role="status" aria-live="polite" className="bg-sky-50 border-b border-sky-200 px-6 py-3 text-sm font-medium text-sky-950 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-sky-700 shrink-0" />
             <span>{syncBanner}</span>
           </div>
           <button
             type="button"
             onClick={() => setSyncBanner(null)}
-            className="text-slate-400 hover:text-white"
+            className="text-slate-600 hover:text-slate-950"
           >
             إغلاق
           </button>
