@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  evaluateTruthEvidence, buildPrivacySafeTimeline, buildSharedDependencyAdvisory,
  rankPostReleaseChecks, buildRepairIntelligenceAddendum, classifyReadOnlyProbe,
- getProgramProblems, buildFleetReportForClaude,
+ getProgramProblems, buildFleetReportForClaude, getLinkIssue,
 } from './guardian.ts';
 import { inspectRepositoryCapabilities } from './engine.ts';
 import type { IncidentCaseFile, PlatformRecord } from './types.ts';
@@ -75,4 +75,13 @@ test('fleet report lists failures and lists unverified programs as gaps',()=>{
  const text=buildFleetReportForClaude([bad,app('OK')],[],'2026-01-01');
  assert.match(text,/BAD/); assert.match(text,/آخر نشر لم ينجح/); assert.match(text,/رصدها غير مكتمل/);
  assert.match(buildFleetReportForClaude([app('OK')],[],'2026-01-01'),/لا توجد مشاكل مؤكدة/);
+});
+
+test('link issue explains why a program is not linked and ignores local programs',()=>{
+ const p=app('ONE');
+ assert.match(getLinkIssue(p)||'',/لم يُفحص/);
+ p.dataIntegrity='Unavailable'; p.connectionStatus='Unavailable'; p.lastVerifiedEvidence='المستودع خاص ولم يُضبط توكن GitHub; prior success, if any, is cached only.';
+ assert.equal(getLinkIssue(p),'المستودع خاص ولم يُضبط توكن GitHub');
+ assert.match(buildFleetReportForClaude([p],[],'2026-01-01'),/مشاكل الربط/);
+ assert.equal(getLinkIssue({...app('L'),runtimeMode:'local-only'}),null);
 });
