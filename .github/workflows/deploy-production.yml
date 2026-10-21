@@ -45,10 +45,10 @@ jobs:
             exit "$code"
           }
           trap rollback_backend ERR
-          SECRET_BINDINGS="ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest"
-          if gcloud secrets describe GITHUB_READ_ONLY_TOKEN --project "$PROJECT_ID" >/dev/null 2>&1; then
-            SECRET_BINDINGS+=",GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest"
-          fi
+          # Bind the token unconditionally. The deploy identity may not have
+          # secret metadata read permission, so `secrets describe` is not a
+          # reliable test for whether the runtime secret exists.
+          SECRET_BINDINGS="ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest,GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest"
           gcloud run deploy orbit-api \
             --source . --region "$REGION" --project "$PROJECT_ID" \
             --service-account "${{ vars.ORBIT_RUNTIME_SERVICE_ACCOUNT }}" \
