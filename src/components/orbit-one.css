@@ -187,3 +187,47 @@
 @media(prefers-reduced-motion:reduce) {
  .orbit-one *, .orbit-one *::before, .orbit-one *::after {transition:none!important;animation:none!important;}
 }
+
+/* One-page owner shell. Only the settings icon reveals specialist tooling. */
+.orbit-shell .one-unified-header { position:sticky;top:0;z-index:35;backdrop-filter:blur(18px); }
+.orbit-shell .one-unified-header .orbit-header-content {max-width:1440px;width:100%;margin:0 auto;}
+.one-unified-header .one-brand-one {font-size:10px;letter-spacing:.13em;color:#39aa85;margin-inline-start:5px;vertical-align:middle;}
+.one-unified-header .one-header-subtitle {font-size:11px;color:#72869a;font-weight:650;}
+.one-unified-header .one-quiet-settings > summary {display:grid;place-items:center;width:35px;height:35px;border-radius:12px;cursor:pointer;list-style:none;background:transparent;}
+.one-unified-header .one-quiet-settings > summary::-webkit-details-marker {display:none;}
+.one-unified-header .one-quiet-settings > summary span {display:none;}
+.one-unified-header .one-settings-divider {margin:10px 4px;border-top:1px solid #e8edf4;}
+.one-unified-header .one-specialist-only {border-top:1px solid #edf1f7;margin-top:8px;padding-top:7px;}
+.one-unified-header .one-specialist-only > summary {display:flex;align-items:center;gap:9px;cursor:pointer;padding:10px 12px;font-size:12px;color:#63778b;font-weight:750;}
+.one-unified-header .one-specialist-menu {padding:5px 0 6px 12px;}
+.one-unified-header .one-specialist-menu button {width:100%;}
+.one-main {position:relative;}
+.one-quick-add {background:var(--one-panel);border:1px solid var(--one-line);border-radius:20px;box-shadow:0 14px 40px #12334a0d;padding:22px;margin:16px 0 22px;display:grid;grid-template-columns:1fr 1fr;gap:13px;}
+.one-quick-add-intro {grid-column:1/-1;}
+.one-quick-add-intro strong {font-size:15px;font-weight:850;color:var(--one-ink);}
+.one-quick-add-intro p {font-size:11px;color:var(--one-muted);margin:3px 0 0;}
+.one-quick-add label {display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:750;color:var(--one-muted);}
+.one-quick-add label input {width:100%;min-height:41px;border:1px solid var(--one-line);background:var(--one-milk);color:var(--one-ink);border-radius:11px;padding:9px 12px;text-align:start;}
+.one-quick-add-actions {display:flex;gap:9px;grid-column:1/-1;flex-wrap:wrap;}
+.one-quick-add-feedback {grid-column:1/-1;font-size:11px;color:#378e77;font-weight:750;margin:0;}
+.one-quick-add small {grid-column:1/-1;font-size:10px;line-height:1.8;color:var(--one-muted);}
+.one-incident-evidence {border-top:1px solid var(--one-line);margin-top:15px;padding:13px 0 2px;color:var(--one-ink);}
+.one-incident-evidence strong {font-size:11px;font-weight:850;}
+.one-incident-evidence p {font-size:11px;line-height:1.9;margin:7px 0;color:var(--one-muted);}
+.one-incident-evidence span {font-size:10px;color:var(--one-muted);}
+.one-overlay-backdrop {position:fixed;z-index:100;inset:0;padding:20px;background:rgba(11,20,36,.7);backdrop-filter:blur(9px);display:flex;align-items:center;justify-content:center;}
+.one-overlay-panel {position:relative;width:min(1120px,100%);max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;background:var(--orbit-surface,#fff);border-radius:22px;padding:20px 23px 30px;box-shadow:0 25px 100px rgba(0,0,0,.27);color:var(--orbit-ink,#182b42);}
+.orbit-dark .one-overlay-panel {background:#0f1928;color:#f4f6fc;}
+.one-overlay-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;position:sticky;z-index:5;top:-20px;padding:12px 0;background:inherit;border-bottom:1px solid #e7edf2;}
+.one-overlay-heading > div {display:flex;flex-direction:column;gap:3px;}
+.one-overlay-heading > div span {font-size:10px;color:#49a889;letter-spacing:.12em;font-weight:750;}
+.one-overlay-heading strong {font-size:15px;font-weight:850;}
+.one-close-overlay {display:flex;align-items:center;gap:8px;min-height:37px;border-radius:10px;border:1px solid #dce6ed;background:#fff;color:#335a63;padding:8px 13px;font-size:12px;font-weight:750;}
+.orbit-dark .one-close-overlay {background:#1b2d40;color:#e5eef8;border-color:#35445e;}
+@media(max-width:760px){
+ .one-unified-header .one-header-subtitle {display:none;}
+ .one-quick-add {grid-template-columns:1fr;padding:15px;}
+ .one-overlay-backdrop {padding:0;align-items:stretch;}
+ .one-overlay-panel {max-height:100dvh;min-height:100dvh;border-radius:0;padding:14px 12px 30px;}
+ .one-overlay-heading {top:-14px;padding:12px 0;}
+}

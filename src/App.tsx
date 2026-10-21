@@ -537,6 +537,41 @@ export default function App() {
     }
   };
 
+  // The executive owner adds a future application from a name and one URL.
+  // Never grants access to monitored repositories or claims functional monitoring on registration.
+  const handleQuickAddProgram = async (nameAr: string, link: string): Promise<string> => {
+    const title = nameAr.trim();
+    if (!title || title.length < 2) throw new Error('اكتب اسم البرنامج أولاً.');
+    let parsed: URL;
+    try { parsed = new URL(link.trim()); } catch { throw new Error('اكتب رابطاً صحيحاً يبدأ بـ https://'); }
+    if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+      throw new Error('الرابط لازم يكون آمناً ويبدأ بـ https://');
+    }
+    const github = parsed.hostname.toLowerCase() === 'github.com';
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (github && parts.length !== 2) throw new Error('انسخ رابط المستودع مثل github.com/owner/project');
+    const owner = github ? parts[0] : 'ProfAlfailakawi';
+    const repoName = github ? parts[1].replace(/\.git$/i, '') : parsed.hostname.toLowerCase();
+    const codeName = (github ? repoName : parsed.hostname.replace(/\W+/g, '-'))
+      .replace(/[^a-zA-Z0-9_-]/g, '-').toUpperCase().slice(0, 48);
+    const response = await fetch('/api/fleet/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        owner, repoName, codeName, nameAr: title,
+        description: 'برنامج مضاف من ORBIT ONE، بانتظار تفعيل المراقبة الحقيقية.',
+        runtimeMode: github ? 'github-web' : 'non-github-web',
+        productionUrl: github ? '' : parsed.origin,
+        techStack: '', defaultBranch: 'main',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'تعذر إضافة البرنامج.');
+    if (data.platforms) setPlatforms(data.platforms);
+    if (data.auditLogs) setAuditLogs(data.auditLogs);
+    return 'تمت إضافة البرنامج. الربط والمراقبة الفعلية يحتاجان تحققاً مستقلاً.';
+  };
+
   // Section 42 Fleet Handlers
   const handleAddPlatform = async (payload: {
     owner: string;
@@ -832,42 +867,32 @@ export default function App() {
     >
       <OfflineConnectivityBanner />
 
-      <header className="orbit-header">
+      <header className="orbit-header one-unified-header">
         <div className="orbit-header-content">
-          <button type="button" className="orbit-brand" onClick={() => { setSelectedPlatformId(null); setActiveNav('mission-control'); }} aria-label="العودة إلى غرفة القيادة">
+          <button type="button" className="orbit-brand" onClick={() => { setSelectedPlatformId(null); setActiveNav('mission-control'); window.scrollTo({top:0,behavior:'smooth'}); }} aria-label="العودة إلى الصفحة الواحدة">
             <span className="orbit-brand-mark"><Radar size={24} strokeWidth={1.7}/></span>
-            <span className="orbit-brand-text"><strong>أوربت</strong><small>ORBIT</small></span>
+            <span className="orbit-brand-text"><strong>أوربت <span className="one-brand-one">ONE</span></strong><small>مراقبة كل برامجك</small></span>
           </button>
-          <nav aria-label="التنقل الرئيسي" className="orbit-desktop-nav">
-            {([
-              { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
-              { id: 'universal-radar', name: 'الرادار', Icon: Radar },
-              { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
-            ] as const).map(({ id, name, Icon }) => (
-              <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
-                onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
-                className={activeNav === id && !selectedPlatformId ? 'orbit-nav-link active' : 'orbit-nav-link'}>
-                <Icon size={16} strokeWidth={1.75}/>{name}
-              </button>
-            ))}
-          </nav>
-          <div className="orbit-header-controls">
-            <details className="orbit-more-menu orbit-more-menu-desktop">
-              <summary aria-label="المزيد"><Ellipsis size={18}/><span>المزيد</span></summary>
-              <div className="orbit-more-popover">
-                <button type="button" aria-current={activeNav === 'intelligence' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={17}/> الرؤى</button>
-                <button type="button" aria-current={activeNav === 'operations' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={17}/> الحماية</button>
-              </div>
-            </details>
-            <span className="orbit-header-evidence"><span/> قيد التحقق</span>
-            <details className="orbit-tools-menu">
-              <summary aria-label="أدوات وإعدادات"><Settings2 size={18}/><span>الأدوات</span></summary>
+          <div className="orbit-header-controls one-unified-controls">
+            <span className="one-header-subtitle">نظرة واحدة. بدون ضوضاء.</span>
+            <details className="orbit-tools-menu one-quiet-settings">
+              <summary aria-label="الإعدادات" title="الإعدادات"><Settings2 size={19}/></summary>
               <div className="orbit-tools-popover">
-                <button type="button" onClick={() => { void handleSyncGithub(); }}><RefreshCw size={17}/> مزامنة GitHub</button>
-                <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Firebase'}</button>
+                <button type="button" onClick={() => { void handleSyncGithub(); }}><RefreshCw size={17}/> فحص اتصال GitHub</button>
+                <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Google'}</button>
                 {firebaseUser && <button type="button" onClick={() => { void signOutGoogleOperator(); }}><Lock size={17}/> خروج من Google</button>}
                 <button type="button" onClick={() => setIsDark(!isDark)}><Moon size={17}/> {isDark ? 'المظهر الفاتح' : 'المظهر الداكن'}</button>
-                <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={17}/> فحص ORBIT الذاتي</button>
+                <div className="one-settings-divider"/>
+                <details className="one-specialist-only">
+                  <summary><Code2 size={17}/> للمختص التقني فقط</summary>
+                  <div className="one-specialist-menu">
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('universal-radar'); }}><Radar size={16}/> تشخيص الحوادث</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}><Layers size={16}/> إعدادات البرامج</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={16}/> التحليلات</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={16}/> الحماية والاختبارات</button>
+                    <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={16}/> فحص أوربت الذاتي</button>
+                  </div>
+                </details>
                 <div className="orbit-tools-install"><PWAInstallButton isDark={isDark}/></div>
               </div>
             </details>
@@ -877,26 +902,6 @@ export default function App() {
             </button>
           </div>
         </div>
-        <nav aria-label="التنقل على الهاتف" className="orbit-mobile-nav">
-          {([
-            { id: 'mission-control', name: 'الرئيسية', Icon: Activity },
-            { id: 'universal-radar', name: 'الرادار', Icon: Radar },
-            { id: 'fleet-manager', name: 'البرامج', Icon: Layers },
-          ] as const).map(({ id, name, Icon }) => (
-            <button type="button" key={id} aria-current={activeNav === id && !selectedPlatformId ? 'page' : undefined}
-              onClick={() => { setSelectedPlatformId(null); setActiveNav(id); }}
-              className={activeNav === id && !selectedPlatformId ? 'orbit-mobile-tab active' : 'orbit-mobile-tab'}>
-              <Icon size={19} strokeWidth={1.75}/><span>{name}</span>
-            </button>
-          ))}
-          <details className="orbit-more-menu orbit-more-menu-mobile">
-            <summary aria-label="المزيد"><Ellipsis size={20}/><span>المزيد</span></summary>
-            <div className="orbit-more-popover">
-              <button type="button" aria-current={activeNav === 'intelligence' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={17}/> الرؤى</button>
-              <button type="button" aria-current={activeNav === 'operations' ? 'page' : undefined} onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={17}/> الحماية</button>
-            </div>
-          </details>
-        </nav>
       </header>
 
       {/* Sync / Action Feedback Banner */}
@@ -916,15 +921,34 @@ export default function App() {
         </div>
       )}
 
-      {(activeNav !== 'mission-control' || Boolean(selectedPlatformId)) && (
+      {false && (
         <div role="status" className="orbit-evidence-note mx-auto max-w-[1440px]">
           <AlertTriangle size={15} />
           <span>بعض بيانات هذه الصفحة توضيحية أو مخزنة؛ تحقق من المصدر قبل اتخاذ قرار إنتاجي.</span>
         </div>
       )}
 
-      {/* Main Content Container */}
-      <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
+      {/* One executive page. Every technical view opens as a temporary overlay. */}
+      <main className="one-main max-w-[1440px] mx-auto px-4 sm:px-8 py-6 space-y-6">
+        <ExecutiveOverview
+          platforms={platforms}
+          incidents={incidents}
+          events={events}
+          onOpenPlatform={(id) => { setSelectedPlatformId(id); setActiveNav('mission-control'); }}
+          onOpenIncident={(id) => { setSelectedIncidentId(id); setActiveNav('universal-radar'); }}
+          onOpenRadar={() => document.getElementById('orbit-one-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          onOpenFleet={() => { setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}
+          onQuickAdd={handleQuickAddProgram}
+        />
+        {(selectedPlatform || activeNav !== 'mission-control') && (
+          <div className="one-overlay-backdrop">
+            <section className="one-overlay-panel" role="dialog" aria-modal="true" aria-label="تفاصيل أوربت">
+              <div className="one-overlay-heading">
+                <div><span>ORBIT ONE</span><strong>{selectedPlatform ? 'تفاصيل البرنامج' : 'الإعدادات والتشخيص'}</strong></div>
+                <button type="button" className="one-close-overlay" onClick={() => { setSelectedPlatformId(null); setSelectedIncidentId(null); setActiveNav('mission-control'); }} aria-label="العودة للصفحة الرئيسية">
+                  <span>العودة</span> <ArrowUpLeft size={18}/>
+                </button>
+              </div>
         {selectedPlatform ? (
           <ProgramDetailView
             platform={selectedPlatform}
@@ -1140,553 +1164,8 @@ export default function App() {
               </div>
             </details>
           </div>
-        ) : (
-          /* =================================================================
-             MISSION CONTROL — INFOGRAPHIC, ICON-FIRST, MINIMAL-TEXT DESIGN
-             ================================================================= */
-          <div className="space-y-6">
-            <ExecutiveOverview
-              platforms={platforms}
-              incidents={incidents}
-              events={events}
-              onOpenPlatform={(id) => setSelectedPlatformId(id)}
-              onOpenIncident={(id) => {
-                setSelectedIncidentId(id);
-                setActiveNav('universal-radar');
-              }}
-              onOpenRadar={() => setActiveNav('universal-radar')}
-              onOpenFleet={() => setActiveNav('fleet-manager')}
-            />
-            <details className="orbit-advanced">
-              <summary>تفاصيل إضافية</summary>
-              <div className="space-y-6 pt-3">
-            {/* ROW 1: 3 VISUAL INFOGRAPHIC HERO CARDS */}
-            <section
-              aria-label="ملخص المؤشرات البصرية"
-              className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch"
-            >
-              {/* Infographic 1: Fleet Radial Donut + Icon Counters (4 cols) */}
-              <div className={`lg:col-span-4 rounded-2xl border p-5 flex items-center gap-5 ${surfaceCls}`}>
-                <RadialGauge
-                  value={Math.round((healthyCount / Math.max(1, activeFleet.length)) * 100)}
-                  size={88}
-                  strokeWidth={8}
-                  colorClass="text-emerald-400"
-                />
-                <div className="flex-1 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold">سلامة الأسطول ({activeFleet.length})</span>
-                    <span className="font-mono text-xs text-sky-400 tabular-nums">
-                      تغطية {avgCoveragePct}%
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-                    <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 text-emerald-300">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{healthyCount} سليم</span>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-2.5 py-1.5 text-rose-300">
-                      <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{incidentCount} حادثة</span>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 text-amber-300">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>{degradedCount + gapCount} تنبيه</span>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl bg-sky-500/10 border border-sky-500/20 px-2.5 py-1.5 text-sky-300">
-                      <Laptop className="w-4 h-4 text-sky-400 shrink-0" />
-                      <span>{localCount} محلي</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Infographic 2: Three-Eyes Visual Bars (3 cols) */}
-              <div className={`lg:col-span-3 rounded-2xl border p-5 flex flex-col justify-between ${surfaceCls}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-sky-400" />
-                    <span>العيون الثلاث</span>
-                  </span>
-                  <span className="font-mono text-[11px] text-amber-400">بيانات أولية</span>
-                </div>
-
-                <div className="space-y-3 my-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1.5 text-slate-300">
-                        <Code2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>الكود والمستودع</span>
-                      </span>
-                      <span className="font-mono tabular-nums text-emerald-400">—</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-400 w-[0%]" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1.5 text-slate-300">
-                        <Activity className="w-3.5 h-3.5 text-sky-400" />
-                        <span>رحلة المستخدم</span>
-                      </span>
-                      <span className="font-mono tabular-nums text-sky-400">—</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-sky-400 w-[0%]" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1.5 text-slate-300">
-                        <Terminal className="w-3.5 h-3.5 text-amber-400" />
-                        <span>السجل الصامت</span>
-                      </span>
-                      <span className="font-mono tabular-nums text-amber-400">—</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-400 w-[0%]" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Infographic 3: 5-Second Visual Cockpit Pulse (5 cols) */}
-              <div
-                aria-label="شريط قراءة الخمس ثوانٍ"
-                className={`lg:col-span-5 rounded-2xl border p-5 flex flex-col justify-between ${
-                  topCriticalIncident
-                    ? 'border-rose-500/40 bg-rose-950/15'
-                    : 'border-emerald-500/30 bg-emerald-950/10'
-                }`}
-              >
-                {topCriticalIncident ? (
-                  <>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
-                          <Zap className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-rose-300">
-                            رادار الـ 5 ثوانٍ · {topCriticalIncident.incidentId}
-                          </div>
-                          <div className="text-sm font-bold text-white mt-0.5">
-                            {topCriticalIncident.appId} — {topCriticalIncident.title || "حادثة تحتاج مراجعة"}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedIncidentId(topCriticalIncident.incidentId);
-                          setCockpitDeck('incidents');
-                          const el = document.getElementById('claude-mission-pack');
-                          el?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="rounded-xl bg-rose-500 px-3.5 py-2 text-xs font-bold text-slate-950 hover:bg-rose-400 transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>تشخيص + مهمة Claude</span>
-                      </button>
-                    </div>
-
-                    {/* 3 Clean Icon-Stat Nodes with zero truncation */}
-                    <div className="grid grid-cols-3 gap-2.5 mt-3 pt-3 border-t border-rose-500/20 text-xs font-mono tabular-nums">
-                      <div className="rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 font-sans">الالتزام</span>
-                        <span className="font-bold text-rose-300">
-                          {topCriticalIncident.suspectedCommitSha}
-                        </span>
-                      </div>
-                      <div className="rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 font-sans">الجلسات</span>
-                        <span className="font-bold text-amber-300">
-                          {topCriticalIncident.affectedSessions}
-                        </span>
-                      </div>
-                      <div className="rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 font-sans">الثقة</span>
-                        <span className="font-bold text-emerald-300">
-                          {topCriticalIncident.confidenceScore}%
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between h-full">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                      <div>
-                        <div className="text-sm font-bold text-emerald-300">
-                          لا توجد حوادث حرجة نشطة
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          لا توجد حوادث حرجة في البيانات المعروضة؛ يلزم التحقق المباشر
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+        ) : null}
             </section>
-
-            {/* ROW 2: VISUAL FILTER CHIPS + FLEET INFOGRAPHIC CARDS */}
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <Layers className="w-5 h-5 text-sky-400" />
-                  <h2 className="text-base font-bold tracking-tight">
-                    أسطول البرامج ({visibleFleet.length} من {activeFleet.length})
-                  </h2>
-                </div>
-
-                {/* Interactive Filter Tabs with Icons */}
-                <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl border border-slate-800 bg-slate-950/70">
-                  {[
-                    { id: 'ALL', label: `الكل (${activeFleet.length})` },
-                    { id: 'Incident', label: `حادثة (${incidentCount})` },
-                    { id: 'Degraded', label: `متدهور (${degradedCount})` },
-                    { id: 'Healthy', label: `سليم (${healthyCount})` },
-                    { id: 'Monitoring Gap', label: `فجوة (${gapCount})` },
-                    { id: 'Local / Not Running', label: `محلي (${localCount})` },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setStatusFilter(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                        statusFilter === tab.id
-                          ? 'bg-sky-500 text-slate-950 font-bold'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Infographic Program Grid (4 columns on desktop — Icon + Gauge + 3-Eyes Bar) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {visibleFleet.map((platform) => {
-                  const gaugeColor =
-                    platform.healthStatus === 'Incident'
-                      ? 'text-rose-400'
-                      : platform.healthStatus === 'Degraded' ||
-                        platform.healthStatus === 'Monitoring Gap'
-                      ? 'text-amber-400'
-                      : platform.healthStatus === 'Local / Not Running'
-                      ? 'text-sky-400'
-                      : 'text-emerald-400';
-
-                  const cleanTitleAr = platform.nameAr.split('(')[0].trim();
-
-                  return (
-                    <div
-                      key={platform.id}
-                      className={`group rounded-2xl border p-4 flex flex-col justify-between gap-4 transition-all hover:border-sky-500/50 ${surfaceCls}`}
-                    >
-                      {/* Top Row: Domain Icon + Clean Title + Radial Donut Gauge */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <PlatformDomainIcon
-                            codeName={platform.codeName}
-                            status={platform.healthStatus}
-                            size="md"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs font-bold text-sky-400">
-                                {platform.codeName}
-                              </span>
-                              <span className="text-slate-600">·</span>
-                              <span className="font-mono text-[11px] text-slate-400">
-                                {platform.recentCommits[0]?.sha || 'HEAD'}
-                              </span>
-                            </div>
-                            <h3 className="text-sm font-bold mt-0.5">
-                              {cleanTitleAr}
-                            </h3>
-                          </div>
-                        </div>
-
-                        <RadialGauge
-                          value={platform.monitoringCoveragePct}
-                          size={48}
-                          strokeWidth={4}
-                          colorClass={gaugeColor}
-                        />
-                      </div>
-
-                      {/* Middle Row: Visual 3-Eyes Infographic Strip */}
-                      <ThreeEyesInfographicRow fourState={platform.fourState} />
-
-                      {/* Bottom Row: Status + 1-Click Detail Button */}
-                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/70">
-                        <HealthStatusIndicator status={platform.healthStatus} />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPlatformId(platform.id)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300 whitespace-nowrap shrink-0"
-                        >
-                          <span>التفاصيل</span>
-                          <ArrowUpLeft className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* ROW 3: TABBED INFOGRAPHIC DECK (Zero Vertical Clutter!) */}
-            <section id="claude-mission-pack" className={`rounded-2xl border p-5 space-y-5 ${surfaceCls}`}>
-              {/* Deck Navigation Tabs */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {[
-                    {
-                      id: 'incidents',
-                      label: `الحوادث ومهمة Claude (${incidents.length})`,
-                      icon: Sparkles,
-                    },
-                    {
-                      id: 'commits',
-                      label: `أثر التغييرات (${changeImpacts.length})`,
-                      icon: GitCommit,
-                    },
-                    {
-                      id: 'memory',
-                      label: `الذاكرة الهندسية (${engineeringMemory.length})`,
-                      icon: BrainCircuit,
-                    },
-                    {
-                      id: 'acceptance',
-                      label: `معايير القبول (${acceptanceCriteria.length}/18)`,
-                      icon: ShieldCheck,
-                    },
-                  ].map((tab) => {
-                    const Icon = tab.icon;
-                    const active = cockpitDeck === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setCockpitDeck(tab.id as CockpitDeckTab)}
-                        className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                          active
-                            ? 'bg-sky-500 text-slate-950'
-                            : 'border border-slate-800 bg-slate-950/50 text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        <span>{tab.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* TAB 1: INCIDENTS & CLAUDE MISSION PACK */}
-              {cockpitDeck === 'incidents' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                  {/* Left 5 cols: Compact Visual Incident Selector Cards */}
-                  <div className="lg:col-span-5 space-y-2.5">
-                    {incidents.map((inc) => {
-                      const isSelected = inc.incidentId === selectedIncidentId;
-                      return (
-                        <div
-                          key={inc.incidentId}
-                          onClick={() => setSelectedIncidentId(inc.incidentId)}
-                          className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
-                            isSelected
-                              ? 'border-sky-400 bg-sky-950/20'
-                              : 'border-slate-800/90 bg-slate-950/40 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-sky-400">
-                                {inc.appId}
-                              </span>
-                              <span className="text-slate-600">·</span>
-                              <SeverityLabel severity={inc.severity} />
-                            </div>
-                            <span className="font-mono text-[11px] text-slate-400">{inc.status}</span>
-                          </div>
-                          <div className="text-xs font-bold text-slate-100 mt-1.5">{inc.title}</div>
-                          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-800/60 text-[11px] font-mono text-slate-400">
-                            <span>Commit {inc.suspectedCommitSha}</span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTransitionIncident(
-                                    inc.incidentId,
-                                    'Investigating',
-                                    false,
-                                    'تم الاستلام'
-                                  );
-                                }}
-                                className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-200 hover:bg-slate-700"
-                              >
-                                استلام
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTransitionIncident(
-                                    inc.incidentId,
-                                    'Resolved',
-                                    true,
-                                    'تم التحقق التقني'
-                                  );
-                                }}
-                                className="rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] text-emerald-300 hover:bg-emerald-500/30"
-                              >
-                                توثيق الحل
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Right 7 cols: Visual Claude Mission Generator */}
-                  <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-slate-950/60 p-4 flex flex-col justify-between space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-sky-400" />
-                        <span className="text-xs font-bold">
-                          مشغل مهمة Claude الجاهزة ({selectedIncidentId})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {selectedIncidentId && (
-                          <button
-                            type="button"
-                            onClick={() => handleRequestAiAnalysis(selectedIncidentId)}
-                            disabled={loadingAi}
-                            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
-                          >
-                            {loadingAi ? 'جاري التحليل...' : 'تحليل AI عميق'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(claudePromptText);
-                            setCopiedClaude(true);
-                            setTimeout(() => setCopiedClaude(false), 2500);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-sky-400 px-3.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-sky-300"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>{copiedClaude ? 'تم النسخ!' : 'نسخ برومت Claude'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {aiAnalysisResult && (
-                      <div className="rounded-lg border border-sky-500/30 bg-sky-950/20 p-3 text-xs text-slate-200 whitespace-pre-wrap">
-                        <div className="font-mono text-[11px] text-sky-400 mb-1">
-                          [{aiAnalysisResult.mode}]
-                        </div>
-                        {aiAnalysisResult.analysis}
-                      </div>
-                    )}
-
-                    <pre
-                      dir="ltr"
-                      className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-[11px] font-mono text-slate-200 overflow-x-auto max-h-56 leading-relaxed"
-                    >
-                      {claudePromptText}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: CHANGE IMPACT INFOGRAPHIC */}
-              {cockpitDeck === 'commits' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {changeImpacts.map((ci) => (
-                    <div
-                      key={ci.id}
-                      className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-sky-400">
-                          {ci.appId} · {ci.commitSha}
-                        </span>
-                        <ReleaseShieldLabel rating={ci.releaseShieldVerdict} />
-                      </div>
-                      <p className="text-xs font-semibold text-slate-200">{ci.commitMessage}</p>
-                      <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs pt-2 border-t border-slate-800/70">
-                        <div className="rounded-lg bg-slate-900 p-2">
-                          <div className="text-[10px] text-slate-400">أخطاء قبل ← بعد</div>
-                          <div className="font-bold text-slate-100 mt-0.5">
-                            {ci.preChangeErrorRate}% ← {ci.postChangeErrorRate}%
-                          </div>
-                        </div>
-                        <div className="rounded-lg bg-slate-900 p-2">
-                          <div className="text-[10px] text-slate-400">الارتباط</div>
-                          <div className="font-bold text-sky-300 mt-0.5 truncate">
-                            {ci.correlationType}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* TAB 3: SELF-LEARNING MEMORY CARDS */}
-              {cockpitDeck === 'memory' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {engineeringMemory.map((mem) => (
-                    <div
-                      key={mem.id}
-                      className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 space-y-2.5"
-                    >
-                      <div className="flex items-center justify-between font-mono text-xs">
-                        <span className="text-sky-400 font-bold">{mem.appId}</span>
-                        <span className="text-emerald-400">{mem.recurringPatternTag}</span>
-                      </div>
-                      <h3 className="text-xs font-bold text-slate-100">{mem.problemTitle}</h3>
-                      <div className="text-xs text-emerald-300 bg-emerald-950/20 border border-emerald-500/20 rounded-lg p-2.5">
-                        {mem.verifiedFixSummary}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* TAB 4: ACCEPTANCE MATRIX (18/18) */}
-              {cockpitDeck === 'acceptance' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {acceptanceCriteria.map((ac) => (
-                    <div
-                      key={ac.id}
-                      className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3 flex items-center gap-2.5 text-xs"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-200 truncate">{ac.titleAr}</div>
-                        <div className="text-[11px] text-slate-400 truncate">{ac.evidenceDetail}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-              </div>
-            </details>
           </div>
         )}
       </main>
