@@ -771,7 +771,7 @@ async function startServer() {
           }
           // For ORBIT itself, use the known public production host when no URL was
           // saved yet. Probe only public HTTPS hosts; never follow redirects off-host.
-          const isOrbitRepository = plat.owner.toLowerCase() === 'proffalfailakawi' && plat.repoName.toLowerCase() === 'orbit';
+          const isOrbitRepository = plat.owner.toLowerCase() === 'profalfailakawi' && plat.repoName.toLowerCase() === 'orbit';
           const productionUrl = plat.productionUrl || (isOrbitRepository ? process.env.ORBIT_PRODUCTION_URL || null : null);
           let siteReachable: boolean | null = null;
           let siteEvidence = 'Production site not configured or not checked.';
