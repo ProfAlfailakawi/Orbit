@@ -114,6 +114,8 @@ type MainNavId =
 
 type CockpitDeckTab = 'incidents' | 'commits' | 'memory' | 'acceptance';
 
+const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
+
 export default function App() {
   const [isDark, setIsDark] = useState<boolean>(false);
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
@@ -173,6 +175,59 @@ export default function App() {
   } | null>(null);
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [copiedClaude, setCopiedClaude] = useState<boolean>(false);
+
+  // Keep already-open tabs current after a production deployment. As in
+  // SCHEDULE, compare the page's baked build id with a no-cache server beacon;
+  // defer navigation while a dialog, form field, or busy task is in progress.
+  useEffect(() => {
+    if (!import.meta.env.PROD || !ORBIT_BUILD_ID || ORBIT_BUILD_ID === 'development') return;
+
+    let stopped = false;
+    const retryKey = 'orbit.release.reload-attempt';
+    const isBusy = () => {
+      if (document.querySelector('dialog[open],[role="dialog"],[aria-busy="true"]')) return true;
+      const active = document.activeElement;
+      return active instanceof HTMLElement && active.matches(
+        'input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]),textarea,select,[contenteditable="true"]',
+      );
+    };
+
+    const checkRelease = async () => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      try {
+        const response = await fetch('/api/version', { cache: 'no-store', credentials: 'same-origin' });
+        if (!response.ok) return;
+        const release = await response.json() as { build?: string };
+        if (!release.build || release.build === ORBIT_BUILD_ID) {
+          window.sessionStorage.removeItem(retryKey);
+          return;
+        }
+        if (isBusy()) return;
+
+        // Backend and Hosting deploy separately. A short cooldown prevents a
+        // reload loop if a tab sees the new API just before the new UI lands.
+        const previous = window.sessionStorage.getItem(retryKey) || '';
+        const [previousBuild, previousAt] = previous.split('|');
+        if (previousBuild === release.build && Date.now() - Number(previousAt) < 60_000) return;
+        window.sessionStorage.setItem(retryKey, `${release.build}|${Date.now()}`);
+        window.location.reload();
+      } catch {
+        // Offline or temporarily unavailable: the next visibility/interval check retries.
+      }
+    };
+
+    const onVisible = () => { if (document.visibilityState === 'visible') void checkRelease(); };
+    const interval = window.setInterval(() => { void checkRelease(); }, 120_000);
+    window.addEventListener('pageshow', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    void checkRelease();
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('pageshow', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const fetchServerState = async () => {
     try {

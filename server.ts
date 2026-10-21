@@ -315,6 +315,13 @@ async function startServer() {
     res.status(ready ? 200 : 503).json({ service: 'orbit', status: ready ? 'running' : 'degraded', storage: firestore ? (persistenceHealthy ? 'firestore' : 'unavailable') : 'local' });
   });
 
+  // Public, non-sensitive release beacon used by open browser tabs to pick up
+  // a newly deployed frontend without requiring a manual refresh.
+  app.get('/api/version', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ build: process.env.ORBIT_BUILD_ID || 'development' });
+  });
+
   // Secure operator session. Reads from .env dynamically so user edits take effect immediately.
   const envFilePath = path.join(__dirname, '.env');
   function resolveOperatorPasskey(): string {
