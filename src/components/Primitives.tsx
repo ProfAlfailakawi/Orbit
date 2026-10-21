@@ -198,15 +198,15 @@ export const ThreeEyesInfographicRow: React.FC<{
     if (state === 'Critical') return 'text-rose-400 bg-rose-500/15 border-rose-500/30';
     if (state === 'Warning') return 'text-amber-400 bg-amber-500/15 border-amber-500/30';
     if (state === 'Local') return 'text-sky-400 bg-sky-500/15 border-sky-500/30';
-    return 'text-slate-400 bg-slate-800/50 border-slate-700';
+    return 'text-amber-200 bg-amber-500/10 border-amber-500/40';
   };
   const stateLabel = (state: string) => ({
     Healthy: 'ناجح',
     Critical: 'فشل',
     Warning: 'تحذير',
     Local: 'محلي',
-    Unknown: 'غير متاح',
-  }[state] || 'غير متاح');
+    Unknown: 'لم يُتحقّق',
+  }[state] || 'لم يُتحقّق');
   const experienceLabel = fourState?.userJourneyHealthy === true
     ? 'مؤكدة'
     : fourState?.userJourneyHealthy === false
@@ -241,7 +241,7 @@ export const ThreeEyesInfographicRow: React.FC<{
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e3
         )}`}
-        title={`حالة النشر: ${stateLabel(e3)}`}
+        title={`حالة دليل النشر: ${stateLabel(e3)}. هذا مؤشر مراقبة وليس زر نشر؛ ORBIT لا ينفذ النشر.`}
       >
         <Terminal className="w-3.5 h-3.5 shrink-0" />
         <span className="text-center leading-tight">النشر: {stateLabel(e3)}</span>
