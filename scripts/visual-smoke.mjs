@@ -56,7 +56,7 @@ try {
 
   await page.getByRole('button', { name: /إضافة برنامج/ }).first().click();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).waitFor();
-  await page.getByRole('button', { name: 'إغلاق' }).click();
+  await page.getByRole('form', { name: 'إضافة برنامج جديد' }).getByRole('button', { name: 'إغلاق' }).click();
 
   await page.locator('.orbit-app-card').first().click();
   await page.getByRole('dialog', { name: 'تفاصيل أوربت' }).waitFor();

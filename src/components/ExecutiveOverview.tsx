@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { IncidentCaseFile, PlatformRecord, RadarEvent } from '../core/types';
 import { generateClaudeMissionPrompt } from '../core/engine';
-import { buildFleetReportForClaude, buildRepairIntelligenceAddendum, getProgramProblems } from '../core/guardian';
+import { buildFleetReportForClaude, buildRepairIntelligenceAddendum, getLinkIssue, getProgramProblems } from '../core/guardian';
 import './orbit-one.css';
 
 interface ExecutiveOverviewProps {
@@ -20,6 +20,7 @@ interface ExecutiveOverviewProps {
   onQuickAdd: (name: string, url: string) => Promise<string>;
   onSyncGithub: () => void;
   isGithubSyncing: boolean;
+  githubTokenConfigured?: boolean;
 }
 
 type Filter = 'all' | 'issues' | 'gaps';
@@ -41,9 +42,10 @@ const sourceConnection = (p: PlatformRecord) => {
   }
   return { label: 'بانتظار الربط', tone: 'pending' };
 };
+/** Linked to live GitHub evidence and the public site answered, with no known failing check. */
 const journeyChecked = (p: PlatformRecord) =>
-  linked(p) && p.productionUrlVerified &&
-  p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true;
+  linked(p) && p.productionUrlVerified && p.fourState?.siteReachable === true &&
+  p.fourState?.ciPassed !== false && p.fourState?.deploymentSucceeded !== false && p.fourState?.userJourneyHealthy !== false;
 
 const displayTime = (s: string) => {
   const date = Date.parse(s);
@@ -82,7 +84,7 @@ export function getConfirmedProductionIncidents(incidents: IncidentCaseFile[], e
 
 export function ExecutiveOverview({
   platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar, onOpenFleet, onQuickAdd,
-  onSyncGithub, isGithubSyncing,
+  onSyncGithub, isGithubSyncing, githubTokenConfigured,
 }: ExecutiveOverviewProps) {
   const [syncSeconds, setSyncSeconds] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
@@ -127,6 +129,10 @@ export function ExecutiveOverview({
   );
   const signals = useMemo(
     () => fleet.map(p => ({ p, problems: getProgramProblems(p) })).filter(x => x.problems.length),
+    [fleet],
+  );
+  const linkIssues = useMemo(
+    () => fleet.map(p => ({ p, issue: getLinkIssue(p) })).filter((x): x is { p: PlatformRecord; issue: string } => Boolean(x.issue)),
     [fleet],
   );
   const affected = new Set([...confirmed.map(i => i.appId.toUpperCase()), ...signals.map(x => x.p.codeName.toUpperCase())]);
@@ -218,7 +224,9 @@ export function ExecutiveOverview({
           </div>
           {status === 'incomplete' && (
             <p className="one-monitoring-gap" role="status">
-              مزامنة GitHub تفحص المستودع ونتائج CI؛ اكتمال الرصد يتطلب أيضاً فحص رابط الموقع ورحلة الاستخدام.
+              {linkIssues.length
+                ? `${linkIssues.length} من ${fleet.length} برامج غير مربوطة بقراءة حية. الأسباب في الأسفل، ويمكنك نسخها لكلود.`
+                : 'مزامنة GitHub تفحص المستودع ونتائج CI؛ اكتمال الرصد يتطلب أيضاً فحص رابط الموقع.'}
             </p>
           )}
           <div className="one-hero-actions">
@@ -238,7 +246,7 @@ export function ExecutiveOverview({
             </p>
           )}
         </div>
-        <div className="one-orbit-art" aria-label={'تم التحقق من تجربة المستخدم في ' + checked.length + ' من ' + fleet.length + ' برامج'}>
+        <div className="one-orbit-art" aria-label={'تم التحقق من عمل الموقع في ' + checked.length + ' من ' + fleet.length + ' برامج'}>
           <div className="one-orbit-glow"/>
           <div className="one-ring one-ring-outer"><span className="one-orbit-star one-star-a"/><span className="one-orbit-star one-star-b"/></div>
           <div className="one-ring one-ring-middle"/>
@@ -270,7 +278,7 @@ export function ExecutiveOverview({
           <div className="one-coverage-ring" style={{ background: 'conic-gradient(#70d8ad ' + coverage + '%, rgba(150,161,178,.16) 0)' }}>
             <span>{coverage}%</span>
           </div>
-          <div><span>تجربة موثقة</span><small>{checked.length} من {fleet.length} برنامج</small></div>
+          <div><span>مواقع تعمل</span><small>{checked.length} من {fleet.length} برنامج</small></div>
         </div>
       </section>
 
@@ -281,6 +289,18 @@ export function ExecutiveOverview({
             <div className="one-quiet-actions"><button type="button" className="one-bell-control" onClick={() => void enableNotifications()} title="إشعارات المتصفح أثناء فتح أوربت فقط" aria-label={notifyEnabled ? 'إيقاف إشعارات المتصفح' : 'تفعيل إشعارات المتصفح'} aria-pressed={notifyEnabled}>{notifyEnabled ? <Bell size={18}/> : <BellOff size={18}/>}</button><span className={'one-counter ' + (confirmed.length ? 'one-counter-alert' : '')}>{confirmed.length}</span></div>
           </header>
           {notifyMessage && <span className="one-notice-inline" role="status">{notifyMessage}</span>}
+          {githubTokenConfigured === false && (
+            <p className="one-monitoring-gap" role="status">لم يُضبط توكن GitHub على الخادم: المستودعات الخاصة لن تُقرأ، والمستودعات العامة محدودة بـ60 طلباً في الساعة.</p>
+          )}
+          {linkIssues.length > 0 && (
+            <div className="one-link-issues" role="status">
+              <strong>سبب عدم ربط بعض البرامج</strong>
+              <ul>{linkIssues.map(({ p, issue }) => <li key={p.id}><b>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}:</b> {issue}</li>)}</ul>
+              <button className="one-button one-button-link" type="button" onClick={() => void copyReport(fleet, 'all')}>
+                {copied === 'all' ? <Check size={16}/> : <Copy size={16}/>} انسخ التقرير لكلود
+              </button>
+            </div>
+          )}
           {signals.length > 0 && (
             <div className="one-incidents-list">
               {signals.map(({ p, problems }) => (
@@ -390,7 +410,7 @@ export function ExecutiveOverview({
               <strong>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong>
               <span className="one-program-code" dir="ltr">{p.codeName}</span>
               <span className={'one-program-status ' + (issue ? 'one-program-bad' : verified ? 'one-program-good' : 'one-program-unknown')}>
-                <span/>{issue ? (problemOf(p) || 'مشكلة مؤكدة') : verified ? 'تجربة أساسية موثقة' : local ? 'برنامج محلي' : 'الرصد غير مكتمل'}
+                <span/>{issue ? (problemOf(p) || 'مشكلة مؤكدة') : verified ? 'الموقع يعمل' : local ? 'برنامج محلي' : 'الرصد غير مكتمل'}
               </span>
             </button>;
           })}

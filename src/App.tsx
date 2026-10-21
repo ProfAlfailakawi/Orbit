@@ -148,6 +148,8 @@ export default function App() {
   >([]);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isGithubSyncing, setIsGithubSyncing] = useState(false);
+  const [githubTokenConfigured, setGithubTokenConfigured] = useState<boolean | undefined>(undefined);
+  const autoSyncedRef = React.useRef(false);
 
   // Claude Mission Pack State
   const [claudePromptText, setClaudePromptText] = useState<string>('');
@@ -232,6 +234,8 @@ export default function App() {
       setDiscoveredCandidates(data.discoveredCandidates);
       setCanaryHistory(data.canaryHistory || []);
       setAuditLogs(data.auditLogs || []);
+      if (typeof data.hasGithubTokenConfigured === 'boolean') setGithubTokenConfigured(data.hasGithubTokenConfigured);
+      return data as { platforms: PlatformRecord[] };
     } catch {
       // Offline / Cached fallback
     }
@@ -239,7 +243,17 @@ export default function App() {
 
   useEffect(() => {
     if (isLocked) return;
-    fetchServerState();
+    void (async () => {
+      const data = await fetchServerState();
+      if (!data || autoSyncedRef.current) return;
+      autoSyncedRef.current = true;
+      // Link on open: if any GitHub-backed program was never verified or its evidence is >6h old, refresh once.
+      const sixHours = 6 * 60 * 60_000;
+      const needsLink = data.platforms.some(p =>
+        p.lifecycleState === 'active' && p.runtimeMode === 'github-web' &&
+        (!p.connectionVerified || !(Date.now() - Date.parse(p.lastVerifiedTimestamp || '') < sixHours)));
+      if (needsLink) void handleSyncGithub();
+    })();
     const timer = setInterval(fetchServerState, 12000);
 
     return () => {
@@ -363,7 +377,9 @@ export default function App() {
       const checked = Array.isArray(data.syncedResults) ? data.syncedResults.length : 0;
       const successful = Array.isArray(data.syncedResults)
         ? data.syncedResults.filter((item: { integrity: string }) => item.integrity === 'Live').length : 0;
-      setSyncBanner(`اكتمل فحص GitHub: تم تأكيد الوصول إلى ${successful} من ${checked} مستودعاً. فحص GitHub لا يؤكد عمل المواقع الإنتاجية.`);
+      setSyncBanner(successful === 0 && checked > 0
+        ? 'تعذر ربط أي برنامج بـGitHub. الأسباب مكتوبة تحت «ما يحتاج تدخّلك»، وزر «انسخ تقرير المشاكل لكلود» يجمعها لك.'
+        : `اكتمل فحص GitHub: تم تأكيد الوصول إلى ${successful} من ${checked} مستودعاً. فحص GitHub لا يؤكد عمل المواقع الإنتاجية.`);
     } catch (error) {
       setSyncBanner(error instanceof Error ? error.message : 'تعذر الوصول إلى GitHub.');
     } finally {
@@ -799,6 +815,7 @@ export default function App() {
           onQuickAdd={handleQuickAddProgram}
           onSyncGithub={() => { void handleSyncGithub(); }}
           isGithubSyncing={isGithubSyncing}
+          githubTokenConfigured={githubTokenConfigured}
         />
         {(selectedPlatform || activeNav !== 'mission-control') && (
           <div className="one-overlay-backdrop">

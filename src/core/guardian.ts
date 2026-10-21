@@ -121,6 +121,18 @@ export function getProgramProblems(p: PlatformRecord): string[] {
   return out;
 }
 
+/** Plain-Arabic reason a program is not linked to live evidence, or null when linked / intentionally local. */
+export function getLinkIssue(p: PlatformRecord): string | null {
+  if (p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local') return null;
+  if (p.connectionVerified && p.dataIntegrity === 'Live') return null;
+  if (p.dataIntegrity === 'Unavailable' || p.connectionStatus === 'Unavailable') {
+    const reason = (p.lastVerifiedEvidence || '').split(/;|(?<=\.)\s/)[0].trim();
+    return reason && !/^GitHub repository HTTP/.test(reason) ? reason : 'تعذر قراءة GitHub لهذا البرنامج';
+  }
+  if (p.dataIntegrity === 'Cached') return 'بيانات قديمة تحتاج مزامنة';
+  return 'لم يُفحص بعد — اضغط «مزامنة GitHub الآن»';
+}
+
 /** One copy-paste report for Claude: every program with a problem, plus the monitoring gaps, read-only. */
 export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents: IncidentCaseFile[], today = new Date().toISOString().slice(0, 10)): string {
   const fleet = platforms.filter(p => p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived');
@@ -140,6 +152,11 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
     problems.forEach(x => lines.push('- ' + x));
   }
   for (const i of open) lines.push('- [' + i.appId + '] ' + sanitizeTelemetryPayload(i.title).sanitized + ' (' + i.severity + ')');
+  const linkIssues = fleet.map(p => ({ p, issue: getLinkIssue(p) })).filter(x => x.issue);
+  if (linkIssues.length) {
+    lines.push('', '## مشاكل الربط (برامج لا يقرأ أوربت بياناتها الحية)');
+    linkIssues.forEach(({ p, issue }) => lines.push('- ' + p.nameAr + ' (' + p.codeName + ', ' + p.owner + '/' + p.repoName + '): ' + issue));
+  }
   const gaps = fleet.filter(p => !(p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true));
   lines.push('', '## برامج رصدها غير مكتمل (ليست دليل سلامة)', gaps.length ? gaps.map(p => p.nameAr + ' (' + p.codeName + ')').join('، ') : 'لا يوجد.');
   return lines.join('\n');

@@ -683,6 +683,7 @@ async function startServer() {
           let githubCiPassed: boolean | null = null;
           let deploymentSucceeded: boolean | null = null;
           let actionsChecked = false;
+          let actionsNote = '';
           let recentCommits: PlatformRecord['recentCommits'] = [];
           const baseUrl = `https://api.github.com/repos/${encodeURIComponent(plat.owner)}/${encodeURIComponent(plat.repoName)}`;
           try {
@@ -691,6 +692,7 @@ async function startServer() {
               headers,
               signal: AbortSignal.timeout(4500),
             });
+            if (!runsResponse.ok) actionsNote = `تعذر قراءة نتائج Actions (HTTP ${runsResponse.status}): يلزم أن يملك التوكن صلاحية Actions: Read-only.`;
             if (runsResponse.ok) {
               actionsChecked = true;
               const result = (await runsResponse.json()) as { workflow_runs?: Array<{
@@ -719,6 +721,7 @@ async function startServer() {
               if (latestDeployment) deploymentSucceeded = latestDeployment.conclusion === 'success';
             }
           } catch {
+            actionsNote = 'تعذر الوصول إلى نتائج Actions (انتهت المهلة أو انقطع الاتصال).';
             // GitHub Actions may be unavailable; keep CI unknown instead of green.
           }
           // One branches request detects head-SHA changes across the whole branch list,
@@ -765,9 +768,10 @@ async function startServer() {
               }
             }
             plat.branchHeads = [...currentHeads].map(([name, sha]) => ({ name, sha }));
-          } catch {
+          } catch (error) {
             // Mark incomplete monitoring unavailable below; never substitute seed data.
             actionsChecked = false;
+            actionsNote = actionsNote || `تعذر قراءة آخر تعديلات المستودع: ${error instanceof Error ? error.message.slice(0, 100) : 'فشل الطلب'}.`;
           }
           // For ORBIT itself, use the known public production host when no URL was
           // saved yet. Probe only public HTTPS hosts; never follow redirects off-host.
@@ -850,7 +854,7 @@ async function startServer() {
                   releaseShield: 'Insufficient Evidence',
                   releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}; deployment ${deploymentSucceeded === null ? 'not evidenced' : deploymentSucceeded ? 'succeeded' : 'failed'}; ${siteEvidence} ${journeyEvidence}`,
+                  lastVerifiedEvidence: `${actionsNote ? actionsNote + ' ' : ''}GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}; deployment ${deploymentSucceeded === null ? 'not evidenced' : deploymentSucceeded ? 'succeeded' : 'failed'}; ${siteEvidence} ${journeyEvidence}`,
                 }
               : p
           );
@@ -858,7 +862,10 @@ async function startServer() {
           syncedResults.push({ codeName: plat.codeName, status: integrity === 'Live' ? 'Live 200 OK' : 'Partial GitHub data; Actions or commit metadata unavailable', integrity });
         } else {
           const failureReason = resp.status === 403 && Number(resp.headers.get('x-ratelimit-remaining')) === 0
-            ? 'GitHub API rate limit exhausted' : `GitHub repository API returned HTTP ${resp.status}`;
+            ? 'استُنفد حد طلبات GitHub؛ أضف توكن قراءة فقط أو انتظر ساعة'
+            : resp.status === 401 ? 'توكن GitHub غير صالح أو منتهي'
+            : resp.status === 404 ? (token ? 'المستودع غير موجود أو التوكن لا يملك صلاحية قراءته' : 'المستودع خاص ولم يُضبط توكن GitHub')
+            : `GitHub repository API returned HTTP ${resp.status}`;
           platforms = platforms.map(p => p.id === plat.id ? {
             ...p, dataIntegrity: 'Unavailable', connectionVerified: false, connectionStatus: 'Unavailable',
             healthStatus: 'Monitoring Gap', lastVerifiedEvidence: `${failureReason}; prior success, if any, is cached only.`,
@@ -873,7 +880,7 @@ async function startServer() {
       } catch {
         platforms = platforms.map(p => p.id === plat.id ? {
           ...p, dataIntegrity: 'Unavailable', connectionVerified: false, connectionStatus: 'Unavailable',
-          healthStatus: 'Monitoring Gap', lastVerifiedEvidence: 'GitHub API request failed or timed out; prior success, if any, is cached only.',
+          healthStatus: 'Monitoring Gap', lastVerifiedEvidence: 'تعذر الاتصال بـGitHub أو انتهت المهلة؛ النتيجة السابقة إن وُجدت قديمة.',
         } : p);
         appendAudit('GitHub Monitor', 'GITHUB_REPOSITORY_UNAVAILABLE', plat.codeName, 'Network error or timeout while contacting GitHub API.');
         syncedResults.push({
