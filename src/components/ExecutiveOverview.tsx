@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowLeft, ArrowUpLeft, Bell, BellOff, Check, CheckCheck, ChevronLeft,
-  CircleAlert, CloudOff, Code2, Copy, Eye, Globe2, Layers3,
+  CircleAlert, CloudOff, Code2, Copy, Eye, Globe2, Layers3, RefreshCw,
   LockKeyhole, Plus, Radar, Search, ShieldCheck, Sparkles, WifiOff, Zap,
 } from 'lucide-react';
 import type { IncidentCaseFile, PlatformRecord, RadarEvent } from '../core/types';
@@ -18,6 +18,8 @@ interface ExecutiveOverviewProps {
   onOpenRadar: () => void;
   onOpenFleet: () => void;
   onQuickAdd: (name: string, url: string) => Promise<string>;
+  onSyncGithub: () => void;
+  isGithubSyncing: boolean;
 }
 
 type Filter = 'all' | 'issues' | 'gaps';
@@ -66,6 +68,7 @@ export function getConfirmedProductionIncidents(incidents: IncidentCaseFile[], e
 
 export function ExecutiveOverview({
   platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar, onOpenFleet, onQuickAdd,
+  onSyncGithub, isGithubSyncing,
 }: ExecutiveOverviewProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const [showAllIssues, setShowAllIssues] = useState(false);
@@ -178,6 +181,9 @@ export function ExecutiveOverview({
           <div className="one-hero-actions">
             <button className="one-button one-button-primary" type="button" onClick={onOpenRadar}>
               <Radar size={17}/> عرض المشاكل <ArrowLeft size={17}/>
+            </button>
+            <button className="one-button one-button-ghost" type="button" onClick={onSyncGithub} disabled={isGithubSyncing} aria-busy={isGithubSyncing}>
+              <RefreshCw size={17} className={isGithubSyncing ? 'animate-spin' : ''}/>{isGithubSyncing ? 'جارٍ فحص GitHub…' : 'مزامنة GitHub الآن'}
             </button>
             <button className="one-button one-button-ghost" type="button" onClick={() => { setAddOpen(true); document.getElementById("orbit-one-programs")?.scrollIntoView({behavior:"smooth"}); }}>
               <Plus size={17}/> إضافة برنامج

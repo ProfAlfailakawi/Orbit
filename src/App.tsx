@@ -163,6 +163,7 @@ export default function App() {
     }>
   >([]);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
+  const [isGithubSyncing, setIsGithubSyncing] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [cloudSyncedAt, setCloudSyncedAt] = useState<string | null>(null);
   const hydratingFromCloudRef = useRef<boolean>(false);
@@ -486,6 +487,8 @@ export default function App() {
   };
 
   const handleSyncGithub = async (appCode?: string) => {
+    if (isGithubSyncing) return;
+    setIsGithubSyncing(true);
     try {
       const res = await apiFetch('/api/github/sync', {
         method: 'POST',
@@ -502,6 +505,8 @@ export default function App() {
       setSyncBanner(`تم فحص ${checked} مستودعات؛ تأكد الوصول إلى ${successful}. هذا لا يثبت عمل المواقع الإنتاجية.`);
     } catch (error) {
       setSyncBanner(error instanceof Error ? error.message : 'تعذر الوصول إلى GitHub.');
+    } finally {
+      setIsGithubSyncing(false);
     }
   };
 
@@ -892,7 +897,6 @@ export default function App() {
             <details className="orbit-tools-menu one-quiet-settings">
               <summary aria-label="الإعدادات" title="الإعدادات"><Settings2 size={19}/></summary>
               <div className="orbit-tools-popover">
-                <button type="button" onClick={() => { void handleSyncGithub(); }}><RefreshCw size={17}/> فحص اتصال GitHub</button>
                 <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Google'}</button>
                 {firebaseUser && <button type="button" onClick={() => { void signOutGoogleOperator(); }}><Lock size={17}/> خروج من Google</button>}
                 <button type="button" onClick={() => setIsDark(!isDark)}><Moon size={17}/> {isDark ? 'المظهر الفاتح' : 'المظهر الداكن'}</button>
@@ -953,6 +957,8 @@ export default function App() {
           onOpenRadar={() => document.getElementById('orbit-one-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           onOpenFleet={() => { setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}
           onQuickAdd={handleQuickAddProgram}
+          onSyncGithub={() => { void handleSyncGithub(); }}
+          isGithubSyncing={isGithubSyncing}
         />
         {(selectedPlatform || activeNav !== 'mission-control') && (
           <div className="one-overlay-backdrop">
