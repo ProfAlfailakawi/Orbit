@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
  evaluateTruthEvidence, buildPrivacySafeTimeline, buildSharedDependencyAdvisory,
  rankPostReleaseChecks, buildRepairIntelligenceAddendum, classifyReadOnlyProbe,
+ getProgramProblems, buildFleetReportForClaude,
 } from './guardian.ts';
 import { inspectRepositoryCapabilities } from './engine.ts';
 import type { IncidentCaseFile, PlatformRecord } from './types.ts';
@@ -61,4 +62,17 @@ test('read only probes do not confuse unverified and reachable',()=>{
  assert.equal(classifyReadOnlyProbe(200,false,true),'failed');
  assert.equal(classifyReadOnlyProbe(200,true,true),'reachable');
  assert.equal(classifyReadOnlyProbe(503,true,true),'failed');
+});
+
+test('program problems come only from explicit failures, never from unknown state',()=>{
+ const p=app('ONE');
+ assert.deepEqual(getProgramProblems(p),[]);
+ p.fourState={...p.fourState,ciPassed:false,siteReachable:false};
+ assert.equal(getProgramProblems(p).length,2);
+});
+test('fleet report lists failures and lists unverified programs as gaps',()=>{
+ const bad=app('BAD'); bad.fourState={...bad.fourState,deploymentSucceeded:false};
+ const text=buildFleetReportForClaude([bad,app('OK')],[],'2026-01-01');
+ assert.match(text,/BAD/); assert.match(text,/آخر نشر لم ينجح/); assert.match(text,/رصدها غير مكتمل/);
+ assert.match(buildFleetReportForClaude([app('OK')],[],'2026-01-01'),/لا توجد مشاكل مؤكدة/);
 });

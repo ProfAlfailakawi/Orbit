@@ -51,7 +51,7 @@ try {
   assert.equal(await page.locator('.orbit-executive').count(), 1, 'Only one owner dashboard should exist');
   assert.equal(await page.locator('.one-quiet-settings, .orbit-tools-menu').count(), 0, 'Technical settings must stay out of the owner header');
 
-  await page.getByRole('button', { name: /عرض المشاكل/ }).click();
+  await page.getByRole('button', { name: /انسخ تقرير المشاكل لكلود/ }).waitFor();
   await page.locator('#orbit-one-incidents').waitFor();
 
   await page.getByRole('button', { name: /إضافة برنامج/ }).first().click();

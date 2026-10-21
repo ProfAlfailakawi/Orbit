@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { IncidentCaseFile, PlatformRecord, RadarEvent } from '../core/types';
 import { generateClaudeMissionPrompt } from '../core/engine';
-import { buildRepairIntelligenceAddendum } from '../core/guardian';
+import { buildFleetReportForClaude, buildRepairIntelligenceAddendum, getProgramProblems } from '../core/guardian';
 import './orbit-one.css';
 
 interface ExecutiveOverviewProps {
@@ -14,9 +14,9 @@ interface ExecutiveOverviewProps {
   incidents: IncidentCaseFile[];
   events: RadarEvent[];
   onOpenPlatform: (id: string) => void;
-  onOpenIncident: (id: string) => void;
-  onOpenRadar: () => void;
-  onOpenFleet: () => void;
+  onOpenIncident?: (id: string) => void;
+  onOpenRadar?: () => void;
+  onOpenFleet?: () => void;
   onQuickAdd: (name: string, url: string) => Promise<string>;
   onSyncGithub: () => void;
   isGithubSyncing: boolean;
@@ -125,12 +125,17 @@ export function ExecutiveOverview({
   const confirmed = useMemo(
     () => getConfirmedProductionIncidents(incidents, events), [incidents, events],
   );
-  const affected = new Set(confirmed.map(i => i.appId.toUpperCase()));
+  const signals = useMemo(
+    () => fleet.map(p => ({ p, problems: getProgramProblems(p) })).filter(x => x.problems.length),
+    [fleet],
+  );
+  const affected = new Set([...confirmed.map(i => i.appId.toUpperCase()), ...signals.map(x => x.p.codeName.toUpperCase())]);
+  const problemOf = (p: PlatformRecord) => signals.find(x => x.p.id === p.id)?.problems[0];
   const checked = fleet.filter(journeyChecked);
   const gaps = fleet.filter(p => !journeyChecked(p));
   const urgent = confirmed.filter(i => i.severity === 'Critical' || i.severity === 'High');
   const coverage = fleet.length ? Math.round(checked.length * 100 / fleet.length) : 0;
-  const status = urgent.length ? 'attention' : gaps.length ? 'incomplete' : 'monitored';
+  const status = urgent.length || signals.length ? 'attention' : gaps.length ? 'incomplete' : 'monitored';
 
   const visible = fleet.filter(p => {
     const q = query.trim().toLowerCase();
@@ -181,6 +186,14 @@ export function ExecutiveOverview({
     } catch { setNotifyMessage('تعذر تفعيل إشعارات المتصفح'); }
   };
 
+  const copyReport = async (list: PlatformRecord[], key: string) => {
+    try {
+      await navigator.clipboard.writeText(buildFleetReportForClaude(list, key === 'all' ? incidents : []));
+      setCopied(key);
+      window.setTimeout(() => setCopied(c => (c === key ? null : c)), 2500);
+    } catch { setCopied(null); }
+  };
+
   const copyMission = async (incident: IncidentCaseFile) => {
     const platform = fleet.find(p => p.codeName.toUpperCase() === incident.appId.toUpperCase());
     if (!platform) return;
@@ -199,7 +212,7 @@ export function ExecutiveOverview({
           <p>نرصد ما يحدث. نختصر الضوضاء. ونعطيك ما تحتاج لإصلاح المشكلة بخطوة واحدة.</p>
           <div className={'one-state one-state-' + status}>
             {status === 'attention' ? <CircleAlert size={18}/> : status === 'incomplete' ? <CloudOff size={18}/> : <ShieldCheck size={18}/>}
-            <span>{status === 'attention' ? 'توجد مشاكل مؤكدة تحتاج انتباهك' :
+            <span>{status === 'attention' ? 'توجد مشاكل تحتاج انتباهك' :
               status === 'incomplete' ? 'لا توجد مشاكل مؤكدة معروضة، لكن الرصد غير مكتمل' :
               'لا توجد مشاكل مؤكدة ضمن نطاق المراقبة المثبت'}</span>
           </div>
@@ -209,8 +222,8 @@ export function ExecutiveOverview({
             </p>
           )}
           <div className="one-hero-actions">
-            <button className="one-button one-button-primary" type="button" onClick={onOpenRadar}>
-              <Radar size={17}/> عرض المشاكل <ArrowLeft size={17}/>
+            <button className="one-button one-button-primary" type="button" onClick={() => void copyReport(fleet, 'all')}>
+              {copied === 'all' ? <Check size={17}/> : <Copy size={17}/>} {copied === 'all' ? 'تم النسخ — الصقه في كلود' : 'انسخ تقرير المشاكل لكلود'}
             </button>
             <button className="one-button one-button-ghost" type="button" onClick={onSyncGithub} disabled={isGithubSyncing} aria-busy={isGithubSyncing}>
               <RefreshCw size={17} className={isGithubSyncing ? 'animate-spin' : ''}/>{isGithubSyncing ? `جارٍ فحص GitHub · ${syncSeconds} ث` : 'مزامنة GitHub الآن'}
@@ -247,7 +260,7 @@ export function ExecutiveOverview({
         </div>
         <div className="one-score-card">
           <span className="one-score-icon one-icon-coral"><CircleAlert size={21}/></span>
-          <strong>{confirmed.length}</strong><span>مشكلة مؤكدة</span><small>إشارات إنتاج موثقة فقط</small>
+          <strong>{affected.size}</strong><span>برنامج فيه مشكلة</span><small>من أدلة موثقة فقط</small>
         </div>
         <div className="one-score-card">
           <span className="one-score-icon one-icon-amber"><WifiOff size={21}/></span>
@@ -268,6 +281,26 @@ export function ExecutiveOverview({
             <div className="one-quiet-actions"><button type="button" className="one-bell-control" onClick={() => void enableNotifications()} title="إشعارات المتصفح أثناء فتح أوربت فقط" aria-label={notifyEnabled ? 'إيقاف إشعارات المتصفح' : 'تفعيل إشعارات المتصفح'} aria-pressed={notifyEnabled}>{notifyEnabled ? <Bell size={18}/> : <BellOff size={18}/>}</button><span className={'one-counter ' + (confirmed.length ? 'one-counter-alert' : '')}>{confirmed.length}</span></div>
           </header>
           {notifyMessage && <span className="one-notice-inline" role="status">{notifyMessage}</span>}
+          {signals.length > 0 && (
+            <div className="one-incidents-list">
+              {signals.map(({ p, problems }) => (
+                <article className="one-issue" key={'sig-' + p.id}>
+                  <div className="one-issue-titleline">
+                    <span className="one-severity one-severity-critical"><span className="one-severity-dot"/>تحتاج فحصاً</span>
+                    <span className="one-issue-app">{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</span>
+                  </div>
+                  <ul className="one-issue-problems">{problems.map(x => <li key={x}>{x}</li>)}</ul>
+                  <div className="one-issue-actions">
+                    <button className="one-button one-button-primary" type="button" onClick={() => void copyReport([p], 'sig-' + p.id)}>
+                      {copied === 'sig-' + p.id ? <Check size={16}/> : <Copy size={16}/>}
+                      {copied === 'sig-' + p.id ? 'تم النسخ' : 'انسخ لكلود'}
+                    </button>
+                    <button className="one-button one-button-link" type="button" onClick={() => onOpenPlatform(p.id)}>التفاصيل <ChevronLeft size={16}/></button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
           {confirmed.length ? (
             <div className="one-incidents-list">
               {(showAllIssues ? confirmed : confirmed.slice(0, 4)).map(incident => {
@@ -309,7 +342,7 @@ export function ExecutiveOverview({
               })}
               {confirmed.length > 4 && <button type="button" className="one-inline-action" onClick={() => setShowAllIssues(!showAllIssues)}>{showAllIssues ? 'عرض أقل' : 'عرض بقية المشاكل'} <ArrowUpLeft size={15}/></button>}
             </div>
-          ) : (
+          ) : signals.length ? null : (
             <div className="one-no-incident">
               <div className="one-no-incident-icon"><ShieldCheck size={31} strokeWidth={1.6}/></div>
               <h3>لا توجد مشاكل إنتاج مؤكدة حالياً</h3>
@@ -357,7 +390,7 @@ export function ExecutiveOverview({
               <strong>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong>
               <span className="one-program-code" dir="ltr">{p.codeName}</span>
               <span className={'one-program-status ' + (issue ? 'one-program-bad' : verified ? 'one-program-good' : 'one-program-unknown')}>
-                <span/>{issue ? 'مشكلة مؤكدة' : verified ? 'تجربة أساسية موثقة' : local ? 'برنامج محلي' : 'الرصد غير مكتمل'}
+                <span/>{issue ? (problemOf(p) || 'مشكلة مؤكدة') : verified ? 'تجربة أساسية موثقة' : local ? 'برنامج محلي' : 'الرصد غير مكتمل'}
               </span>
             </button>;
           })}
