@@ -16,6 +16,7 @@
 .orbit-one .one-state-attention {color:#ffd5ce;background:rgba(236,125,106,.15);}
 .orbit-one .one-state-incomplete {color:#ffe3a6;background:rgba(218,169,76,.12);}
 .orbit-one .one-state-monitored {color:#9af2ce;background:rgba(100,217,169,.1);}
+.orbit-one .one-monitoring-gap,.orbit-one .one-sync-progress {max-width:490px;margin:10px 0 0;color:#c2d1e1;font-size:11px;line-height:1.8;}
 .orbit-one .one-hero-actions {display:flex;gap:10px;flex-wrap:wrap;margin-top:23px;}
 .orbit-one .one-button {min-height:41px;display:inline-flex;justify-content:center;align-items:center;gap:8px;border-radius:12px;padding:10px 16px;font-size:12px;font-weight:750;border:1px solid transparent;white-space:normal;text-align:center;line-height:1.35;transition:transform .18s ease,background .18s ease,color .18s ease;}
 .orbit-one .one-button:hover {transform:translateY(-2px);}
