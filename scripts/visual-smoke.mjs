@@ -99,15 +99,10 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.orbit-executive').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-mobile.png', fullPage: true });
+  assert.equal(await page.getByRole('button', { name: 'مزامنة GitHub الآن' }).count(), 1, 'Manual GitHub sync button is missing');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3);
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
 
-  await page.locator('.orbit-tools-menu > summary').click();
-  await page.getByRole('button', { name: 'المظهر الداكن' }).click();
-  assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 1, 'Dark appearance not applied');
-  await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
-  await page.getByRole('button', { name: 'المظهر الفاتح' }).click();
-  assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 0, 'Light appearance not restored');
   const unauthorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
     headers: { Origin: base },
     data: { appId: 'MIRAS', environment: 'production', operationName: 'ci.test', errorCode: 'CI_SMOKE', errorMessage: 'isolated smoke test' },

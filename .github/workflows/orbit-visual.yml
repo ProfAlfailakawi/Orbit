@@ -12,9 +12,6 @@ jobs:
     timeout-minutes: 20
     env:
       PORT: 3100
-      # Test-only placeholder so Firebase client modules initialize in CI.
-      # Production uses the restricted project key supplied at build time.
-      VITE_FIREBASE_API_KEY: ci-public-placeholder
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

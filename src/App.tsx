@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import {
   Activity,
@@ -11,7 +11,6 @@ import {
   ArrowUpLeft,
   BrainCircuit,
   CheckCircle2,
-  Cloud,
   Code2,
   Compass,
   Copy,
@@ -23,7 +22,6 @@ import {
   Layers,
   Laptop,
   Lock,
-  Moon,
   Play,
   Radar,
   RefreshCw,
@@ -37,14 +35,6 @@ import {
   Unlock,
   Zap,
 } from 'lucide-react';
-import type { User as FirebaseUser } from 'firebase/auth';
-import {
-  observeOperatorAuth,
-  signInWithGoogleOperator,
-  signOutGoogleOperator,
-  subscribeToCloudSnapshot,
-  syncStateToFirestore,
-} from './firebase';
 import { generateClaudeMissionPrompt } from './core/engine';
 import {
   INITIAL_ACCEPTANCE_CRITERIA,
@@ -117,7 +107,7 @@ type CockpitDeckTab = 'incidents' | 'commits' | 'memory' | 'acceptance';
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
 
 export default function App() {
-  const [isDark, setIsDark] = useState<boolean>(false);
+  const isDark = false;
   const [activeNav, setActiveNav] = useState<MainNavId>('mission-control');
   const [cockpitDeck, setCockpitDeck] = useState<CockpitDeckTab>('incidents');
   const [selectedPlatformId, setSelectedPlatformId] = useState<string | null>(null);
@@ -164,9 +154,6 @@ export default function App() {
   >([]);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isGithubSyncing, setIsGithubSyncing] = useState(false);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [cloudSyncedAt, setCloudSyncedAt] = useState<string | null>(null);
-  const hydratingFromCloudRef = useRef<boolean>(false);
 
   // Claude Mission Pack State
   const [claudePromptText, setClaudePromptText] = useState<string>('');
@@ -273,72 +260,6 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  // Firebase Auth & Real-Time Firestore Multi-Device Sync
-  useEffect(() => {
-    let unsubSnapshot: (() => void) | null = null;
-    const unsubAuth = observeOperatorAuth((user) => {
-      setFirebaseUser(user);
-      if (unsubSnapshot) {
-        unsubSnapshot();
-        unsubSnapshot = null;
-      }
-      if (user && !isLocked) {
-        unsubSnapshot = subscribeToCloudSnapshot(user.uid, (cloudData, syncedIso) => {
-          hydratingFromCloudRef.current = true;
-          if (Array.isArray(cloudData.platforms) && cloudData.platforms.length > 0) {
-            setPlatforms(cloudData.platforms as PlatformRecord[]);
-          }
-          if (Array.isArray(cloudData.events)) {
-            setEvents(cloudData.events as RadarEvent[]);
-          }
-          if (Array.isArray(cloudData.incidents)) {
-            setIncidents(cloudData.incidents as IncidentCaseFile[]);
-          }
-          if (Array.isArray(cloudData.alerts)) {
-            setAlerts(cloudData.alerts as AlertNotification[]);
-          }
-          if (Array.isArray(cloudData.engineeringMemory)) {
-            setEngineeringMemory(cloudData.engineeringMemory as EngineeringMemoryEntry[]);
-          }
-          if (Array.isArray(cloudData.discoveredCandidates)) {
-            setDiscoveredCandidates(cloudData.discoveredCandidates as DiscoveredRepoCandidate[]);
-          }
-          setCloudSyncedAt(syncedIso);
-          setTimeout(() => {
-            hydratingFromCloudRef.current = false;
-          }, 600);
-        });
-      }
-    });
-    return () => {
-      unsubAuth();
-      if (unsubSnapshot) unsubSnapshot();
-    };
-  }, []);
-
-  // Auto-sync state changes to Cloud Firestore when operator is signed in with Google
-  useEffect(() => {
-    if (!firebaseUser || hydratingFromCloudRef.current) return;
-    const timer = setTimeout(() => {
-      void syncStateToFirestore({
-        fleetCount: platforms.length,
-        data: {
-          platforms,
-          events,
-          incidents,
-          alerts,
-          engineeringMemory,
-          discoveredCandidates,
-        },
-      })
-        .then((res) => {
-          if (res?.syncedAt) setCloudSyncedAt(res.syncedAt);
-        })
-        .catch(() => {});
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [firebaseUser, platforms, events, incidents, alerts, engineeringMemory, discoveredCandidates]);
-
   // Keyboard shortcuts (Alt+1..5 for rapid cockpit navigation)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -408,60 +329,6 @@ export default function App() {
       }
     } catch {
       setAuthError('تعذر التحقق من الخادم. لا يمكن الدخول دون مصادقة.');
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    if (isLocked) { setAuthError('سجّل الدخول إلى ORBIT أولاً قبل ربط Google.'); return; }
-    try {
-      const user = await signInWithGoogleOperator();
-      const syncRes = await syncStateToFirestore({
-        fleetCount: platforms.length,
-        data: {
-          platforms,
-          events,
-          incidents,
-          alerts,
-          engineeringMemory,
-          discoveredCandidates,
-        },
-      });
-      if (syncRes?.syncedAt) setCloudSyncedAt(syncRes.syncedAt);
-      setSyncBanner(`تم ربط ومزامنة Firebase Cloud بنجاح (${user.email})`);
-      setTimeout(() => setSyncBanner(null), 5000);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذر تسجيل الدخول عبر Google';
-      setSyncBanner(`تنبيه مصادقة Google: ${msg}`);
-      setTimeout(() => setSyncBanner(null), 5000);
-    }
-  };
-
-  const handleManualCloudSync = async () => {
-    if (!firebaseUser) {
-      await handleGoogleSignIn();
-      return;
-    }
-    try {
-      const res = await syncStateToFirestore({
-        fleetCount: platforms.length,
-        data: {
-          platforms,
-          events,
-          incidents,
-          alerts,
-          engineeringMemory,
-          discoveredCandidates,
-        },
-      });
-      if (res?.syncedAt) {
-        setCloudSyncedAt(res.syncedAt);
-        setSyncBanner(`تم حفظ الأسطول والحوادث في Firebase Firestore (${res.docId})`);
-        setTimeout(() => setSyncBanner(null), 4500);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'خطأ أثناء الحفظ السحابي';
-      setSyncBanner(`فشل الحفظ السحابي: ${msg}`);
-      setTimeout(() => setSyncBanner(null), 4500);
     }
   };
 
@@ -897,9 +764,6 @@ export default function App() {
             <details className="orbit-tools-menu one-quiet-settings">
               <summary aria-label="الإعدادات" title="الإعدادات"><Settings2 size={19}/></summary>
               <div className="orbit-tools-popover">
-                <button type="button" onClick={() => { void handleManualCloudSync(); }}><Cloud size={17}/> {firebaseUser ? 'مزامنة السحابة' : 'ربط Google'}</button>
-                {firebaseUser && <button type="button" onClick={() => { void signOutGoogleOperator(); }}><Lock size={17}/> خروج من Google</button>}
-                <button type="button" onClick={() => setIsDark(!isDark)}><Moon size={17}/> {isDark ? 'المظهر الفاتح' : 'المظهر الداكن'}</button>
                 <div className="one-settings-divider"/>
                 <details className="one-specialist-only">
                   <summary><Code2 size={17}/> للمختص التقني فقط</summary>

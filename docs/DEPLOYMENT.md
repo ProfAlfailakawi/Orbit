@@ -1,5 +1,12 @@
-# Deployment status
+# ORBIT deployment status
 
-ORBIT is configured for the standalone Firebase project `orbit-one-orbit-2026`. It is **not deployed**. Firebase Hosting is prepared to rewrite `/api/**` to Express on Cloud Run, but Cloud Run/Cloud Scheduler deployment requires Firebase Blaze/Google Cloud billing. The project currently has billing disabled to honor the no-cost requirement.
+ORBIT is deployed as a standalone production app at <https://orbitq8.web.app>.
 
-See [the Arabic deployment and status guide](PRODUCTION-DEPLOYMENT-AR.md) for the verified project state, free-tier limits, and remaining work. Do not deploy Hosting alone: the current frontend depends on Express APIs for authentication and dashboard operations.
+- Firebase Hosting serves the React application.
+- Cloud Run runs the authenticated Express API with `min-instances=0`.
+- Cloud Firestore stores the persistent application state.
+- A GitHub Actions schedule invokes the authenticated read-only GitHub monitor daily; a Firestore gate limits full scans to once every 72 hours. A manual GitHub sync is also available in the dashboard.
+
+Deploy from GitHub Actions using **Deploy ORBIT production**. The workflow runs `npm ci` and `npm run check`, deploys Cloud Run and Hosting, then verifies that the build ID served by both matches the deployed commit. It uses Workload Identity Federation; no Google service-account key or browser Firebase API key is required.
+
+Cloud Run scales to zero, but this project uses Google Cloud billing. Costs can occur if usage exceeds free quotas; a budget alert is not a hard spending cap. See [the Arabic deployment guide](PRODUCTION-DEPLOYMENT-AR.md) for setup and cost details.

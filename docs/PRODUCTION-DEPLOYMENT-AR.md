@@ -39,7 +39,7 @@
 الإعداد الحالي يتطلب هذه القيم في إعدادات مستودع `ProfAlfailakawi/Orbit`:
 
 - Secrets: `GCP_WIF_PROVIDER` و`GCP_DEPLOY_SERVICE_ACCOUNT`.
-- Variables: `GCP_PROJECT_ID` و`ORBIT_SCHEDULER_SERVICE_ACCOUNT` و`ORBIT_RUNTIME_SERVICE_ACCOUNT` و`FIREBASE_DATABASE_ID` و`VITE_FIREBASE_API_KEY`.
+- Variables: `GCP_PROJECT_ID` و`ORBIT_SCHEDULER_SERVICE_ACCOUNT` و`ORBIT_RUNTIME_SERVICE_ACCOUNT` و`FIREBASE_DATABASE_ID`.
 
 مزود WIF يسمح بفرع `main` للمستودع نفسه فقط. حساب النشر يستطيع إصدار رمز قصير الأجل لهوية خدمة المراقبة، وحساب خدمة المراقبة يملك `roles/run.invoker` على خدمة `orbit-api`. لا تستخدم مفاتيح JSON طويلة العمر.
 

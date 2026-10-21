@@ -18,13 +18,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Validate public Firebase build configuration
-        env:
-          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
-        run: test -n "$VITE_FIREBASE_API_KEY"
       - run: npm run check
         env:
-          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_ORBIT_BUILD_ID: ${{ github.sha }}
       - id: auth
         uses: google-github-actions/auth@v2
