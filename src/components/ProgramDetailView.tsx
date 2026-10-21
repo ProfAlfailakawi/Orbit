@@ -654,42 +654,46 @@ export const ProgramDetailView: React.FC<ProgramDetailViewProps> = ({
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-sky-400">نتائج GitHub Actions الأخيرة</h3>
-            {platform.recentRuns.length === 0 ? (
-              <p className="text-xs text-slate-400">لا توجد تشغيلات مسجلة في اللقطة الحالية.</p>
-            ) : (
-              <div className="divide-y divide-slate-800/70 text-xs">
-                {platform.recentRuns.map((run) => (
-                  <div key={run.id} className="py-3 space-y-1.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-sm">{run.workflowName}</span>
-                      <span
-                        className={`font-mono font-semibold ${
-                          run.status === 'warning_masked'
-                            ? 'text-amber-400'
-                            : run.status === 'success'
-                            ? 'text-emerald-400'
-                            : 'text-rose-400'
-                        }`}
-                      >
-                        {run.status === 'warning_masked'
-                          ? 'Success with Masked Sub-Job Warning !'
-                          : run.status.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="font-mono text-slate-400">
-                      Branch: {run.branch} · Commit: {run.commitSha} ({run.commitMessage}) · Duration:{' '}
-                      {run.durationSec}s
-                    </div>
-                    {run.warningDetails && (
-                      <div className="text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-lg p-2.5">
-                        كشف ORBIT: {run.warningDetails}
+            <details className="group rounded-lg border border-slate-800/70 px-4">
+              <summary className="cursor-pointer list-none py-3 text-sm font-semibold text-sky-400 marker:hidden">
+                نتائج GitHub Actions الأخيرة ({platform.recentRuns.length})
+              </summary>
+              {platform.recentRuns.length === 0 ? (
+                <p className="pb-3 text-xs text-slate-400">لا توجد تشغيلات مسجلة في اللقطة الحالية.</p>
+              ) : (
+                <div className="divide-y divide-slate-800/70 text-xs">
+                  {platform.recentRuns.map((run) => (
+                    <div key={run.id} className="py-3 space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-sm">{run.workflowName}</span>
+                        <span
+                          className={`font-mono font-semibold ${
+                            run.status === 'warning_masked'
+                              ? 'text-amber-400'
+                              : run.status === 'success'
+                              ? 'text-emerald-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {run.status === 'warning_masked'
+                            ? 'Success with Masked Sub-Job Warning !'
+                            : run.status.toUpperCase()}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                      <div className="font-mono text-slate-400">
+                        Branch: {run.branch} · Commit: {run.commitSha} ({run.commitMessage}) · Duration:{' '}
+                        {run.durationSec}s
+                      </div>
+                      {run.warningDetails && (
+                        <div className="text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-lg p-2.5">
+                          كشف ORBIT: {run.warningDetails}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </details>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-800/70">
