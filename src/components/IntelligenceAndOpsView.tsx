@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../core/api';
 import {
   ClipboardCheck,
   Copy,
@@ -182,7 +183,7 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
   const handleRunDigitalTwin = async (
     scenario: 'all' | 'auth' | 'save_submit' | 'payment_mock' | 'notification_mock' | 'journey_regression'
   ) => {
-    const res = await fetch('/api/twin/run', {
+    const res = await apiFetch('/api/twin/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ appId: twinAppId, scenario }),
@@ -222,7 +223,7 @@ export const EngineeringIntelligenceView: React.FC<IntelligenceProps> = ({
   };
 
   const handleRunSecurityScan = async () => {
-    const res = await fetch('/api/security/scan', { method: 'POST' });
+    const res = await apiFetch('/api/security/scan', { method: 'POST' });
     if (res.ok) {
       const data = await res.json();
       setSecScanResult(data.scanResult);

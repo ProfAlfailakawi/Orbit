@@ -354,6 +354,13 @@ async function startServer() {
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const cookieName = 'orbit_operator_session';
 
+  function getSessionToken(req: express.Request) {
+    const authorization = req.get('authorization') || '';
+    const bearer = authorization.match(/^Bearer\s+([a-f0-9]{64})$/i)?.[1];
+    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
+    return bearer || cookie?.slice(cookieName.length + 1) || '';
+  }
+
   function getCookieOptions(req: express.Request, maxAge?: number): express.CookieOptions {
     const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();
     const isHttps = req.secure || forwardedProto === 'https' || process.env.NODE_ENV === 'production';
@@ -367,6 +374,7 @@ async function startServer() {
   }
 
   app.post('/api/auth/verify', asyncRoute(async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     const address = req.ip || 'unknown';
     const now = Date.now();
     const attemptRef = firestore?.collection('orbitLoginAttempts').doc(crypto.createHash('sha256').update(address).digest('hex'));
@@ -406,13 +414,13 @@ async function startServer() {
     if (firestore) await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).set({ expiresAt });
     res.cookie(cookieName, token, getCookieOptions(req, 8 * 60 * 60_000));
     appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
-    return res.json({ authenticated: true, operator: 'Operator' });
+    return res.json({ authenticated: true, operator: 'Operator', sessionToken: token });
   }));
 
   app.post('/api/auth/logout', asyncRoute(async (req, res) => {
-    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
-    if (cookie) {
-      const token = cookie.slice(cookieName.length + 1);
+    res.setHeader('Cache-Control', 'no-store');
+    const token = getSessionToken(req);
+    if (token) {
       sessions.delete(token);
       if (firestore) await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).delete();
     }
@@ -421,8 +429,8 @@ async function startServer() {
   }));
 
   app.get('/api/auth/session', asyncRoute(async (req, res) => {
-    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
-    const token = cookie?.slice(cookieName.length + 1) || '';
+    res.setHeader('Cache-Control', 'no-store');
+    const token = getSessionToken(req);
     let expiry = sessions.get(token);
     if (firestore && token) {
       const stored = await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).get();
@@ -565,8 +573,7 @@ async function startServer() {
 
   app.use('/api', asyncRoute(async (req, res, next) => {
     // Sensor ingestion is a separate integration; never allow unauthenticated writes.
-    const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
-    const token = cookie?.slice(cookieName.length + 1) || '';
+    const token = getSessionToken(req);
     let expiry = sessions.get(token);
     if (firestore && token) {
       const stored = await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).get();

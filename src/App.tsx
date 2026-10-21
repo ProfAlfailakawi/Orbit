@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import {
   Activity,
   AlertTriangle,
@@ -175,7 +176,7 @@ export default function App() {
 
   const fetchServerState = async () => {
     try {
-      const res = await fetch('/api/state');
+      const res = await apiFetch('/api/state');
       if (!res.ok) return;
       const data = await res.json();
       setPlatforms(data.platforms);
@@ -204,46 +205,15 @@ export default function App() {
     fetchServerState();
     const timer = setInterval(fetchServerState, 12000);
 
-    let es: EventSource | null = null;
-    if (typeof EventSource !== 'undefined') {
-      try {
-        es = new EventSource('/api/stream');
-        es.onmessage = (evt) => {
-          try {
-            const data = JSON.parse(evt.data);
-            if (data.type === 'STATE_UPDATE') {
-              if (data.platforms) setPlatforms(data.platforms);
-              if (data.events) setEvents(data.events);
-              if (data.incidents) setIncidents(data.incidents);
-              if (data.alerts) setAlerts(data.alerts);
-              if (data.crossAppPatterns) setCrossAppPatterns(data.crossAppPatterns);
-              if (data.innovations) setInnovations(data.innovations);
-              if (data.featureMatrix) setFeatureMatrix(data.featureMatrix);
-              if (data.acceptanceCriteria) setAcceptanceCriteria(data.acceptanceCriteria);
-              if (data.engineeringMemory) setEngineeringMemory(data.engineeringMemory);
-              if (data.selfHealth) setSelfHealth(data.selfHealth);
-              if (data.costGuard) setCostGuard(data.costGuard);
-              if (data.discoveredCandidates) setDiscoveredCandidates(data.discoveredCandidates);
-              if (data.auditLogs) setAuditLogs(data.auditLogs);
-            }
-          } catch {
-            // ignore malformed frame
-          }
-        };
-      } catch {
-        // fallback to interval polling
-      }
-    }
-
     return () => {
       clearInterval(timer);
-      if (es) es.close();
     };
   }, [isLocked]);
 
   useEffect(() => {
-    fetch('/api/auth/session').then(r => r.json()).then(data => {
+    apiFetch('/api/auth/session').then(r => r.json()).then(data => {
       if (data.authenticated) setIsLocked(false);
+      else clearOrbitSessionToken();
     }).catch(() => {});
   }, []);
 
@@ -351,7 +321,7 @@ export default function App() {
     e.preventDefault();
     setAuthError(null);
     try {
-      const res = await fetch('/api/auth/verify', {
+      const res = await apiFetch('/api/auth/verify', {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
@@ -361,7 +331,7 @@ export default function App() {
         body: JSON.stringify({ passkey: passkeyInput }),
       });
       const text = await res.text();
-      let data: { authenticated?: boolean; error?: string } | null = null;
+      let data: { authenticated?: boolean; error?: string; sessionToken?: string } | null = null;
       try {
         data = JSON.parse(text);
       } catch {
@@ -372,6 +342,7 @@ export default function App() {
         return;
       }
       if (res.ok && data.authenticated) {
+        if (data.sessionToken) setOrbitSessionToken(data.sessionToken);
         setIsLocked(false);
         setPasskeyInput('');
         setAuthError(null);
@@ -440,7 +411,7 @@ export default function App() {
 
   const handleRunCanary = async () => {
     try {
-      const res = await fetch('/api/canary/run', { method: 'POST' });
+      const res = await apiFetch('/api/canary/run', { method: 'POST' });
       const data = await res.json();
       if (data.canaryResult) {
         setCanaryHistory(data.canaryHistory || [data.canaryResult]);
@@ -461,7 +432,7 @@ export default function App() {
 
   const handleSyncGithub = async (appCode?: string) => {
     try {
-      const res = await fetch('/api/github/sync', {
+      const res = await apiFetch('/api/github/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appId: appCode }),
@@ -488,7 +459,7 @@ export default function App() {
     isUserVisible: boolean;
     environment: string;
   }) => {
-    const res = await fetch('/api/radar/ingest', {
+    const res = await apiFetch('/api/radar/ingest', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -510,7 +481,7 @@ export default function App() {
     note: string,
     addToMemory = false
   ) => {
-    const res = await fetch(`/api/incidents/${incidentId}/transition`, {
+    const res = await apiFetch(`/api/incidents/${incidentId}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nextStatus, technicalVerificationPassed: technicallyVerified, note, addToMemory }),
@@ -524,7 +495,7 @@ export default function App() {
   const handleRequestAiAnalysis = async (incidentId: string) => {
     setLoadingAi(true);
     try {
-      const res = await fetch('/api/ai/diagnose', {
+      const res = await apiFetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ incidentId }),
@@ -554,7 +525,7 @@ export default function App() {
     const repoName = github ? parts[1].replace(/\.git$/i, '') : parsed.hostname.toLowerCase();
     const codeName = (github ? repoName : parsed.hostname.replace(/\W+/g, '-'))
       .replace(/[^a-zA-Z0-9_-]/g, '-').toUpperCase().slice(0, 48);
-    const response = await fetch('/api/fleet/add', {
+    const response = await apiFetch('/api/fleet/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -584,7 +555,7 @@ export default function App() {
     techStack: string;
     defaultBranch: string;
   }) => {
-    const res = await fetch('/api/fleet/add', {
+    const res = await apiFetch('/api/fleet/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -596,7 +567,7 @@ export default function App() {
 
   const handleVerifyConnection = async (id: string) => {
     try {
-      const res = await fetch(`/api/fleet/${encodeURIComponent(id)}/verify`, { method: 'POST' });
+      const res = await apiFetch(`/api/fleet/${encodeURIComponent(id)}/verify`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'تعذر التحقق من الاتصال.');
       if (data.platforms) setPlatforms(data.platforms);
@@ -608,7 +579,7 @@ export default function App() {
   };
 
   const handleLifecycleChange = async (id: string, nextLifecycle: PlatformLifecycleState) => {
-    const res = await fetch(`/api/fleet/${id}/lifecycle`, {
+    const res = await apiFetch(`/api/fleet/${id}/lifecycle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nextLifecycle }),
@@ -628,7 +599,7 @@ export default function App() {
       runtimeMode: AppRuntimeMode;
     }
   ) => {
-    const res = await fetch(`/api/fleet/${id}/update`, {
+    const res = await apiFetch(`/api/fleet/${id}/update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -642,7 +613,7 @@ export default function App() {
     id: string,
     confirmationToken: string
   ): Promise<{ purged: boolean; error?: string }> => {
-    const res = await fetch(`/api/fleet/${id}/purge-history`, {
+    const res = await apiFetch(`/api/fleet/${id}/purge-history`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmationToken }),
@@ -659,7 +630,7 @@ export default function App() {
   };
 
   const handleApproveDiscovered = async (codeName: string) => {
-    const res = await fetch(`/api/fleet/discover/${codeName}/approve`, { method: 'POST' });
+    const res = await apiFetch(`/api/fleet/discover/${codeName}/approve`, { method: 'POST' });
     const data = await res.json();
     if (data.platforms) setPlatforms(data.platforms);
     if (data.discoveredCandidates) setDiscoveredCandidates(data.discoveredCandidates);
@@ -679,7 +650,7 @@ export default function App() {
     recurringPatternTag: string;
     isConfirmedByEvidence: boolean;
   }): Promise<{ accepted: boolean; error?: string }> => {
-    const res = await fetch('/api/memory/save', {
+    const res = await apiFetch('/api/memory/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -691,7 +662,7 @@ export default function App() {
   };
 
   const handleSimulateOutage = async (simulateOutage: boolean) => {
-    const res = await fetch('/api/self-health/simulate-outage', {
+    const res = await apiFetch('/api/self-health/simulate-outage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ simulateOutage }),
@@ -706,7 +677,7 @@ export default function App() {
     hasHiddenSubStepWarning: boolean;
     tamperSignature: boolean;
   }): Promise<{ verified: boolean; signatureHeader: string; message: string }> => {
-    const res = await fetch('/api/github/webhook-simulate', {
+    const res = await apiFetch('/api/github/webhook-simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -897,7 +868,7 @@ export default function App() {
               </div>
             </details>
             <button type="button" className="orbit-lock-control" title="قفل الجلسة" aria-label="قفل الجلسة"
-              onClick={() => { void fetch('/api/auth/logout', { method: 'POST' }).finally(() => setIsLocked(true)); }}>
+              onClick={() => { void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => { clearOrbitSessionToken(); setIsLocked(true); }); }}>
               <Lock size={17}/>
             </button>
           </div>
@@ -1014,7 +985,7 @@ export default function App() {
             }}
             onRunCanary={handleRunCanary}
             onRequestAiDiagnosis={async (incidentId) => {
-              const res = await fetch('/api/ai/diagnose', {
+              const res = await apiFetch('/api/ai/diagnose', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ incidentId }),
