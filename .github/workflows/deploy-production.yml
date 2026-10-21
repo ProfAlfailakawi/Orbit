@@ -47,12 +47,16 @@ jobs:
             exit "$code"
           }
           trap rollback_backend ERR
+          SECRET_BINDINGS="ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest"
+          if gcloud secrets describe GITHUB_READ_ONLY_TOKEN --project "$PROJECT_ID" >/dev/null 2>&1; then
+            SECRET_BINDINGS+=",GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest"
+          fi
           gcloud run deploy orbit-api \
             --source . --region "$REGION" --project "$PROJECT_ID" \
             --service-account "${{ vars.ORBIT_RUNTIME_SERVICE_ACCOUNT }}" \
-            --allow-unauthenticated --min 0 --max 3 --cpu 1 --memory 1Gi \
+            --allow-unauthenticated --min 0 --max 1 --cpu 1 --memory 1Gi \
             --timeout 300 --concurrency 40 --set-env-vars DATA_STORE=firestore,FIREBASE_PROJECT_ID=$PROJECT_ID,FIREBASE_DATABASE_ID='${{ vars.FIREBASE_DATABASE_ID }}',SCHEDULER_ONLY=true,ORBIT_TRUST_PROXY_HOPS=1,GITHUB_SYNC_MIN_INTERVAL_HOURS=72 \
-            --set-secrets ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest,GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest
+            --set-secrets "$SECRET_BINDINGS"
           SERVICE_URL="$(gcloud run services describe orbit-api --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
           gcloud run services update orbit-api --region "$REGION" --project "$PROJECT_ID" \
             --update-env-vars "SCHEDULER_AUDIENCE=$SERVICE_URL,SCHEDULER_SERVICE_ACCOUNT=${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}"

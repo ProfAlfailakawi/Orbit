@@ -2,19 +2,19 @@
 
 ## الحالة الفعلية
 
-- مشروع Firebase مستقل باسم `orbit-one-orbit-2026`، منفصل عن NAHJ، والفوترة غير مفعّلة.
+- مشروع Firebase مستقل باسم `orbit-one-orbit-2026`، منفصل عن NAHJ. تم ربطه بحساب فوترة مستقل فارغ بناءً على موافقتك، مع حد إنفاق Cloud Run موثق أدناه.
 - موقع Hosting الأساسي: `https://orbit-one-orbit-2026.web.app`. تم حجز اسم أسهل داخل المشروع: `https://orbitq8.web.app` (لم يُنشر التطبيق عليه بعد). اسم `orbit-one.web.app` غير متاح.
 - تم تسجيل تطبيق الويب ORBIT وإنشاء قاعدة Firestore `(default)` في `me-central1` على المستوى القياسي مع `freeTier: true`. إعداد النشر يضع Cloud Run وCloud Scheduler في المنطقة نفسها لتقليل زمن الاتصال وتكاليف نقل البيانات.
 - نُشرت قواعد Firestore الحالية على المشروع المستقل. القراءة والكتابة تتطلبان مستخدماً موثقاً، وبيانات مساحة العمل مقيدة بمالكها/المشرف.
-- لم يُنشر الموقع أو الـAPI، ولم يُنشأ Cloud Run أو Cloud Scheduler، ولم تُضف رموز GitHub أو passkey إلى أي خدمة.
+- رُبط المشروع بحساب الفوترة الفارغ `My Billing Account 1` (`01FBE0-42DCB4-1AA803`) لتظل تكاليف ORBIT منفصلة. أُنشئ حد إنفاق شهري فعلي لخدمة Cloud Run وحده بقيمة **2 USD**، مع تنبيهات عند 50% و80% و100%. يوجد أيضاً تنبيه حساب عام عند 5 USD. حد Cloud Run يوقف استخدام هذه الخدمة عند بلوغ الحد التقديري؛ قد يبقى فرق محدود بسبب الطلبات الجارية وتأخر تقدير الكلفة، ولا يغطي الخدمات الأخرى.
 
-## لماذا لم يُنشر الموقع بعد؟
+## النشر والحالة التشغيلية
 
 هذا التطبيق ليس واجهة ثابتة: تسجيل الدخول وواجهات `/api/*` ومراقبة GitHub والعمليات الإدارية تعتمد على خادم Express. إعداد Firebase Hosting الحالي يوجّه هذه الطلبات إلى Cloud Run. Firebase Hosting وFirestore لهما حصص مجانية، لكن نشر Cloud Run أو Cloud Functions يتطلب خطة Blaze وربط حساب فوترة. لذلك لا يمكن تحقيق البنية الأصلية (Hosting + Express + Scheduler) داخل Firebase مع ضمان عدم ربط فوترة. نشر `dist/` وحده سيعرض الواجهة بينما يفشل تسجيل الدخول والـAPI، ولهذا لم أطلقه كرابط إنتاج.
 
 الخيار الأنسب هنا فحص تلقائي كل 72 ساعة، مع زر المزامنة اليدوية الموجود في اللوحة للفحص الفوري عند الحاجة. Cloud Scheduler يستدعي الخدمة يومياً الساعة 08:00 بتوقيت الكويت، لكن الخادم لا ينفذ فحص GitHub إلا إذا مرّت 72 ساعة على آخر فحص ناجح؛ وهذا يتجنب مشكلة `*/3` التي تعيد العد عند بداية الشهر. إذا فشل الفحص، لا يُحدّث وقت النجاح وتُعاد المحاولة في موعد Scheduler التالي. هذا رصد دوري وليس مراقبة لحظية.
 
-تفعيل الجدولة يتطلب Cloud Scheduler وCloud Run، وهما يحتاجان ربط Billing account/Blaze حتى لو ضُبط Cloud Run على `min-instances=0`. لدى Cloud Scheduler أول 3 وظائف مجانية على مستوى حساب الفوترة؛ وتُحاسب الوظائف الزائدة، كما أن حصة Cloud Run المجانية لا تمنع الفوترة بعد تجاوزها. لم أفعّلهما ولم أضع أسراراً في المشروع. Google Cloud Free Trial المؤهل يقدم رصيد 300 دولار لمدة 90 يوماً دون فوترة أثناء التجربة، لكن يحتاج حساب Billing؛ وبعد انتهاء التجربة تتوقف الموارد إذا لم تتم الترقية. لم أربط المشروع أو أفعّل الخدمات.
+تفعيل الجدولة يتطلب Cloud Scheduler وCloud Run، وهما يحتاجان ربط Billing account/Blaze حتى لو ضُبط Cloud Run على `min-instances=0`. لدى Cloud Scheduler أول 3 وظائف مجانية على مستوى حساب الفوترة؛ وتُحاسب الوظائف الزائدة. حد الإنفاق الفعلي الحالي يخص Cloud Run فقط، بينما تنبيه 5 USD لبقية تكاليف الحساب تنبيه وليس إيقافاً آلياً. لذلك تظل رسوم خدمات أخرى أو تجاوز تأخر التقدير ممكنة.
 
 ## ما يفعله الكود وما يحتاج إعداد الحساب
 
@@ -36,7 +36,7 @@
    ```
 
 3. أنشئ حسابي خدمة منفصلين في المنطقة `me-central1`: واحد لتشغيل Cloud Run ويحتاج `roles/datastore.user` و`roles/secretmanager.secretAccessor`، وآخر لـCloud Scheduler ويحتاج `roles/run.invoker` على خدمة `orbit-api` فقط. لا تستخدم حساب المستخدم الشخصي كهوية تشغيل.
-4. أنشئ في Secret Manager السرّين `ORBIT_OPERATOR_PASSKEY` و`GITHUB_READ_ONLY_TOKEN`. اختر passkey عشوائياً بطول 16 حرفاً أو أكثر، وGitHub fine-grained token بصلاحية **Contents: Read-only** و**Actions: Read-only** للمستودعات المطلوبة فقط. لا تضعهما في متغيرات Vite أو GitHub logs.
+4. أنشئ في Secret Manager السر `ORBIT_OPERATOR_PASSKEY` (طول 16 حرفاً أو أكثر). بما أن المستودعات الحالية عامة، لا يلزم GitHub token للتشغيل الأولي؛ يستخدم ORBIT GitHub API العام. عند إضافة مستودعات خاصة، أنشئ `GITHUB_READ_ONLY_TOKEN` كـfine-grained token بصلاحية **Contents: Read-only** و**Actions: Read-only** للمستودعات المختارة. Workflow النشر يضيفه تلقائياً إلى Cloud Run عند وجود السر. لا تضع الأسرار في متغيرات Vite أو GitHub logs.
 5. أنشئ GitHub Workload Identity Pool/Provider لمصدر `https://token.actions.githubusercontent.com`، واقصر شرطه على `ProfAlfailakawi/Orbit` وعلى فرع `main`. اربط principalSet بحساب النشر، مع أقل الأدوار اللازمة: Cloud Run Admin، Firebase Hosting Admin، Secret Accessor، Service Account User لحساب تشغيل Cloud Run، وصلاحية البناء. أضف `GCP_WIF_PROVIDER` و`GCP_DEPLOY_SERVICE_ACCOUNT` كـGitHub Actions secrets، وأضف `GCP_PROJECT_ID` و`FIREBASE_DATABASE_ID=(default)` و`ORBIT_RUNTIME_SERVICE_ACCOUNT` و`ORBIT_SCHEDULER_SERVICE_ACCOUNT` كـActions variables.
    أضف كذلك `VITE_FIREBASE_API_KEY` كـActions variable عام للبناء فقط. مفتاح Firebase للويب مُعرّف مشروع عام يظهر في ملفات المتصفح؛ قيّده في Google Cloud بمراجع `orbitq8.web.app` وFirebase APIs اللازمة. لا تستخدمه كمصادقة أو كبديل لقواعد Firestore، ولا تضع أسرار الخادم في متغيرات `VITE_*`.
 6. شغّل Workflow **Deploy ORBIT production** يدوياً من GitHub Actions. يفحص الخادم وHosting ويعيد Cloud Run إلى النسخة السابقة عند فشل الفحص؛ ونشر Hosting يتم بعد نشر backend والتحقق من `/healthz`.
@@ -52,7 +52,7 @@
 
 8. اختبر `/healthz` و`/api/auth/session` بعد النشر، ثم سجّل الدخول وراقب سجل Scheduler ووقت آخر نجاح. ابدأ بإضافة المستودعات التي تريد مراقبتها وتحقق من كل واحد يدوياً. يقتصر التكامل على القراءة من GitHub.
 
-إذا كان المطلوب **صفر فوترة وربط حساب Billing**، يبقى النشر الآمن الكامل غير ممكن على بنية Firebase Hosting → Cloud Run المطلوبة. يمكن حجز اسم Hosting مجاناً، لكن نشر ملفات الواجهة وحدها سيعطي موقعاً معطلاً لأن تسجيل الدخول وواجهات API موجودة في Express.
+إذا كان المطلوب **صفر فوترة وربط حساب Billing**، يبقى النشر الآمن الكامل غير ممكن على بنية Firebase Hosting → Cloud Run المطلوبة. حد Cloud Run البالغ 2 USD يقلل خطر ارتفاع تكلفته ويوقف الخدمة عند بلوغه، لكنه ليس سقفاً إجمالياً على جميع خدمات المشروع. يمكن حجز اسم Hosting مجاناً، لكن نشر ملفات الواجهة وحدها سيعطي موقعاً معطلاً لأن تسجيل الدخول وواجهات API موجودة في Express.
 
 ## أوامر التحقق الحالية
 
