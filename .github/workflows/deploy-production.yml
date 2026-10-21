@@ -64,10 +64,14 @@ jobs:
           gcloud run services update orbit-api --region "$REGION" --project "$PROJECT_ID" \
             --update-env-vars "SCHEDULER_AUDIENCE=$SERVICE_URL,SCHEDULER_SERVICE_ACCOUNT=${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}"
           for attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz/" >/dev/null; then break; fi
+            if curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz/" >/dev/null \
+              && curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/api/version" \
+                | jq -e --arg build "$ORBIT_BUILD_ID" '.build == $build' >/dev/null; then break; fi
             sleep 3
           done
           curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz/" >/dev/null
+          curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/api/version" \
+            | jq -e --arg build "$ORBIT_BUILD_ID" '.build == $build' >/dev/null
           trap - ERR
       - name: Deploy and verify Firebase Hosting (rollback on failure)
         shell: bash
@@ -93,4 +97,6 @@ jobs:
           npx --yes firebase-tools@14 --non-interactive deploy --only hosting --project "$PROJECT_ID"
           curl --fail --silent --show-error --max-time 20 "https://$SITE_ID.web.app/" >/dev/null
           curl --fail --silent --show-error --max-time 20 "https://$SITE_ID.web.app/healthz/" >/dev/null
+          curl --fail --silent --show-error --max-time 20 "https://$SITE_ID.web.app/api/version" \
+            | jq -e --arg build "${GITHUB_SHA}" '.build == $build' >/dev/null
           trap - ERR
