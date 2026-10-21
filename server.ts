@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { buildPrivacySafeTimeline, buildSharedDependencyAdvisory, evaluateTruthEvidence } from './src/core/guardian.ts';
 import { GoogleGenAI } from '@google/genai';
 import {
   evaluateSelfHealthOnOutage,
@@ -235,6 +236,8 @@ function loadStateFromDisk() {
     if (Array.isArray(parsed.events)) events = parsed.events;
     if (Array.isArray(parsed.incidents)) incidents = parsed.incidents;
     if (Array.isArray(parsed.alerts)) alerts = parsed.alerts;
+    if (Array.isArray(parsed.silentFailures)) silentFailures = parsed.silentFailures;
+    if (Array.isArray(parsed.crossAppPatterns)) crossAppPatterns = parsed.crossAppPatterns;
     if (Array.isArray(parsed.engineeringMemory)) engineeringMemory = parsed.engineeringMemory;
     if (Array.isArray(parsed.discoveredCandidates)) discoveredCandidates = parsed.discoveredCandidates;
     if (Array.isArray(parsed.canaryHistory)) canaryHistory = parsed.canaryHistory;
@@ -270,6 +273,12 @@ async function startServer() {
   if (Number.isSafeInteger(configuredProxyHops) && configuredProxyHops > 0) {
     app.set('trust proxy', configuredProxyHops);
   }
+
+  // Independent liveness only: no app health information, secrets or authenticated data.
+  app.get('/healthz', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ service: 'orbit', status: 'running' });
+  });
 
   // Secure operator session. Reads from .env dynamically so user edits take effect immediately.
   const envFilePath = path.join(__dirname, '.env');
@@ -420,8 +429,10 @@ async function startServer() {
     const environment = body.environment;
     if (!['production', 'staging', 'local'].includes(environment)) return res.status(400).json({ error: 'Invalid environment' });
     const operationName = sanitizeShortText(body.operationName, 160);
-    const errorCode = sanitizeShortText(body.errorCode, 100);
-    const errorMessage = sanitizeShortText(body.errorMessage, 4000);
+    const truth = evaluateTruthEvidence(body.outcomeEvidence);
+    const contradiction = truth.verdict === 'contradiction';
+    const errorCode = contradiction ? truth.code! : sanitizeShortText(body.errorCode, 100);
+    const errorMessage = contradiction ? truth.reason : sanitizeShortText(body.errorMessage, 4000);
     if (!operationName || !errorCode || !errorMessage) {
       return res.status(400).json({ error: 'Missing or invalid event fields' });
     }
@@ -437,15 +448,43 @@ async function startServer() {
       commitSha: /^[a-f0-9]{7,64}$/i.test(String(body.commitSha || '')) ? String(body.commitSha) : '',
       browserOs: sanitizeShortText(body.browserOs, 160),
       detectionSource: 'ORBIT Sensor',
-      isSilentMismatch: Boolean(body.isSilentMismatch),
+      isSilentMismatch: Boolean(body.isSilentMismatch) || contradiction,
       isUserVisible: Boolean(body.isUserVisible),
       latencyMs: typeof body.latencyMs === 'number' ? body.latencyMs : undefined,
       dataIntegrity: 'Live',
     }, events, incidents, alerts);
 
+    const safeFrames = buildPrivacySafeTimeline(body.breadcrumbs, {
+      correlationId: outcome.event.correlationId,
+      releaseVersion: outcome.event.releaseVersion,
+      operationName,
+    });
+    if (safeFrames.length) {
+      outcome.incident.blackBoxFrames = safeFrames;
+      outcome.incidents = outcome.incidents.map(item => item.incidentId === outcome.incident.incidentId
+        ? { ...item, blackBoxFrames: safeFrames } : item);
+    }
     events = outcome.events;
     incidents = outcome.incidents;
     alerts = outcome.alerts;
+    if (environment === 'production' && outcome.event.dataIntegrity === 'Live') {
+      const advisory = buildSharedDependencyAdvisory(outcome.incident, platforms);
+      if (advisory) crossAppPatterns = [advisory, ...crossAppPatterns.filter(p => p.id !== advisory.id)].slice(0, 100);
+    }
+    if (contradiction) {
+      silentFailures = [{
+        id: 'TRUTH-' + outcome.event.eventId,
+        appId,
+        patternType: 'Fake Success Toast without DB Commit' as const,
+        operationName,
+        detectedAt: new Date().toISOString(),
+        evidenceSummary: 'Authenticated app-scoped sensor reports UI success with explicit authoritative non-commit.',
+        expectedOutcome: 'Successful operation must be confirmed by the server.',
+        actualOutcome: 'The server explicitly reported non-commit.',
+        confidence: 'High' as const,
+        dataIntegrity: 'Live' as const,
+      }, ...silentFailures].slice(0, 120);
+    }
     boundedTelemetryState();
     platforms = platforms.map(p => p.id === target.id ? {
       ...p,

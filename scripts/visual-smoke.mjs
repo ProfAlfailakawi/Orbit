@@ -12,6 +12,9 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, dev
 const runtimeErrors = [];
 page.on('pageerror', error => runtimeErrors.push(error.message));
 try {
+  const health = await page.request.get(base + '/healthz');
+  assert.equal(health.status(), 200);
+  assert.deepEqual(await health.json(), { service: 'orbit', status: 'running' });
   const unauth = await page.request.get(base + '/api/state');
   assert.equal(unauth.status(), 401, 'Protected state must reject unauthenticated requests');
 
@@ -111,6 +114,26 @@ try {
     data: { appId: 'MIRAS', environment: 'staging', operationName: 'ci.visual.smoke', errorCode: 'CI_SMOKE', errorMessage: 'Synthetic browser-only verification of opt-in secure sensor' },
   });
   assert.equal(authorizedSensor.status(), 202, 'Authenticated staging sensor must accept a test event');
+  const contradictorySensor = await page.request.post(base + '/api/sensor/ingest', {
+    headers: { Authorization: 'Bearer ' + sensorToken },
+    data: {
+      appId: 'MIRAS', environment: 'staging', operationName: 'ci.truth.staging',
+      outcomeEvidence: { uiReportedSuccess: true, serverRecordConfirmed: false, httpStatus: 200 },
+      breadcrumbs: [
+        { kind: 'ui_action', operation: 'save.click', outcome: 'success', typedValue: 'private.student@example.com', secret: 'DO_NOT_LOG' },
+        { kind: 'http_result', operation: 'save.response', outcome: 'failure', statusCode: 200, body: 'private payload' },
+      ],
+    },
+  });
+  assert.equal(contradictorySensor.status(), 202, 'Explicit server contradiction must create a verified silent-failure incident');
+  const truthState = await (await page.request.get(base + '/api/state')).json();
+  const truthIncident = truthState.incidents.find(i => i.appId === 'MIRAS' && i.summary.includes('non-commit'));
+  assert.ok(truthIncident, 'Authoritative mismatch must create an incident');
+  assert.equal(truthIncident.blackBoxFrames.length, 2, 'Only two safe timeline records should be stored');
+  assert.ok(!JSON.stringify(truthIncident.blackBoxFrames).includes('private.student@example.com'), 'No typed private input in evidence timeline');
+  assert.ok(!JSON.stringify(truthIncident.blackBoxFrames).includes('DO_NOT_LOG'), 'No unexpected secret in evidence timeline');
+  assert.ok(truthState.silentFailures.some(f => f.appId === 'MIRAS' && f.dataIntegrity === 'Live'), 'Internal evidence store must record explicit contradiction');
+
   const spoofedSensor = await page.request.post(base + '/api/sensor/ingest', {
     headers: { Authorization: 'Bearer ' + sensorToken },
     data: { appId: 'THRIVE', environment: 'staging', operationName: 'ci.spoof.attempt', errorCode: 'CI_SPOOF', errorMessage: 'A MIRAS credential must not impersonate another app' },

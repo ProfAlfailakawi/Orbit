@@ -410,9 +410,9 @@ export function ingestAndCorrelateEvent(
       eventType: classification.category,
       severity: classification.severity,
       timestamp: now,
-      releaseVersion: raw.releaseVersion || 'v2026.10.2',
-      commitSha: raw.commitSha || 'a8f4c21',
-      browserOs: raw.browserOs || 'Safari 18.1 / iOS 18.1',
+      releaseVersion: raw.releaseVersion || 'unknown',
+      commitSha: raw.commitSha || 'unknown',
+      browserOs: raw.browserOs || 'unknown',
       operationName: raw.operationName,
       errorCode: raw.errorCode,
       safeErrorMessage: sanitizedMsg.sanitized,
@@ -459,14 +459,10 @@ export function ingestAndCorrelateEvent(
         `احتمال تعارض في عقد البيانات (Schema/Contract) داخل العملية ${raw.operationName}`,
         `تغير سلوك مرتبط بالإصدار ${resultEvent.releaseVersion} (${resultEvent.commitSha})`,
       ],
-      falsifiedHypotheses: [
-        'انقطاع كامل للخادم (تم استبعاده لأن نبض Heartbeat مستمر)',
-      ],
+      falsifiedHypotheses: [], // No exclusions without real verification.
       relatedReleases: [resultEvent.releaseVersion],
       suspectedCommitSha: resultEvent.commitSha,
-      suspectedFiles: [
-        `src/services/${raw.operationName.replace(/[^a-zA-Z0-9]/g, '')}.ts`,
-      ],
+      suspectedFiles: [], // No invented path until repository inspection.
       reproductionSteps: [
         `تشغيل بيئة الفحص لبرنامج ${raw.appId} على الإصدار ${resultEvent.releaseVersion}`,
         `تنفيذ العملية: ${raw.operationName}`,
@@ -487,35 +483,10 @@ export function ingestAndCorrelateEvent(
         `اختفاء الخطأ ${raw.errorCode} في بيئة المختبر الموازي (Digital Twin)`,
         `نجاح كافة اختبارات القبول الحالية دون تراجع`,
       ],
-      confidenceScore: 92,
+      confidenceScore: 55, // Root cause not established by a telemetry event.
       eyeLayer: classification.eyeLayer,
       dataIntegrity: resultEvent.dataIntegrity,
-      blackBoxFrames: [
-        {
-          frameId: 'FRM-1',
-          timestamp: now,
-          appVersion: resultEvent.releaseVersion,
-          operationName: `${raw.operationName}:init`,
-          requestType: 'UI_ACTION',
-          statusCode: '200',
-          correlationId,
-          outcome: 'Success',
-          sanitizedPayloadSummary: 'بدء العملية من واجهة المستخدم بنجاح',
-          redactedFieldsCount: 0,
-        },
-        {
-          frameId: 'FRM-2',
-          timestamp: now,
-          appVersion: resultEvent.releaseVersion,
-          operationName: raw.operationName,
-          requestType: 'HTTP',
-          statusCode: raw.errorCode,
-          correlationId,
-          outcome: raw.isSilentMismatch ? 'Silent Failure' : 'Exception',
-          sanitizedPayloadSummary: sanitizedMsg.sanitized,
-          redactedFieldsCount: totalRedactions,
-        },
-      ],
+      blackBoxFrames: [], // Await authenticated metadata; never fabricate an interaction replay.
       history: [
         {
           timestamp: now,

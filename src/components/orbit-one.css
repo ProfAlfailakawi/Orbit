@@ -231,3 +231,16 @@
  .one-overlay-panel {max-height:100dvh;min-height:100dvh;border-radius:0;padding:14px 12px 30px;}
  .one-overlay-heading {top:-14px;padding:12px 0;}
 }
+
+.orbit-one .one-content-grid {display:block;}
+.orbit-one .one-incidents {width:100%;min-height:235px;}
+.orbit-one .one-panel-heading .one-quiet-actions {display:flex;align-items:center;gap:10px;}
+.orbit-one .one-bell-control {display:grid;place-items:center;width:33px;height:33px;border:1px solid var(--one-line);border-radius:11px;background:var(--one-milk);color:var(--one-muted);}
+.orbit-one .one-bell-control[aria-pressed="true"] {color:#2a9b77;background:#e6f7ef;border-color:#b2e3cf;}
+.orbit-one .one-notice-inline {display:block;font-size:10px;color:var(--one-muted);margin:-9px 0 13px;}
+.orbit-one .one-hero {background:radial-gradient(ellipse 44% 75% at 82% 40%,rgba(71,155,147,.17),transparent),linear-gradient(124deg,#102b47 0%,#111f38 53%,#0c1c30 100%);}
+.orbit-one .one-program-card {background:linear-gradient(155deg,var(--one-panel) 65%,var(--one-milk));}
+.orbit-one .one-program-card:focus-visible {outline:3px solid #6edabb;outline-offset:3px;}
+@media(prefers-reduced-motion:no-preference) {.orbit-one .one-ring-outer {animation:orbit-one-revolve 120s linear infinite;}.orbit-one .one-orbit-glow {animation:orbit-one-breathe 8s ease-in-out infinite alternate;}}
+@keyframes orbit-one-revolve {to{transform:rotate(341deg);}}
+@keyframes orbit-one-breathe {from{opacity:.65;transform:scale(.93)}to{opacity:1;transform:scale(1.07)}}
