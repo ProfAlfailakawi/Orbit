@@ -56,7 +56,7 @@ try {
   await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
   assert.equal(await page.getByRole('dialog').count(), 0, 'Program detail must close within same owner page');
 
-  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.orbit-tools-menu > summary').click();
   await page.locator('.one-specialist-only > summary').click();
   const specialist = page.locator('.one-specialist-menu');
   await specialist.getByRole('button', { name: 'تشخيص الحوادث' }).click();
@@ -65,21 +65,21 @@ try {
   await page.screenshot({ path: 'test-artifacts/orbit-radar.png', fullPage: true });
   await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
 
-  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.orbit-tools-menu > summary').click();
   await page.locator('.one-specialist-only > summary').click();
   await specialist.getByRole('button', { name: 'إعدادات البرامج' }).click();
   await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
   await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
 
-  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.orbit-tools-menu > summary').click();
   await page.locator('.one-specialist-only > summary').click();
   await specialist.getByRole('button', { name: 'التحليلات' }).click();
   await page.locator('.orbit-workspace-overview[data-mode="intelligence"]').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
   await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
 
-  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.orbit-tools-menu > summary').click();
   await page.locator('.one-specialist-only > summary').click();
   await specialist.getByRole('button', { name: 'الحماية والاختبارات' }).click();
   await page.locator('.orbit-workspace-overview[data-mode="operations"]').waitFor();
@@ -94,7 +94,7 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3);
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
 
-  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.orbit-tools-menu > summary').click();
   await page.getByRole('button', { name: 'المظهر الداكن' }).click();
   assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 1, 'Dark appearance not applied');
   await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
