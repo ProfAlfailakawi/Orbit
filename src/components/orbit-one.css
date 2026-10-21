@@ -244,3 +244,16 @@
 @media(prefers-reduced-motion:no-preference) {.orbit-one .one-ring-outer {animation:orbit-one-revolve 120s linear infinite;}.orbit-one .one-orbit-glow {animation:orbit-one-breathe 8s ease-in-out infinite alternate;}}
 @keyframes orbit-one-revolve {to{transform:rotate(341deg);}}
 @keyframes orbit-one-breathe {from{opacity:.65;transform:scale(.93)}to{opacity:1;transform:scale(1.07)}}
+
+/* A quieter instrument arc gives the existing live fleet orbit a clearer focal point. */
+.orbit-one .one-orbit-art { isolation: isolate; }
+.orbit-one .one-ring-outer { border-width: 1px; box-shadow: inset 0 0 0 12px rgba(157,236,228,.018), 0 0 0 1px rgba(157,236,228,.035); }
+.orbit-one .one-orbit-core { outline: 1px solid rgba(141,244,201,.12); outline-offset: 7px; }
+@media (max-width: 760px) {
+  .orbit-one .one-hero { padding: 28px 22px; }
+  .orbit-one .one-orbit-art { min-height: 250px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-one .one-button { transition: none; }
+  .orbit-one .one-button:hover { transform: none; }
+}
