@@ -681,6 +681,7 @@ async function startServer() {
           // nothing about workflows, deployment, uptime or real user journeys.
           let recentRuns: PlatformRecord['recentRuns'] = [];
           let githubCiPassed: boolean | null = null;
+          let deploymentSucceeded: boolean | null = null;
           let actionsChecked = false;
           let recentCommits: PlatformRecord['recentCommits'] = [];
           const baseUrl = `https://api.github.com/repos/${encodeURIComponent(plat.owner)}/${encodeURIComponent(plat.repoName)}`;
@@ -695,7 +696,7 @@ async function startServer() {
               const result = (await runsResponse.json()) as { workflow_runs?: Array<{
                 id?: number; name?: string; head_branch?: string; head_sha?: string;
                 display_title?: string; status?: string; conclusion?: string | null;
-                created_at?: string; run_started_at?: string; updated_at?: string;
+                created_at?: string; run_started_at?: string; updated_at?: string; path?: string;
               }> };
               recentRuns = (result.workflow_runs || []).slice(0, 5).map(run => ({
                 id: String(run.id || ''),
@@ -712,6 +713,10 @@ async function startServer() {
               }));
               const latestCompleted = (result.workflow_runs || []).find(run => run.status === 'completed');
               if (latestCompleted) githubCiPassed = latestCompleted.conclusion === 'success';
+              const latestDeployment = (result.workflow_runs || []).find(run =>
+                run.status === 'completed' && /deploy/i.test(`${run.path || ''} ${run.name || ''}`)
+              );
+              if (latestDeployment) deploymentSucceeded = latestDeployment.conclusion === 'success';
             }
           } catch {
             // GitHub Actions may be unavailable; keep CI unknown instead of green.
@@ -764,23 +769,66 @@ async function startServer() {
             // Mark incomplete monitoring unavailable below; never substitute seed data.
             actionsChecked = false;
           }
+          // For ORBIT itself, use the known public production host when no URL was
+          // saved yet. Probe only public HTTPS hosts; never follow redirects off-host.
+          const isOrbitRepository = plat.owner.toLowerCase() === 'proffalfailakawi' && plat.repoName.toLowerCase() === 'orbit';
+          const productionUrl = plat.productionUrl || (isOrbitRepository ? process.env.ORBIT_PRODUCTION_URL || null : null);
+          let siteReachable: boolean | null = null;
+          let siteEvidence = 'Production site not configured or not checked.';
+          if (productionUrl) {
+            try {
+              const parsed = new URL(productionUrl);
+              const host = parsed.hostname.toLowerCase();
+              if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+                  host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
+                  host.endsWith('.internal') || host === 'metadata.google.internal' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':')) {
+                throw new Error('Production URL must be a public HTTPS hostname.');
+              }
+              const startedAt = Date.now();
+              const response = await fetch(parsed, {
+                method: 'GET',
+                headers: { Accept: 'text/html,application/json;q=0.9,*/*;q=0.1', Range: 'bytes=0-0' },
+                redirect: 'manual',
+                signal: AbortSignal.timeout(5000),
+              });
+              siteReachable = response.status >= 200 && response.status < 400;
+              siteEvidence = `Production URL HTTP ${response.status} (${Date.now() - startedAt}ms).`;
+              await response.body?.cancel().catch(() => undefined);
+            } catch (error) {
+              siteReachable = false;
+              siteEvidence = `Production URL unavailable: ${error instanceof Error ? error.message.slice(0, 120) : 'request failed'}.`;
+            }
+          }
+          const fourState: PlatformRecord['fourState'] = {
+            ciPassed: githubCiPassed,
+            deploymentSucceeded,
+            siteReachable,
+            userJourneyHealthy: plat.fourState?.userJourneyHealthy ?? null,
+          };
+          const confirmedChecks = Object.values(fourState).filter(value => value !== null).length;
+          const monitoringCoveragePct = Math.round(confirmedChecks * 100 / 4);
+          const healthStatus = siteReachable === false ? 'Offline'
+            : githubCiPassed === false || deploymentSucceeded === false || fourState.userJourneyHealthy === false ? 'Degraded'
+            : confirmedChecks === 4 ? 'Healthy' : 'Monitoring Gap';
           platforms = platforms.map((p) =>
             p.id === plat.id
               ? {
                   ...p,
+                  productionUrl,
+                  productionUrlVerified: siteReachable === true,
                   defaultBranch: repoData.default_branch || p.defaultBranch,
                   dataIntegrity: actionsChecked && recentCommits.length > 0 ? 'Live' : 'Unavailable',
                   connectionVerified: actionsChecked && recentCommits.length > 0,
                   connectionStatus: actionsChecked && recentCommits.length > 0 ? 'Connected (Read-Only)' : 'Unavailable',
-                  healthStatus: 'Monitoring Gap',
-                  monitoringCoveragePct: 0,
-                  fourState: { ciPassed: githubCiPassed, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
+                  healthStatus,
+                  monitoringCoveragePct,
+                  fourState,
                   recentRuns,
                   recentCommits,
                   releaseShield: 'Insufficient Evidence',
                   releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}. Deploy/user journey not tested.`,
+                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}; deployment ${deploymentSucceeded === null ? 'not evidenced' : deploymentSucceeded ? 'succeeded' : 'failed'}; ${siteEvidence} User journey is ${fourState.userJourneyHealthy === null ? 'not tested' : fourState.userJourneyHealthy ? 'healthy' : 'unhealthy'}.`,
                 }
               : p
           );
