@@ -254,16 +254,14 @@ export function evaluatePlatformHealth(params: {
     return 'Degraded';
   }
 
-  if (params.monitoringCoveragePct < 50) {
-    return 'Monitoring Gap';
-  }
-
   if (
-    params.fourState.ciPassed === null &&
-    params.fourState.siteReachable === null &&
+    params.monitoringCoveragePct < 100 ||
+    params.fourState.ciPassed === null ||
+    params.fourState.deploymentSucceeded === null ||
+    params.fourState.siteReachable === null ||
     params.fourState.userJourneyHealthy === null
   ) {
-    return 'Unknown';
+    return 'Monitoring Gap';
   }
 
   return 'Healthy';

@@ -163,6 +163,21 @@ test('Three Eyes health evaluation respects local sessions (ALFA) and does not e
     activeIncidentSeverities: [],
   });
   assert.equal(ciPassedButJourneyBroken, 'Degraded');
+
+  const siteLiveButJourneyUnknown = evaluatePlatformHealth({
+    lifecycleState: 'active',
+    runtimeMode: 'github-web',
+    connectionVerified: true,
+    monitoringCoveragePct: 75,
+    fourState: {
+      ciPassed: true,
+      deploymentSucceeded: true,
+      siteReachable: true,
+      userJourneyHealthy: null,
+    },
+    activeIncidentSeverities: [],
+  });
+  assert.equal(siteLiveButJourneyUnknown, 'Monitoring Gap');
 });
 
 test('Claude Mission Pack always includes mandatory non-negotiable guardrail', () => {

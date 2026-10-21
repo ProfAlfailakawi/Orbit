@@ -180,16 +180,18 @@ export const ThreeEyesInfographicRow: React.FC<{
       ? 'Healthy'
       : fourState?.userJourneyHealthy === false
       ? 'Critical'
-      : fourState?.siteReachable === null
-      ? 'Local'
-      : 'Warning');
+      : fourState?.siteReachable === false
+      ? 'Critical'
+      : fourState?.siteReachable === true
+      ? 'Warning'
+      : 'Unknown');
   const e3 =
     eye3 ||
     (fourState?.deploymentSucceeded === true
       ? 'Healthy'
       : fourState?.deploymentSucceeded === false
       ? 'Critical'
-      : 'Local');
+      : 'Unknown');
 
   const getTone = (state: string) => {
     if (state === 'Healthy') return 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30';
@@ -198,35 +200,51 @@ export const ThreeEyesInfographicRow: React.FC<{
     if (state === 'Local') return 'text-sky-400 bg-sky-500/15 border-sky-500/30';
     return 'text-slate-400 bg-slate-800/50 border-slate-700';
   };
+  const stateLabel = (state: string) => ({
+    Healthy: 'ناجح',
+    Critical: 'فشل',
+    Warning: 'تحذير',
+    Local: 'محلي',
+    Unknown: 'غير متاح',
+  }[state] || 'غير متاح');
+  const experienceLabel = fourState?.userJourneyHealthy === true
+    ? 'مؤكدة'
+    : fourState?.userJourneyHealthy === false
+    ? 'تحتاج مراجعة'
+    : fourState?.siteReachable === false
+    ? 'الموقع لا يستجيب'
+    : fourState?.siteReachable === true
+    ? 'الموقع يستجيب · التجربة لم تُفحص'
+    : 'لم تُفحص';
 
   return (
-    <div className="grid grid-cols-3 gap-1.5 w-full" aria-label="مؤشرات الموقع">
+    <div className="grid grid-cols-3 gap-1.5 w-full" role="group" aria-label="حالة المراقبة؛ هذه مؤشرات وليست أزراراً">
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e1
         )}`}
-        title={`جودة الموقع: ${e1}`}
+        title={`حالة اختبارات CI: ${stateLabel(e1)}`}
       >
         <Code2 className="w-3.5 h-3.5 shrink-0" />
-        <span>الجودة</span>
+        <span className="text-center leading-tight">الاختبارات: {stateLabel(e1)}</span>
       </div>
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e2
         )}`}
-        title={`تجربة الموقع: ${e2}`}
+        title={`حالة تجربة المستخدم: ${experienceLabel}`}
       >
         <Activity className="w-3.5 h-3.5 shrink-0" />
-        <span>التجربة</span>
+        <span className="text-center leading-tight">التجربة: {experienceLabel}</span>
       </div>
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg border py-1.5 px-2 text-[11px] font-medium ${getTone(
           e3
         )}`}
-        title={`آخر تحديث: ${e3}`}
+        title={`حالة النشر: ${stateLabel(e3)}`}
       >
         <Terminal className="w-3.5 h-3.5 shrink-0" />
-        <span>التحديث</span>
+        <span className="text-center leading-tight">النشر: {stateLabel(e3)}</span>
       </div>
     </div>
   );
