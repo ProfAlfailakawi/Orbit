@@ -18,8 +18,12 @@ import {
   updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import firebaseConfigTemplate from '../firebase-applet-config.json';
 
+const firebaseConfig = {
+  ...firebaseConfigTemplate,
+  ...(import.meta.env.VITE_FIREBASE_API_KEY ? { apiKey: import.meta.env.VITE_FIREBASE_API_KEY } : {}),
+};
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);

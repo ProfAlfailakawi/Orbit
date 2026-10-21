@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "orbit-one-orbit-2026"
+  },
+  "targets": {
+    "orbit-one-orbit-2026": {
+      "hosting": {
+        "production": [
+          "orbitq8"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

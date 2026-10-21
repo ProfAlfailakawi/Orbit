@@ -19,10 +19,16 @@ jobs:
           node-version: '22'
       - name: Generate disposable test credential
         run: |
-          echo "ORBIT_OPERATOR_PASSKEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "ORBIT_SENSOR_INGEST_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          PASSKEY="$(openssl rand -hex 24)"
+          SENSOR_TOKEN="$(openssl rand -hex 32)"
+          WEBHOOK_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$PASSKEY"
+          echo "::add-mask::$SENSOR_TOKEN"
+          echo "::add-mask::$WEBHOOK_SECRET"
+          echo "ORBIT_OPERATOR_PASSKEY=$PASSKEY" >> "$GITHUB_ENV"
+          echo "ORBIT_SENSOR_INGEST_TOKEN=$SENSOR_TOKEN" >> "$GITHUB_ENV"
           echo "ORBIT_SENSOR_APP_ID=MIRAS" >> "$GITHUB_ENV"
-          echo "ORBIT_WEBHOOK_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORBIT_WEBHOOK_SECRET=$WEBHOOK_SECRET" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
       - name: Install Chromium

@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { buildPrivacySafeTimeline, buildSharedDependencyAdvisory, evaluateTruthEvidence } from './src/core/guardian.ts';
 import { GoogleGenAI } from '@google/genai';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   evaluateSelfHealthOnOutage,
   executeSyntheticCanary,
@@ -49,6 +51,15 @@ import type {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_SNAPSHOT_PATH = path.join(__dirname, '.orbit-data.json');
+const cloudProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID;
+const firebaseAdminApp = process.env.DATA_STORE === 'firestore' && cloudProjectId
+  ? (getApps()[0] || initializeApp({ projectId: cloudProjectId })) : null;
+const firestore = firebaseAdminApp
+  ? (process.env.FIREBASE_DATABASE_ID ? getFirestore(firebaseAdminApp, process.env.FIREBASE_DATABASE_ID) : getFirestore(firebaseAdminApp)) : null;
+if (firestore) firestore.settings({ ignoreUndefinedProperties: true });
+const stateDocument = firestore?.collection('orbit').doc('workspace');
+let persistenceQueue: Promise<unknown> = Promise.resolve();
+let persistenceHealthy = true;
 const MAX_EVENTS = 1_000;
 const MAX_INCIDENTS = 500;
 const MAX_ALERTS = 500;
@@ -135,23 +146,24 @@ let simulatedTelemetryOutage = false;
 // Real-Time Server-Sent Events (SSE) connected clients (Section 35)
 const sseClients = new Set<express.Response>();
 const sseClientsBySession = new Map<string, number>();
+let githubSyncActive = false;
 
 function saveStateToDisk() {
+  const snapshot = {
+    platforms, events, incidents, alerts, silentFailures, changeImpacts,
+    crossAppPatterns, engineeringMemory, innovations, discoveredCandidates,
+    canaryHistory, auditLogs, selfHealth, costGuard,
+  };
+  if (stateDocument) {
+    persistenceQueue = persistenceQueue.then(() => stateDocument.set({ ...snapshot, updatedAt: new Date().toISOString() }, { merge: true }))
+      .then(() => { persistenceHealthy = true; })
+      .catch((error: unknown) => {
+        persistenceHealthy = false;
+        console.error('Firestore state persistence failed:', error instanceof Error ? error.message : 'unknown');
+      });
+    return;
+  }
   try {
-    const snapshot = {
-      platforms,
-      events,
-      incidents,
-      alerts,
-      silentFailures,
-      changeImpacts,
-      crossAppPatterns,
-      engineeringMemory,
-      innovations,
-      discoveredCandidates,
-      canaryHistory,
-      auditLogs,
-    };
     fs.writeFileSync(DATA_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), { encoding: 'utf8', mode: 0o600 });
   } catch {
     // Non-blocking fail-open persistence
@@ -254,6 +266,26 @@ function loadStateFromDisk() {
   }
 }
 
+async function loadPersistentState() {
+  if (!stateDocument) return;
+  const parsed = (await stateDocument.get()).data();
+  if (!parsed) return;
+  if (Array.isArray(parsed.platforms)) platforms = parsed.platforms as typeof platforms;
+  if (Array.isArray(parsed.events)) events = parsed.events as typeof events;
+  if (Array.isArray(parsed.incidents)) incidents = parsed.incidents as typeof incidents;
+  if (Array.isArray(parsed.alerts)) alerts = parsed.alerts as typeof alerts;
+  if (Array.isArray(parsed.silentFailures)) silentFailures = parsed.silentFailures as typeof silentFailures;
+  if (Array.isArray(parsed.changeImpacts)) changeImpacts = parsed.changeImpacts as typeof changeImpacts;
+  if (Array.isArray(parsed.crossAppPatterns)) crossAppPatterns = parsed.crossAppPatterns as typeof crossAppPatterns;
+  if (Array.isArray(parsed.engineeringMemory)) engineeringMemory = parsed.engineeringMemory as typeof engineeringMemory;
+  if (Array.isArray(parsed.innovations)) innovations = parsed.innovations as typeof innovations;
+  if (Array.isArray(parsed.discoveredCandidates)) discoveredCandidates = parsed.discoveredCandidates as typeof discoveredCandidates;
+  if (Array.isArray(parsed.canaryHistory)) canaryHistory = parsed.canaryHistory as typeof canaryHistory;
+  if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs as typeof auditLogs;
+  if (parsed.selfHealth && typeof parsed.selfHealth === 'object') selfHealth = parsed.selfHealth as typeof selfHealth;
+  if (parsed.costGuard && typeof parsed.costGuard === 'object') costGuard = parsed.costGuard as typeof costGuard;
+}
+
 loadStateFromDisk();
 
 // Idempotency & Rate-limiting store
@@ -261,6 +293,8 @@ const processedIdempotencyKeys = new Set<string>();
 
 async function startServer() {
   const app = express();
+  const asyncRoute = (handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>) =>
+    (req: express.Request, res: express.Response, next: express.NextFunction) => { void handler(req, res, next).catch(next); };
   app.disable('x-powered-by');
   app.use(helmet({
     contentSecurityPolicy: false,
@@ -277,7 +311,8 @@ async function startServer() {
   // Independent liveness only: no app health information, secrets or authenticated data.
   app.get('/healthz', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ service: 'orbit', status: 'running' });
+    const ready = persistenceHealthy && (process.env.NODE_ENV !== 'production' || Boolean(firestore));
+    res.status(ready ? 200 : 503).json({ service: 'orbit', status: ready ? 'running' : 'degraded', storage: firestore ? (persistenceHealthy ? 'firestore' : 'unavailable') : 'local' });
   });
 
   // Secure operator session. Reads from .env dynamically so user edits take effect immediately.
@@ -287,7 +322,7 @@ async function startServer() {
       if (fs.existsSync(envFilePath)) {
         const raw = fs.readFileSync(envFilePath, 'utf8');
         const match = raw.match(/^\s*ORBIT_OPERATOR_PASSKEY\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        if (match && match[1].trim().length >= 8) {
+        if (match && match[1].trim().length >= 16) {
           process.env.ORBIT_OPERATOR_PASSKEY = match[1].trim();
           return match[1].trim();
         }
@@ -296,9 +331,10 @@ async function startServer() {
       // Fall back to process.env if .env read fails
     }
     const fromEnv = process.env.ORBIT_OPERATOR_PASSKEY;
-    if (typeof fromEnv === 'string' && fromEnv.trim().length >= 8) {
+    if (typeof fromEnv === 'string' && fromEnv.trim().length >= 16) {
       return fromEnv.trim();
     }
+    if (process.env.NODE_ENV === 'production') return '';
     const generated = crypto.randomBytes(24).toString('base64url');
     process.env.ORBIT_OPERATOR_PASSKEY = generated;
     try {
@@ -314,7 +350,6 @@ async function startServer() {
   }
 
   resolveOperatorPasskey();
-  const sessionSecret = crypto.randomBytes(32).toString('hex');
   const sessions = new Map<string, number>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const cookieName = 'orbit_operator_session';
@@ -331,47 +366,72 @@ async function startServer() {
     };
   }
 
-  app.post('/api/auth/verify', (req, res) => {
+  app.post('/api/auth/verify', asyncRoute(async (req, res) => {
     const address = req.ip || 'unknown';
     const now = Date.now();
-    const attempt = loginAttempts.get(address);
+    const attemptRef = firestore?.collection('orbitLoginAttempts').doc(crypto.createHash('sha256').update(address).digest('hex'));
+    const storedAttempt = attemptRef ? (await attemptRef.get()).data() : undefined;
+    const attempt = loginAttempts.get(address) || (storedAttempt ? { count: storedAttempt.count as number, until: storedAttempt.until as number } : undefined);
     if (attempt && attempt.until > now && attempt.count >= 5) {
       return res.status(429).json({ authenticated: false, error: 'محاولات كثيرة. حاول لاحقاً.' });
     }
     const currentPasskey = resolveOperatorPasskey();
-    if (!currentPasskey || currentPasskey.length < 8) {
+    if (!currentPasskey || currentPasskey.length < 16) {
       return res.status(503).json({ authenticated: false, error: 'يجب إعداد ORBIT_OPERATOR_PASSKEY آمن على الخادم.' });
     }
     const supplied = typeof req.body?.passkey === 'string' ? req.body.passkey.trim() : '';
     const left = crypto.createHash('sha256').update(supplied).digest();
     const right = crypto.createHash('sha256').update(currentPasskey).digest();
     if (! supplied || !crypto.timingSafeEqual(left, right)) {
-      const count = (attempt && attempt.until > now ? attempt.count : 0) + 1;
-      loginAttempts.set(address, { count, until: now + 15 * 60_000 });
+      const nextAttempt = attemptRef
+        ? await firestore!.runTransaction(async tx => {
+            const latest = await tx.get(attemptRef);
+            const current = latest.data() as { count?: number; until?: number } | undefined;
+            if (current && current.until! > now && current.count! >= 5) return null;
+            const next = { count: (current && current.until! > now ? current.count! : 0) + 1, until: now + 15 * 60_000 };
+            tx.set(attemptRef, next);
+            return next;
+          })
+        : { count: (attempt && attempt.until > now ? attempt.count : 0) + 1, until: now + 15 * 60_000 };
+      if (!nextAttempt) return res.status(429).json({ authenticated: false, error: 'محاولات كثيرة. حاول لاحقاً.' });
+      loginAttempts.set(address, nextAttempt);
       appendAudit('Unknown', 'AUTH_LOGIN_FAILED', 'ORBIT Console', 'محاولة دخول غير ناجحة.');
       return res.status(401).json({ authenticated: false, error: 'رمز الدخول غير صحيح' });
     }
     loginAttempts.delete(address);
-    const token = crypto.createHmac('sha256', sessionSecret).update(crypto.randomBytes(32)).digest('hex');
-    sessions.set(token, now + 8 * 60 * 60_000);
+    if (attemptRef) await attemptRef.delete();
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = now + 8 * 60 * 60_000;
+    sessions.set(token, expiresAt);
+    if (firestore) await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).set({ expiresAt });
     res.cookie(cookieName, token, getCookieOptions(req, 8 * 60 * 60_000));
     appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
     return res.json({ authenticated: true, operator: 'Operator' });
-  });
+  }));
 
-  app.post('/api/auth/logout', (req, res) => {
+  app.post('/api/auth/logout', asyncRoute(async (req, res) => {
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
-    if (cookie) sessions.delete(cookie.slice(cookieName.length + 1));
+    if (cookie) {
+      const token = cookie.slice(cookieName.length + 1);
+      sessions.delete(token);
+      if (firestore) await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).delete();
+    }
     res.clearCookie(cookieName, getCookieOptions(req));
     res.json({ authenticated: false });
-  });
+  }));
 
-  app.get('/api/auth/session', (req, res) => {
+  app.get('/api/auth/session', asyncRoute(async (req, res) => {
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
     const token = cookie?.slice(cookieName.length + 1) || '';
-    const expiry = sessions.get(token);
+    let expiry = sessions.get(token);
+    if (firestore && token) {
+      const stored = await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).get();
+      expiry = stored.data()?.expiresAt;
+      if (expiry) sessions.set(token, expiry);
+      else sessions.delete(token);
+    }
     res.json({ authenticated: Boolean(expiry && expiry > Date.now()) });
-  });
+  }));
 
   // Opt-in server-to-server telemetry (never embed this token in browser code).
   // Authenticated sensor data is distinct from operator-run Demo simulations.
@@ -503,11 +563,17 @@ async function startServer() {
     return res.status(202).json({ accepted: true, eventId: outcome.event.eventId, incidentId: outcome.incident.incidentId, deduplicated: outcome.isDeduplicated });
   });
 
-  app.use('/api', (req, res, next) => {
+  app.use('/api', asyncRoute(async (req, res, next) => {
     // Sensor ingestion is a separate integration; never allow unauthenticated writes.
     const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='));
     const token = cookie?.slice(cookieName.length + 1) || '';
-    const expiry = sessions.get(token);
+    let expiry = sessions.get(token);
+    if (firestore && token) {
+      const stored = await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).get();
+      expiry = stored.data()?.expiresAt;
+      if (expiry) sessions.set(token, expiry);
+      else sessions.delete(token);
+    }
     if (!expiry || expiry <= Date.now()) return res.status(401).json({ error: 'Authentication required' });
     res.locals.sessionToken = token;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -525,7 +591,7 @@ async function startServer() {
       }
     }
     next();
-  });
+  }));
 
   // 2. Full Mission Control State Endpoint
   app.get('/api/state', (_req, res) => {
@@ -623,7 +689,7 @@ async function startServer() {
                 branch: run.head_branch || '',
                 commitSha: run.head_sha || '',
                 commitMessage: run.display_title || '',
-                status: run.status !== 'completed' ? 'in_progress' : run.conclusion === 'success' ? 'success' : 'failure',
+                status: run.status !== 'completed' ? 'in_progress' : run.conclusion === 'success' ? 'success' : run.conclusion === 'cancelled' ? 'cancelled' : 'failure',
                 hasSubJobWarning: false,
                 warningDetails: 'Run-level status only; sub-job warnings have not been checked.',
                 durationSec: 0,
@@ -636,28 +702,33 @@ async function startServer() {
           } catch {
             // GitHub Actions may be unavailable; keep CI unknown instead of green.
           }
-          // Commit metadata is also read-only. Without fetching file-level diffs,
-          // risk must remain explicitly unknown.
+          // Commit metadata is read-only and bounded to the five most recently active branches.
           try {
             costGuard.githubApiCallsToday += 1;
-            const commitsResponse = await fetch(`${baseUrl}/commits?per_page=3`, {
+            const branchesResponse = await fetch(`${baseUrl}/branches?per_page=5`, {
               headers,
               signal: AbortSignal.timeout(4500),
             });
-            if (commitsResponse.ok) {
-              const result = (await commitsResponse.json()) as Array<{
-                sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } };
-              }>;
-              recentCommits = result.slice(0, 3).map(commit => ({
-                sha: commit.sha?.slice(0, 10) || '',
-                author: commit.commit?.author?.name || 'Unknown',
-                message: commit.commit?.message?.split('\\n')[0] || '',
-                timestamp: commit.commit?.author?.date || '',
-                branch: repoData.default_branch || plat.defaultBranch,
-                changedFiles: [],
-                riskLevel: 'Unknown',
-                dataIntegrity: 'Live',
-              }));
+            const branches = branchesResponse.ok
+              ? ((await branchesResponse.json()) as Array<{ name?: string }>).map(branch => branch.name).filter((name): name is string => Boolean(name)).slice(0, 5)
+              : [repoData.default_branch || plat.defaultBranch].filter(Boolean);
+            const commits = await Promise.all(branches.map(async branch => {
+              costGuard.githubApiCallsToday += 1;
+              const response = await fetch(`${baseUrl}/commits?sha=${encodeURIComponent(branch)}&per_page=1`, { headers, signal: AbortSignal.timeout(4500) });
+              if (!response.ok) return null;
+              const items = await response.json() as Array<{ sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } } }>;
+              const commit = items[0];
+              if (!commit) return null;
+              return {
+                sha: commit.sha?.slice(0, 10) || '', author: commit.commit?.author?.name || 'Unknown',
+                message: commit.commit?.message?.split(/\r?\n/)[0] || '', timestamp: commit.commit?.author?.date || '',
+                branch, changedFiles: [], riskLevel: 'Unknown' as const, dataIntegrity: 'Live' as const,
+              };
+            }));
+            recentCommits = commits.filter((commit): commit is NonNullable<typeof commit> => Boolean(commit));
+            for (const commit of recentCommits) {
+              const previous = plat.recentCommits.find(item => item.branch === commit.branch);
+              if (previous?.sha && previous.sha !== commit.sha) appendAudit('GitHub Monitor', 'NEW_BRANCH_COMMIT', plat.codeName, `New commit detected on ${commit.branch}: ${commit.sha}`);
             }
           } catch {
             // Do not fall back to seeded or fabricated commit records.
@@ -684,17 +755,29 @@ async function startServer() {
           );
           syncedResults.push({ codeName: plat.codeName, status: 'Live 200 OK', integrity: 'Live' });
         } else {
+          const failureReason = resp.status === 403 && Number(resp.headers.get('x-ratelimit-remaining')) === 0
+            ? 'GitHub API rate limit exhausted' : `GitHub repository API returned HTTP ${resp.status}`;
+          platforms = platforms.map(p => p.id === plat.id ? {
+            ...p, dataIntegrity: 'Unavailable', connectionVerified: false, connectionStatus: 'Unavailable',
+            healthStatus: 'Monitoring Gap', lastVerifiedEvidence: `${failureReason}; prior success, if any, is cached only.`,
+          } : p);
+          appendAudit('GitHub Monitor', 'GITHUB_REPOSITORY_UNAVAILABLE', plat.codeName, failureReason);
           syncedResults.push({
             codeName: plat.codeName,
-            status: `HTTP ${resp.status} (Repository unavailable or private — connection not verified)`,
-            integrity: plat.dataIntegrity,
+            status: failureReason,
+            integrity: 'Unavailable',
           });
         }
       } catch {
+        platforms = platforms.map(p => p.id === plat.id ? {
+          ...p, dataIntegrity: 'Unavailable', connectionVerified: false, connectionStatus: 'Unavailable',
+          healthStatus: 'Monitoring Gap', lastVerifiedEvidence: 'GitHub API request failed or timed out; prior success, if any, is cached only.',
+        } : p);
+        appendAudit('GitHub Monitor', 'GITHUB_REPOSITORY_UNAVAILABLE', plat.codeName, 'Network error or timeout while contacting GitHub API.');
         syncedResults.push({
           codeName: plat.codeName,
-          status: 'Network/Offline — repository state unconfirmed',
-          integrity: plat.dataIntegrity,
+          status: 'Network/Offline — repository state unavailable',
+          integrity: 'Unavailable',
         });
       }
     }
@@ -710,19 +793,91 @@ async function startServer() {
     return { syncedResults, platforms, selfHealth, costGuard };
   }
 
-  app.post('/api/github/sync', async (req, res) => {
+  async function claimGithubSyncLease(force: boolean) {
+    const now = Date.now();
+    if (!firestore) {
+      if (githubSyncActive) return { acquired: false as const, reason: 'run already active' };
+      githubSyncActive = true;
+      return { acquired: true as const, local: true as const };
+    }
+    const lock = firestore.collection('orbitLocks').doc('github-sync');
+    return firestore.runTransaction(async tx => {
+      const current = await tx.get(lock);
+      const data = current.data() || {};
+      if ((data.leaseUntil || 0) > now) return { acquired: false as const, reason: 'run already active' };
+      const lastSuccess = typeof data.lastSuccessfulSyncAt === 'number' ? data.lastSuccessfulSyncAt : 0;
+      const minimumInterval = Math.max(72, Number(process.env.GITHUB_SYNC_MIN_INTERVAL_HOURS) || 72) * 60 * 60_000;
+      if (!force && lastSuccess && now - lastSuccess < minimumInterval) {
+        return { acquired: false as const, reason: 'not due', nextDueAt: new Date(lastSuccess + minimumInterval).toISOString() };
+      }
+      tx.set(lock, { ...data, leaseUntil: now + 8 * 60_000, owner: process.env.K_REVISION || 'cloud-run', lastAttemptAt: now }, { merge: true });
+      return { acquired: true as const, local: false as const };
+    });
+  }
+
+  async function releaseGithubSyncLease(lease: { local?: boolean; successful?: boolean }) {
+    if (lease.local) {
+      githubSyncActive = false;
+      return;
+    }
+    const lock = firestore?.collection('orbitLocks').doc('github-sync');
+    if (lock) await lock.set({ ...(lease.successful ? { lastSuccessfulSyncAt: Date.now(), lastResult: 'Live' } : { lastResult: 'Unavailable', lastErrorAt: Date.now() }), leaseUntil: 0, owner: null }, { merge: true }).catch(() => undefined);
+  }
+
+  app.post('/api/github/sync', asyncRoute(async (req, res) => {
+    const lease = await claimGithubSyncLease(true);
+    if (!lease.acquired) return res.status(409).json({ error: 'المزامنة قيد التنفيذ بالفعل.' });
     try {
       const result = await syncGithubFleet(req.body?.appId);
+      await persistenceQueue;
+      if (!persistenceHealthy) {
+        await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}) });
+        return res.status(503).json({ error: 'تعذر حفظ نتيجة الفحص بشكل دائم.' });
+      }
+      const healthy = result.syncedResults.length > 0 && result.syncedResults.every(item => item.integrity === 'Live');
+      await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}), successful: healthy });
       res.json(result);
     } catch {
-      res.status(503).json({ error: 'تعذر إجراء فحص GitHub الآن.' });
+      await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}) });
+      return res.status(503).json({ error: 'تعذر إجراء فحص GitHub الآن.' });
     }
-  });
+  }));
+
+  app.post('/internal/scheduler/github-sync', asyncRoute(async (req, res) => {
+    const audience = process.env.SCHEDULER_AUDIENCE;
+    const expectedServiceAccount = process.env.SCHEDULER_SERVICE_ACCOUNT;
+    const authHeader = req.get('authorization') || '';
+    if (!audience || !expectedServiceAccount) return res.status(503).json({ error: 'Scheduler identity is not configured' });
+    if (!authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Scheduler identity required' });
+    try {
+      const { OAuth2Client } = await import('google-auth-library');
+      const ticket = await new OAuth2Client().verifyIdToken({ idToken: authHeader.slice(7), audience });
+      const email = ticket.getPayload()?.email;
+      if (!email || email !== expectedServiceAccount) return res.status(403).json({ error: 'Scheduler identity rejected' });
+    } catch { return res.status(401).json({ error: 'Invalid scheduler identity' }); }
+    if (!firestore) return res.status(503).json({ error: 'Durable scheduler state is unavailable' });
+    const lease = await claimGithubSyncLease(false);
+    const acquired = lease;
+    if (!acquired.acquired) return res.status(202).json({ skipped: acquired.reason, ...('nextDueAt' in acquired ? { nextDueAt: acquired.nextDueAt } : {}) });
+    try {
+      const result = await syncGithubFleet();
+      await persistenceQueue;
+      const healthy = result.syncedResults.length > 0 && result.syncedResults.every(item => item.integrity === 'Live');
+      if (!persistenceHealthy) throw new Error('Firestore state persistence failed');
+      if (!healthy) throw new Error('One or more monitored repositories are unavailable');
+      await releaseGithubSyncLease({ successful: true });
+      return res.json({ completedAt: new Date().toISOString(), ...result });
+    } catch (error) {
+      appendAudit('Cloud Scheduler', 'GITHUB_SYNC_FAILED', 'Fleet', error instanceof Error ? error.message.slice(0, 300) : 'unknown error');
+      await releaseGithubSyncLease({});
+      return res.status(503).json({ error: 'Scheduled GitHub check failed' });
+    }
+  }));
 
   // Automatic monitoring is opt-in: a read-only token is required for a sustainable
   // rate limit budget. Without a token, the operator can request a manual sync.
   // Never write to or redeploy the monitored repositories.
-  if (process.env.GITHUB_READ_ONLY_TOKEN) {
+  if (process.env.GITHUB_READ_ONLY_TOKEN && !process.env.SCHEDULER_ONLY) {
     let githubRefreshActive = false;
     const refresh = async () => {
       if (githubRefreshActive) return;
@@ -1500,7 +1655,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist');
+    const distPath = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
@@ -1513,4 +1668,19 @@ async function startServer() {
   });
 }
 
-startServer();
+async function main() {
+  if (process.env.NODE_ENV === 'production' && process.env.DATA_STORE !== 'firestore') {
+    throw new Error('Production requires DATA_STORE=firestore; local disk snapshots are not durable on Cloud Run.');
+  }
+  if (process.env.NODE_ENV === 'production' && (!firestore || resolveProductionPasskeyMissing())) {
+    throw new Error('Production requires Firestore and an ORBIT_OPERATOR_PASSKEY secret of at least 16 characters.');
+  }
+  await loadPersistentState();
+  await startServer();
+}
+
+function resolveProductionPasskeyMissing() {
+  return typeof process.env.ORBIT_OPERATOR_PASSKEY !== 'string' || process.env.ORBIT_OPERATOR_PASSKEY.length < 16;
+}
+
+void main();

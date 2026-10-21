@@ -14,7 +14,10 @@ page.on('pageerror', error => runtimeErrors.push(error.message));
 try {
   const health = await page.request.get(base + '/healthz');
   assert.equal(health.status(), 200);
-  assert.deepEqual(await health.json(), { service: 'orbit', status: 'running' });
+  const healthData = await health.json();
+  assert.equal(healthData.service, 'orbit');
+  assert.equal(healthData.status, 'running');
+  assert.ok(['firestore', 'local'].includes(healthData.storage));
   const unauth = await page.request.get(base + '/api/state');
   assert.equal(unauth.status(), 401, 'Protected state must reject unauthenticated requests');
 
@@ -34,7 +37,9 @@ try {
   const state = await response.json();
   assert.ok(Array.isArray(state.platforms), 'Fleet state missing');
   assert.ok(state.acceptanceCriteria.every(item => item.status !== 'Pass'), 'Unverified acceptance must not be declared passed');
-  const canary = await page.request.post(base + '/api/canary/run');
+  const unauthScheduler = await page.request.post(base + '/internal/scheduler/github-sync');
+  assert.equal(unauthScheduler.status(), 503, 'Scheduler endpoint must fail closed when scheduler identity is not configured');
+  const canary = await page.request.post(base + '/api/canary/run', { headers: { Origin: base } });
   assert.equal(canary.status(), 200, 'Isolated canary endpoint should run');
   const canaryData = await canary.json();
   assert.ok(canaryData.events.filter(item => item.appId === 'ORBIT-CANARY').every(item => item.dataIntegrity === 'Demo'), 'Synthetic canary must remain Demo');
@@ -104,13 +109,14 @@ try {
   await page.getByRole('button', { name: 'المظهر الفاتح' }).click();
   assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 0, 'Light appearance not restored');
   const unauthorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
+    headers: { Origin: base },
     data: { appId: 'MIRAS', environment: 'production', operationName: 'ci.test', errorCode: 'CI_SMOKE', errorMessage: 'isolated smoke test' },
   });
   assert.equal(unauthorizedSensor.status(), 401, 'Sensor must reject requests without bearer authentication');
   const sensorToken = process.env.ORBIT_SENSOR_INGEST_TOKEN || '';
   assert.ok(sensorToken.length >= 32, 'CI sensor token missing');
   const authorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
-    headers: { Authorization: 'Bearer ' + sensorToken },
+    headers: { Authorization: 'Bearer ' + sensorToken, Origin: base },
     data: { appId: 'MIRAS', environment: 'staging', operationName: 'ci.visual.smoke', errorCode: 'CI_SMOKE', errorMessage: 'Synthetic browser-only verification of opt-in secure sensor' },
   });
   assert.equal(authorizedSensor.status(), 202, 'Authenticated staging sensor must accept a test event');
@@ -135,11 +141,11 @@ try {
   assert.ok(truthState.silentFailures.some(f => f.appId === 'MIRAS' && f.dataIntegrity === 'Live'), 'Internal evidence store must record explicit contradiction');
 
   const spoofedSensor = await page.request.post(base + '/api/sensor/ingest', {
-    headers: { Authorization: 'Bearer ' + sensorToken },
+    headers: { Authorization: 'Bearer ' + sensorToken, Origin: base },
     data: { appId: 'THRIVE', environment: 'staging', operationName: 'ci.spoof.attempt', errorCode: 'CI_SPOOF', errorMessage: 'A MIRAS credential must not impersonate another app' },
   });
   assert.equal(spoofedSensor.status(), 403, 'An app-scoped sensor credential must not impersonate another app');
-  const hydrate = await page.request.post(base + '/api/state/hydrate', { data: state });
+  const hydrate = await page.request.post(base + '/api/state/hydrate', { headers: { Origin: base }, data: state });
   assert.equal(hydrate.status(), 410, 'Client cloud snapshots must not overwrite shared server truth');
   const updatedState = await page.request.get(base + '/api/state');
   const newState = await updatedState.json();

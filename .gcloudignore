@@ -1,0 +1,8 @@
+.gcloudignore
+.git
+.gitignore
+node_modules/
+.env*
+!.env.example
+.orbit-data.json
+test-artifacts/
