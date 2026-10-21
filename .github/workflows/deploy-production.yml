@@ -1,0 +1,89 @@
+name: Deploy ORBIT production
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: orbit-production-deploy
+  cancel-in-progress: false
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Validate public Firebase build configuration
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+        run: test -n "$VITE_FIREBASE_API_KEY"
+      - run: npm run check
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy Cloud Run API
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PROJECT_ID='${{ vars.GCP_PROJECT_ID }}'
+          REGION='me-central1'
+          PREVIOUS_REVISION="$(gcloud run services describe orbit-api --region "$REGION" --project "$PROJECT_ID" --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          rollback_backend() {
+            code=$?
+            if [[ "$code" -ne 0 && -n "$PREVIOUS_REVISION" ]]; then
+              gcloud run services update-traffic orbit-api --region "$REGION" --project "$PROJECT_ID" \
+                --to-revisions "$PREVIOUS_REVISION=100" >/dev/null 2>&1 || true
+            fi
+            exit "$code"
+          }
+          trap rollback_backend ERR
+          gcloud run deploy orbit-api \
+            --source . --region "$REGION" --project "$PROJECT_ID" \
+            --service-account "${{ vars.ORBIT_RUNTIME_SERVICE_ACCOUNT }}" \
+            --allow-unauthenticated --min 0 --max 3 --cpu 1 --memory 1Gi \
+            --timeout 300 --concurrency 40 --set-env-vars DATA_STORE=firestore,FIREBASE_PROJECT_ID=$PROJECT_ID,FIREBASE_DATABASE_ID='${{ vars.FIREBASE_DATABASE_ID }}',SCHEDULER_ONLY=true,ORBIT_TRUST_PROXY_HOPS=1,GITHUB_SYNC_MIN_INTERVAL_HOURS=72 \
+            --set-secrets ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest,GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest
+          SERVICE_URL="$(gcloud run services describe orbit-api --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
+          gcloud run services update orbit-api --region "$REGION" --project "$PROJECT_ID" \
+            --update-env-vars "SCHEDULER_AUDIENCE=$SERVICE_URL,SCHEDULER_SERVICE_ACCOUNT=${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}"
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz" >/dev/null; then break; fi
+            sleep 3
+          done
+          curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz" >/dev/null
+          trap - ERR
+      - name: Deploy and verify Firebase Hosting (rollback on failure)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PROJECT_ID='${{ vars.GCP_PROJECT_ID }}'
+          SITE_ID='orbitq8'
+          TOKEN="$(gcloud auth print-access-token)"
+          PREVIOUS_VERSION="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://firebasehosting.googleapis.com/v1beta1/sites/$SITE_ID/channels/live/releases?pageSize=1" \
+            | jq -r '.releases[0].version.name // empty | split("/")[-1]')"
+          unset TOKEN
+          rollback_hosting() {
+            code=$?
+            if [[ "$code" -ne 0 && -n "$PREVIOUS_VERSION" ]]; then
+              npx --yes firebase-tools@14 --non-interactive hosting:clone \
+                "$SITE_ID:@$PREVIOUS_VERSION" "$SITE_ID:live" --project "$PROJECT_ID" >/dev/null 2>&1 || true
+            fi
+            exit "$code"
+          }
+          trap rollback_hosting ERR
+          npx --yes firebase-tools@14 --non-interactive deploy --only hosting --project "$PROJECT_ID"
+          curl --fail --silent --show-error --max-time 20 "https://$SITE_ID.web.app/" >/dev/null
+          curl --fail --silent --show-error --max-time 20 "https://$SITE_ID.web.app/healthz" >/dev/null
+          trap - ERR

@@ -157,7 +157,7 @@ export interface GitHubActionRunSummary {
   branch: string;
   commitSha: string;
   commitMessage: string;
-  status: 'success' | 'failure' | 'warning_masked' | 'in_progress';
+  status: 'success' | 'failure' | 'cancelled' | 'warning_masked' | 'in_progress';
   hasSubJobWarning: boolean;
   warningDetails?: string;
   durationSec: number;
@@ -203,6 +203,7 @@ export interface PlatformRecord {
     | 'Local Session Telemetry'
     | 'Webhook Ready'
     | 'Pending Credentials'
+    | 'Unavailable'
     | 'Paused'
     | 'Unlinked';
   connectionVerified: boolean;
