@@ -96,6 +96,16 @@ export function ExecutiveOverview({
           <p>ملخص واضح لحالة مواقعك.</p>
           <div className="orbit-system-note"><CircleHelp size={15} aria-hidden="true" /> لم يكتمل الربط؟ لا يمكن تأكيد الحالة بعد.</div>
         </div>
+        <div className="orbit-art" aria-hidden="true">
+          <span className="orbit-art-ring orbit-art-ring-one" />
+          <span className="orbit-art-ring orbit-art-ring-two" />
+          <span className="orbit-art-ring orbit-art-ring-three" />
+          <span className="orbit-art-center"><Radar size={32} strokeWidth={1.7} /></span>
+          <span className="orbit-art-point orbit-art-point-a"><Code2 size={18} /></span>
+          <span className="orbit-art-point orbit-art-point-b"><Rocket size={18} /></span>
+          <span className="orbit-art-point orbit-art-point-c"><ShieldCheck size={18} /></span>
+          <span className="orbit-art-label">رصد · دليل · نزاهة</span>
+        </div>
       </section>
 
       <section className="orbit-stat-grid" aria-label="أرقام مؤكدة للمراقبة">
