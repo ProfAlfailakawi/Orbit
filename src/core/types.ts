@@ -218,6 +218,7 @@ export interface PlatformRecord {
   featuresDna: FeatureDnaRecord[];
   recentRuns: GitHubActionRunSummary[];
   recentCommits: CommitRecord[];
+  branchHeads?: Array<{ name: string; sha: string }>;
   createdAt: string;
   isCustomAdded?: boolean;
 }

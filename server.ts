@@ -702,45 +702,62 @@ async function startServer() {
           } catch {
             // GitHub Actions may be unavailable; keep CI unknown instead of green.
           }
-          // Commit metadata is read-only and bounded to the five most recently active branches.
+          // One branches request detects head-SHA changes across the whole branch list,
+          // then one commit request fetches human-readable metadata for the default branch.
+          // This keeps public unauthenticated monitoring under GitHub's 60 req/hour limit
+          // for the current fleet (four requests per repository).
           try {
             costGuard.githubApiCallsToday += 1;
-            const branchesResponse = await fetch(`${baseUrl}/branches?per_page=5`, {
+            const branchesResponse = await fetch(`${baseUrl}/branches?per_page=100`, {
               headers,
               signal: AbortSignal.timeout(4500),
             });
-            const branches = branchesResponse.ok
-              ? ((await branchesResponse.json()) as Array<{ name?: string }>).map(branch => branch.name).filter((name): name is string => Boolean(name)).slice(0, 5)
-              : [repoData.default_branch || plat.defaultBranch].filter(Boolean);
-            const commits = await Promise.all(branches.map(async branch => {
-              costGuard.githubApiCallsToday += 1;
-              const response = await fetch(`${baseUrl}/commits?sha=${encodeURIComponent(branch)}&per_page=1`, { headers, signal: AbortSignal.timeout(4500) });
-              if (!response.ok) return null;
-              const items = await response.json() as Array<{ sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } } }>;
-              const commit = items[0];
-              if (!commit) return null;
-              return {
+            if (!branchesResponse.ok) throw new Error(`GitHub branches API returned HTTP ${branchesResponse.status}`);
+            const branches = (await branchesResponse.json()) as Array<{ name?: string; commit?: { sha?: string } }>;
+            const currentHeads = new Map(branches.filter(branch => branch.name && branch.commit?.sha).map(branch => [branch.name!, branch.commit!.sha!]));
+            const previousHeads = new Map((plat.branchHeads || []).map(branch => [branch.name, branch.sha]));
+            for (const [branch, sha] of currentHeads) {
+              const previous = previousHeads.get(branch);
+              if (previous && previous !== sha) appendAudit('GitHub Monitor', 'NEW_BRANCH_COMMIT', plat.codeName, `New commit detected on ${branch}: ${sha.slice(0, 10)}`);
+              else if (!previous && previousHeads.size) appendAudit('GitHub Monitor', 'NEW_BRANCH_DETECTED', plat.codeName, `New branch detected: ${branch} (${sha.slice(0, 10)})`);
+            }
+            for (const branch of previousHeads.keys()) {
+              if (!currentHeads.has(branch)) appendAudit('GitHub Monitor', 'BRANCH_REMOVED', plat.codeName, `Branch removed: ${branch}`);
+            }
+
+            const defaultBranch = repoData.default_branch || plat.defaultBranch;
+            costGuard.githubApiCallsToday += 1;
+            const commitResponse = await fetch(`${baseUrl}/commits?sha=${encodeURIComponent(defaultBranch)}&per_page=1`, {
+              headers,
+              signal: AbortSignal.timeout(4500),
+            });
+            if (!commitResponse.ok) throw new Error(`GitHub commit API returned HTTP ${commitResponse.status}`);
+            const items = await commitResponse.json() as Array<{ sha?: string; commit?: { message?: string; author?: { name?: string; date?: string } } }>;
+            const commit = items[0];
+            if (commit) {
+              recentCommits = [{
                 sha: commit.sha?.slice(0, 10) || '', author: commit.commit?.author?.name || 'Unknown',
                 message: commit.commit?.message?.split(/\r?\n/)[0] || '', timestamp: commit.commit?.author?.date || '',
-                branch, changedFiles: [], riskLevel: 'Unknown' as const, dataIntegrity: 'Live' as const,
-              };
-            }));
-            recentCommits = commits.filter((commit): commit is NonNullable<typeof commit> => Boolean(commit));
-            for (const commit of recentCommits) {
-              const previous = plat.recentCommits.find(item => item.branch === commit.branch);
-              if (previous?.sha && previous.sha !== commit.sha) appendAudit('GitHub Monitor', 'NEW_BRANCH_COMMIT', plat.codeName, `New commit detected on ${commit.branch}: ${commit.sha}`);
+                branch: defaultBranch, changedFiles: [], riskLevel: 'Unknown', dataIntegrity: 'Live',
+              }];
+              const previous = plat.recentCommits.find(item => item.branch === defaultBranch);
+              if (previous?.sha && previous.sha !== recentCommits[0].sha && !currentHeads.has(defaultBranch)) {
+                appendAudit('GitHub Monitor', 'NEW_BRANCH_COMMIT', plat.codeName, `New commit detected on ${defaultBranch}: ${recentCommits[0].sha}`);
+              }
             }
+            plat.branchHeads = [...currentHeads].map(([name, sha]) => ({ name, sha }));
           } catch {
-            // Do not fall back to seeded or fabricated commit records.
+            // Mark incomplete monitoring unavailable below; never substitute seed data.
+            actionsChecked = false;
           }
           platforms = platforms.map((p) =>
             p.id === plat.id
               ? {
                   ...p,
                   defaultBranch: repoData.default_branch || p.defaultBranch,
-                  dataIntegrity: 'Live',
-                  connectionVerified: true,
-                  connectionStatus: 'Connected (Read-Only)',
+                  dataIntegrity: actionsChecked && recentCommits.length > 0 ? 'Live' : 'Unavailable',
+                  connectionVerified: actionsChecked && recentCommits.length > 0,
+                  connectionStatus: actionsChecked && recentCommits.length > 0 ? 'Connected (Read-Only)' : 'Unavailable',
                   healthStatus: 'Monitoring Gap',
                   monitoringCoveragePct: 0,
                   fourState: { ciPassed: githubCiPassed, deploymentSucceeded: null, siteReachable: null, userJourneyHealthy: null },
@@ -753,7 +770,8 @@ async function startServer() {
                 }
               : p
           );
-          syncedResults.push({ codeName: plat.codeName, status: 'Live 200 OK', integrity: 'Live' });
+          const integrity = actionsChecked && recentCommits.length > 0 ? 'Live' : 'Unavailable';
+          syncedResults.push({ codeName: plat.codeName, status: integrity === 'Live' ? 'Live 200 OK' : 'Partial GitHub data; Actions or commit metadata unavailable', integrity });
         } else {
           const failureReason = resp.status === 403 && Number(resp.headers.get('x-ratelimit-remaining')) === 0
             ? 'GitHub API rate limit exhausted' : `GitHub repository API returned HTTP ${resp.status}`;
