@@ -886,10 +886,10 @@ export default function App() {
                 <details className="one-specialist-only">
                   <summary><Code2 size={17}/> للمختص التقني فقط</summary>
                   <div className="one-specialist-menu">
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('universal-radar'); }}><Radar size={16}/> تشخيص الحوادث</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}><Layers size={16}/> إعدادات البرامج</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={16}/> التحليلات</button>
-                    <button type="button" onClick={ev => { ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={16}/> الحماية والاختبارات</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('universal-radar'); }}><Radar size={16}/> تشخيص الحوادث</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('fleet-manager'); }}><Layers size={16}/> إعدادات البرامج</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('intelligence'); }}><BrainCircuit size={16}/> التحليلات</button>
+                    <button type="button" onClick={ev => { ev.currentTarget.closest('.one-specialist-only')?.removeAttribute('open'); ev.currentTarget.closest('.orbit-tools-menu')?.removeAttribute('open'); setSelectedPlatformId(null); setActiveNav('operations'); }}><ShieldCheck size={16}/> الحماية والاختبارات</button>
                     <button type="button" onClick={() => { void handleRunCanary(); }}><ShieldCheck size={16}/> فحص أوربت الذاتي</button>
                   </div>
                 </details>
