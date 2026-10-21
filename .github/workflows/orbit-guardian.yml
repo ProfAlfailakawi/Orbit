@@ -1,0 +1,21 @@
+name: ORBIT independent guardian (opt-in)
+on:
+  schedule:
+    - cron: "13 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readonly-guardian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ORBIT_HEALTHCHECK_URL: ${{ secrets.ORBIT_HEALTHCHECK_URL }}
+      ORBIT_GHOST_TARGETS: ${{ secrets.ORBIT_GHOST_TARGETS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run separate read-only watchdog
+        run: node scripts/guardian-probe.mjs

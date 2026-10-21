@@ -23,3 +23,5 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Independent guardian script syntax
+        run: node --check scripts/guardian-probe.mjs

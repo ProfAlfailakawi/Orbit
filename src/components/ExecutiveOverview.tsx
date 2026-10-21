@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowLeft, ArrowUpLeft, Bell, BellOff, Check, CheckCheck, ChevronLeft,
-  CircleAlert, CircleHelp, CloudOff, Code2, Copy, Eye, Globe2, Layers3,
+  CircleAlert, CloudOff, Code2, Copy, Eye, Globe2, Layers3,
   LockKeyhole, Plus, Radar, Search, ShieldCheck, Sparkles, WifiOff, Zap,
 } from 'lucide-react';
 import type { IncidentCaseFile, PlatformRecord, RadarEvent } from '../core/types';
 import { generateClaudeMissionPrompt } from '../core/engine';
+import { buildRepairIntelligenceAddendum } from '../core/guardian';
 import './orbit-one.css';
 
 interface ExecutiveOverviewProps {
@@ -100,13 +101,6 @@ export function ExecutiveOverview({
   const checked = fleet.filter(journeyChecked);
   const gaps = fleet.filter(p => !journeyChecked(p));
   const urgent = confirmed.filter(i => i.severity === 'Critical' || i.severity === 'High');
-  const productionEvents = events.filter(e => e.environment === 'production' && e.dataIntegrity === 'Live');
-  const signalCounts = [
-    { title: 'تجربة المستخدم', icon: Eye, count: productionEvents.filter(e => e.eyeLayer === 'Eye 1: Client Experience').length, tone: 'peach' },
-    { title: 'الخادم والعمليات', icon: Activity, count: productionEvents.filter(e => e.eyeLayer === 'Eye 2: Server & Infrastructure').length, tone: 'mint' },
-    { title: 'الكود والتحديثات', icon: Code2, count: productionEvents.filter(e => e.eyeLayer === 'Eye 3: Code & Deployment').length, tone: 'lilac' },
-  ];
-  const totalSignals = signalCounts.reduce((sum, x) => sum + x.count, 0);
   const coverage = fleet.length ? Math.round(checked.length * 100 / fleet.length) : 0;
   const status = urgent.length ? 'attention' : gaps.length ? 'incomplete' : 'monitored';
 
@@ -163,7 +157,7 @@ export function ExecutiveOverview({
     const platform = fleet.find(p => p.codeName.toUpperCase() === incident.appId.toUpperCase());
     if (!platform) return;
     try {
-      await navigator.clipboard.writeText(generateClaudeMissionPrompt(incident, platform, 'fix'));
+      await navigator.clipboard.writeText(generateClaudeMissionPrompt(incident, platform, 'fix') + '\n' + buildRepairIntelligenceAddendum(incident, platform, fleet));
       setCopied(incident.incidentId);
     } catch { setCopied(null); }
   };
@@ -230,8 +224,9 @@ export function ExecutiveOverview({
         <section id="orbit-one-incidents" className="one-panel one-incidents" aria-label="الحوادث التي تحتاج انتباهك">
           <header className="one-panel-heading">
             <div><span className="one-section-tag">الأهم الآن</span><h2>ما يحتاج تدخّلك</h2></div>
-            <span className={'one-counter ' + (confirmed.length ? 'one-counter-alert' : '')}>{confirmed.length}</span>
+            <div className="one-quiet-actions"><button type="button" className="one-bell-control" onClick={() => void enableNotifications()} title="إشعارات المتصفح أثناء فتح أوربت فقط" aria-label={notifyEnabled ? 'إيقاف إشعارات المتصفح' : 'تفعيل إشعارات المتصفح'} aria-pressed={notifyEnabled}>{notifyEnabled ? <Bell size={18}/> : <BellOff size={18}/>}</button><span className={'one-counter ' + (confirmed.length ? 'one-counter-alert' : '')}>{confirmed.length}</span></div>
           </header>
+          {notifyMessage && <span className="one-notice-inline" role="status">{notifyMessage}</span>}
           {confirmed.length ? (
             <div className="one-incidents-list">
               {(showAllIssues ? confirmed : confirmed.slice(0, 4)).map(incident => {
@@ -283,34 +278,6 @@ export function ExecutiveOverview({
           )}
         </section>
 
-        <aside className="one-side-column">
-          <section className="one-panel one-signal-panel" aria-label="مصادر إشارات الإنتاج">
-            <header className="one-panel-heading"><div><span className="one-section-tag">عيون أوربت</span><h2>من وين نرصد؟</h2></div><Eye size={19}/></header>
-            <p className="one-muted">إشارات إنتاج مسجلة، وليست نسبة ضمان أو تغطية.</p>
-            <div className="one-signal-list">
-              {signalCounts.map(s => {
-                const Icon = s.icon;
-                return <div className="one-signal" key={s.title}>
-                  <span className={'one-signal-icon one-icon-' + s.tone}><Icon size={18}/></span>
-                  <div className="one-signal-content">
-                    <div><span>{s.title}</span><b>{s.count}</b></div>
-                    <div className="one-signal-track"><i className={'one-fill-' + s.tone} style={{width: (totalSignals ? s.count / totalSignals * 100 : 0) + '%'}}/></div>
-                  </div>
-                </div>;
-              })}
-            </div>
-            {totalSignals === 0 && <p className="one-signal-note"><CircleHelp size={14}/> ما وصلتنا إشارات إنتاج موثقة بعد.</p>}
-          </section>
-          <section className="one-notice-card">
-            <div className="one-notice-icon"><Bell size={20}/></div>
-            <div><h3>تنبيهات بدون إزعاج</h3><p>إشعار للمشاكل المهمة أثناء فتح أوربت. إشعارات الهاتف بالخلفية تحتاج خدمة Push مستقلة.</p></div>
-            <button className="one-notify-button" type="button" aria-pressed={notifyEnabled} onClick={() => void enableNotifications()}>
-              {notifyEnabled ? <BellOff size={15}/> : <Bell size={15}/>}
-              {notifyEnabled ? 'إيقاف' : 'تفعيل'}
-            </button>
-            {notifyMessage && <small className="one-notice-message" role="status">{notifyMessage}</small>}
-          </section>
-        </aside>
       </div>
 
       <section id="orbit-one-programs" className="one-program-section" aria-label="دليل البرامج">

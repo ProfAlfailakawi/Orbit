@@ -12,6 +12,9 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, dev
 const runtimeErrors = [];
 page.on('pageerror', error => runtimeErrors.push(error.message));
 try {
+  const health = await page.request.get(base + '/healthz');
+  assert.equal(health.status(), 200);
+  assert.deepEqual(await health.json(), { service: 'orbit', status: 'running' });
   const unauth = await page.request.get(base + '/api/state');
   assert.equal(unauth.status(), 401, 'Protected state must reject unauthenticated requests');
 
