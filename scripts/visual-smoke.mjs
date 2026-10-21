@@ -71,6 +71,8 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.orbit-executive').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-mobile.png', fullPage: true });
+  // The dashboard links to GitHub automatically on open; the button reads "جارٍ فحص…" until that finishes.
+  await page.getByRole('button', { name: 'مزامنة GitHub الآن' }).waitFor({ timeout: 90000 });
   assert.equal(await page.getByRole('button', { name: 'مزامنة GitHub الآن' }).count(), 1, 'Manual GitHub sync button is missing');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3);
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
