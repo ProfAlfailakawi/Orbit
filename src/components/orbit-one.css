@@ -122,6 +122,14 @@
 .orbit-one .one-program-card {text-align:start;display:flex;align-items:flex-start;flex-direction:column;min-width:0;min-height:161px;border:1px solid var(--one-line);border-radius:19px;background:var(--one-panel);padding:17px;box-shadow:0 4px 14px rgba(36,60,86,.025);transition:transform .2s,box-shadow .2s,border-color .2s;gap:0;}
 .orbit-one .one-program-card:hover {transform:translateY(-4px);border-color:#9bcfc2;box-shadow:0 14px 30px rgba(36,60,86,.085);}
 .orbit-one .one-program-top {display:flex;align-items:center;justify-content:space-between;width:100%;color:#a0aebe;margin-bottom:14px;}
+.orbit-one .one-connection-indicator {display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:4px 8px;border:1px solid;border-radius:999px;font-size:9px;line-height:1;font-weight:850;white-space:nowrap;}
+.orbit-one .one-connection-dot {width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:currentColor;}
+.orbit-one .one-connection-connected {color:#087f5b;background:#e9fbf4;border-color:#a7e8cf;box-shadow:0 0 0 2px rgba(74,222,164,.12),0 0 13px rgba(74,222,164,.3);}
+.orbit-one .one-connection-connected .one-connection-dot {box-shadow:0 0 0 3px rgba(45,194,135,.15),0 0 10px rgba(45,194,135,.75);}
+.orbit-one .one-connection-pending {color:#9a6a28;background:#fff8e9;border-color:#f0d7a6;}
+.orbit-one .one-connection-stale {color:#896826;background:#fff8e9;border-color:#f0d7a6;}
+.orbit-one .one-connection-unavailable {color:#a64444;background:#fff0f0;border-color:#f1c4c4;}
+.orbit-one .one-connection-local {color:#516b7b;background:#eef5f8;border-color:#d0e0e8;}
 .orbit-one .one-program-icon {display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#edf4f7;color:#387f83;}
 .orbit-dark .orbit-one .one-program-icon {background:#203e49;color:#95dfd2;}
 .orbit-one .one-program-card strong {color:var(--one-ink);font-size:13px;font-weight:800;line-height:1.6;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;max-width:100%;}

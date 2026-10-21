@@ -27,6 +27,20 @@ const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, 
 const closedStatuses = new Set(['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"]);
 
 const linked = (p: PlatformRecord) => p.connectionVerified && p.dataIntegrity === 'Live';
+const sourceConnection = (p: PlatformRecord) => {
+  if (linked(p)) {
+    return {
+      label: p.runtimeMode === 'github-web' || p.runtimeMode === 'github-local' ? 'GitHub مربوط' : 'المصدر متصل',
+      tone: 'connected',
+    };
+  }
+  if (p.runtimeMode === 'local-only') return { label: 'محلي', tone: 'local' };
+  if (p.dataIntegrity === 'Cached') return { label: 'بيانات قديمة', tone: 'stale' };
+  if (p.dataIntegrity === 'Unavailable' || p.connectionStatus === 'Unavailable') {
+    return { label: 'تعذر الاتصال', tone: 'unavailable' };
+  }
+  return { label: 'بانتظار الربط', tone: 'pending' };
+};
 const journeyChecked = (p: PlatformRecord) =>
   linked(p) && p.productionUrlVerified &&
   p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true;
@@ -327,7 +341,7 @@ export function ExecutiveOverview({
           <div className="orbit-filter-tabs" role="group" aria-label="تصفية البرامج">
             <button type="button" className={filter === 'all' ? 'active' : ''} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>الكل <span>{fleet.length}</span></button>
             <button type="button" className={filter === 'issues' ? 'active' : ''} aria-pressed={filter === 'issues'} onClick={() => setFilter('issues')}>المشاكل <span>{fleet.filter(p => affected.has(p.codeName.toUpperCase())).length}</span></button>
-            <button type="button" className={filter === 'gaps' ? 'active' : ''} aria-pressed={filter === 'gaps'} onClick={() => setFilter('gaps')}>يحتاج ربط <span>{gaps.length}</span></button>
+            <button type="button" className={filter === 'gaps' ? 'active' : ''} aria-pressed={filter === 'gaps'} onClick={() => setFilter('gaps')}>رصد ناقص <span>{gaps.length}</span></button>
           </div>
           <label className="one-search"><Search size={16}/><input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="ابحث عن برنامج..." aria-label="ابحث عن برنامج"/></label>
         </div>
@@ -337,8 +351,9 @@ export function ExecutiveOverview({
             const issue = affected.has(p.codeName.toUpperCase());
             const verified = journeyChecked(p);
             const local = p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local';
+            const connection = sourceConnection(p);
             return <button type="button" className="orbit-app-card one-program-card" key={p.id} onClick={() => onOpenPlatform(p.id)} aria-label={'فتح تفاصيل ' + p.nameAr}>
-              <span className="one-program-top"><span className="one-program-icon"><Icon size={22} strokeWidth={1.65}/></span><ArrowUpLeft size={17}/></span>
+              <span className="one-program-top"><span className="one-program-icon"><Icon size={22} strokeWidth={1.65}/></span><span className={'one-connection-indicator one-connection-' + connection.tone} role="status" aria-label={connection.label} title={connection.label}><span className="one-connection-dot"/>{connection.label}</span><ArrowUpLeft size={17}/></span>
               <strong>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong>
               <span className="one-program-code" dir="ltr">{p.codeName}</span>
               <span className={'one-program-status ' + (issue ? 'one-program-bad' : verified ? 'one-program-good' : 'one-program-unknown')}>
