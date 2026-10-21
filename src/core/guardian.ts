@@ -1,6 +1,6 @@
 /** ORBIT ONE intelligence: private, bounded, evidence-qualified and read-only. */
 import type { BlackBoxFrame, CrossAppPattern, IncidentCaseFile, PlatformRecord } from './types.ts';
-import { sanitizeTelemetryPayload } from './engine.ts';
+import { MANDATORY_CLAUDE_GUARDRAIL, sanitizeTelemetryPayload } from './engine.ts';
 
 export type TruthEvidence = { uiReportedSuccess?: unknown; serverRecordConfirmed?: unknown; httpStatus?: unknown };
 export function evaluateTruthEvidence(input: TruthEvidence | null | undefined) {
@@ -106,4 +106,41 @@ export function classifyReadOnlyProbe(status: number|null, verifiedBody=false, i
   if(status===null)return 'unverified';
   if(status>=200&&status<300&&(!isOrbit||verifiedBody))return 'reachable';
   return 'failed';
+}
+
+/** Evidence-backed failure signals for one program, in plain Arabic. Unknown is never reported as a failure. */
+export function getProgramProblems(p: PlatformRecord): string[] {
+  const out: string[] = [];
+  const f = p.fourState;
+  if (f?.ciPassed === false) out.push('اختبارات GitHub الأخيرة فشلت');
+  if (f?.deploymentSucceeded === false) out.push('آخر نشر لم ينجح');
+  if (f?.siteReachable === false) out.push('الموقع لا يستجيب');
+  if (f?.userJourneyHealthy === false) out.push('تجربة المستخدم الأساسية تحتاج مراجعة');
+  const failed = (p.recentRuns || []).find(r => r.dataIntegrity === 'Live' && r.status === 'failure');
+  if (failed && f?.ciPassed === false) out.push('آخر عملية فاشلة: ' + sanitizeTelemetryPayload(failed.workflowName + ' — ' + failed.commitMessage).sanitized.slice(0, 160));
+  return out;
+}
+
+/** One copy-paste report for Claude: every program with a problem, plus the monitoring gaps, read-only. */
+export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents: IncidentCaseFile[], today = new Date().toISOString().slice(0, 10)): string {
+  const fleet = platforms.filter(p => p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived');
+  const withProblems = fleet.map(p => ({ p, problems: getProgramProblems(p) })).filter(x => x.problems.length);
+  const open = incidents.filter(i => i.dataIntegrity === 'Live' && !['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"].includes(i.status));
+  const lines = [
+    '# تقرير أوربت لكلود — ' + today,
+    MANDATORY_CLAUDE_GUARDRAIL,
+    '',
+    'المطلوب: افحص المشاكل أدناه وحدد السبب بالدليل، ثم اقترح أقل تعديل ممكن للموافقة قبل التنفيذ.',
+    '',
+    '## المشاكل الحالية',
+  ];
+  if (!withProblems.length && !open.length) lines.push('- لا توجد مشاكل مؤكدة.');
+  for (const { p, problems } of withProblems) {
+    lines.push('### ' + p.nameAr + ' (' + p.codeName + ') — ' + p.owner + '/' + p.repoName + ' · ' + p.defaultBranch);
+    problems.forEach(x => lines.push('- ' + x));
+  }
+  for (const i of open) lines.push('- [' + i.appId + '] ' + sanitizeTelemetryPayload(i.title).sanitized + ' (' + i.severity + ')');
+  const gaps = fleet.filter(p => !(p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true));
+  lines.push('', '## برامج رصدها غير مكتمل (ليست دليل سلامة)', gaps.length ? gaps.map(p => p.nameAr + ' (' + p.codeName + ')').join('، ') : 'لا يوجد.');
+  return lines.join('\n');
 }

@@ -255,15 +255,15 @@ export const ThreeEyesInfographicRow: React.FC<{
  */
 export const DataIntegrityTag: React.FC<{ state: DataIntegrityState }> = ({ state }) => {
   const map: Record<DataIntegrityState, { labelAr: string; colorClass: string }> = {
-    Live: { labelAr: 'حي · Live', colorClass: 'text-emerald-400' },
-    Cached: { labelAr: 'موثق · Cached', colorClass: 'text-sky-400' },
-    Demo: { labelAr: 'محاكاة · Demo', colorClass: 'text-amber-400' },
-    Unavailable: { labelAr: 'غير متاح · Unavailable', colorClass: 'text-rose-400' },
-    'Not Configured': { labelAr: 'غير مهيأ · Not Configured', colorClass: 'text-slate-400' },
+    Live: { labelAr: 'حي', colorClass: 'text-emerald-400' },
+    Cached: { labelAr: 'بيانات قديمة', colorClass: 'text-sky-400' },
+    Demo: { labelAr: 'تجريبي', colorClass: 'text-amber-400' },
+    Unavailable: { labelAr: 'غير متاح', colorClass: 'text-rose-400' },
+    'Not Configured': { labelAr: 'غير مربوط بعد', colorClass: 'text-slate-400' },
   };
   const cfg = map[state] || map['Not Configured'];
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-mono ${cfg.colorClass}`}>
+    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${cfg.colorClass}`}>
       <span>{cfg.labelAr}</span>
     </span>
   );
