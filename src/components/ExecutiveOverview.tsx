@@ -64,6 +64,79 @@ const iconFor = (p: PlatformRecord) => {
   return Code2;
 };
 
+
+const toneColor: Record<string, string> = {
+  connected: '#46dcab', pending: '#e9c27a', stale: '#e9c27a', unavailable: '#ff7a86', local: '#9aa8ff',
+};
+
+/** Fleet dial: each program is a node on a track that encodes its evidence state (no invented data). */
+function FleetDial({ fleet, affected, coverage }: {
+  fleet: PlatformRecord[]; affected: Set<string>; coverage: number;
+}) {
+  const C = 180;
+  const tracks = [
+    { key: 'verified', r: 82 },
+    { key: 'issue', r: 123 },
+    { key: 'gap', r: 160 },
+  ];
+  const grouped: Record<string, PlatformRecord[]> = { verified: [], issue: [], gap: [] };
+  fleet.forEach(p => {
+    const k = affected.has(p.codeName.toUpperCase()) ? 'issue' : journeyChecked(p) ? 'verified' : 'gap';
+    grouped[k].push(p);
+  });
+  const arcR = 56;
+  const circ = 2 * Math.PI * arcR;
+  return (
+    <svg className="one-dial" viewBox="0 0 360 360" role="img" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="one-dial-core" cx="50%" cy="38%" r="70%">
+          <stop offset="0%" stopColor="#3a2f86"/><stop offset="100%" stopColor="#17133d"/>
+        </radialGradient>
+      </defs>
+      {tracks.map(t => (
+        <circle key={t.key} cx={C} cy={C} r={t.r} className={'one-dial-track one-dial-track-' + t.key}/>
+      ))}
+      {[0, 45, 90, 135].map(a => (
+        <line key={a} x1={C} y1={C - 170} x2={C} y2={C + 170} className="one-dial-spoke" transform={`rotate(${a} ${C} ${C})`}/>
+      ))}
+      <circle cx={C} cy={C} r={arcR} className="one-dial-arc-bg"/>
+      <circle cx={C} cy={C} r={arcR} className="one-dial-arc" strokeDasharray={`${(circ * coverage) / 100} ${circ}`} transform={`rotate(-90 ${C} ${C})`}/>
+      <circle cx={C} cy={C} r={46} fill="url(#one-dial-core)" className="one-dial-core"/>
+      <text x={C} y={C + 4} textAnchor="middle" className="one-dial-pct">{coverage}%</text>
+      <text x={C} y={C + 24} textAnchor="middle" className="one-dial-cap">ORBIT</text>
+      {tracks.map(t => {
+        const list = grouped[t.key];
+        return (
+          <g key={t.key} className={'one-dial-nodes one-dial-nodes-' + t.key}>
+            {list.map((p, i) => {
+              const ang = (i / Math.max(list.length, 1)) * Math.PI * 2 + (t.key === 'issue' ? 0.5 : t.key === 'gap' ? -0.35 : 0.9);
+              const x = C + t.r * Math.cos(ang);
+              const y = C + t.r * Math.sin(ang);
+              const tone = t.key === 'issue' ? 'unavailable' : sourceConnection(p).tone;
+              return (
+                <g key={p.id} className="one-dial-node">
+                  {t.key === 'issue' && <circle cx={x} cy={y} r={12} className="one-dial-halo"/>}
+                  <circle cx={x} cy={y} r={7} fill={toneColor[tone]} className="one-dial-dot"/>
+                  <title>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</title>
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function Ticks({ total, lit, tone }: { total: number; lit: number; tone: string }) {
+  const n = Math.min(Math.max(total, 0), 24);
+  return (
+    <span className={'one-ticks one-ticks-' + tone} aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => <i key={i} className={i < lit ? 'on' : ''}/>)}
+    </span>
+  );
+}
+
 /** All prominent incident counts require a witnessed production event; demonstration data is excluded. */
 export function getConfirmedProductionIncidents(incidents: IncidentCaseFile[], events: RadarEvent[]) {
   const witnessed = new Set(events
@@ -240,14 +313,12 @@ export function ExecutiveOverview({
         </div>
         <div className="one-orbit-art" aria-label={'تم التحقق من تجربة المستخدم في ' + checked.length + ' من ' + fleet.length + ' برامج'}>
           <div className="one-orbit-glow"/>
-          <div className="one-ring one-ring-outer"><span className="one-orbit-star one-star-a"/><span className="one-orbit-star one-star-b"/></div>
-          <div className="one-ring one-ring-middle"/>
-          <div className="one-ring one-ring-inner"/>
-          <div className="one-orbit-core">
-            <Radar size={27} strokeWidth={1.6}/>
-            <span>ORBIT</span>
-            <strong>ONE</strong>
-          </div>
+          <FleetDial fleet={fleet} affected={affected} coverage={coverage}/>
+          <ul className="one-dial-legend" aria-label="دلالة المدارات">
+            <li><i className="one-lg one-lg-verified"/>مدار داخلي: تجربة موثقة</li>
+            <li><i className="one-lg one-lg-issue"/>مشكلة مؤكدة</li>
+            <li><i className="one-lg one-lg-gap"/>الحافة: رصد غير مكتمل</li>
+          </ul>
           <div className="one-float-chip one-chip-top"><ShieldCheck size={15}/> رصد من أدلة حقيقية</div>
           <div className="one-float-chip one-chip-bottom"><Layers3 size={15}/> {fleet.length} برنامج</div>
         </div>
@@ -256,15 +327,15 @@ export function ExecutiveOverview({
       <section className="one-score-row" aria-label="المؤشرات الرئيسية">
         <div className="one-score-card">
           <span className="one-score-icon one-icon-blue"><Layers3 size={21}/></span>
-          <strong>{fleet.length}</strong><span>برنامج في المدار</span><small>الحالية والمضافة مستقبلاً</small>
+          <strong>{fleet.length}</strong><span>برنامج في المدار</span><small>الحالية والمضافة مستقبلاً</small><Ticks total={fleet.length} lit={fleet.length} tone="blue"/>
         </div>
         <div className="one-score-card">
           <span className="one-score-icon one-icon-coral"><CircleAlert size={21}/></span>
-          <strong>{affected.size}</strong><span>برنامج فيه مشكلة</span><small>من أدلة موثقة فقط</small>
+          <strong>{affected.size}</strong><span>برنامج فيه مشكلة</span><small>من أدلة موثقة فقط</small><Ticks total={fleet.length} lit={affected.size} tone="coral"/>
         </div>
         <div className="one-score-card">
           <span className="one-score-icon one-icon-amber"><WifiOff size={21}/></span>
-          <strong>{gaps.length}</strong><span>رصد غير مكتمل</span><small>لا نعتبرها سليمة بلا دليل</small>
+          <strong>{gaps.length}</strong><span>رصد غير مكتمل</span><small>لا نعتبرها سليمة بلا دليل</small><Ticks total={fleet.length} lit={gaps.length} tone="amber"/>
         </div>
         <div className="one-score-card one-coverage-card">
           <div className="one-coverage-ring" style={{ background: 'conic-gradient(#70d8ad ' + coverage + '%, rgba(150,161,178,.16) 0)' }}>
@@ -385,7 +456,7 @@ export function ExecutiveOverview({
             const verified = journeyChecked(p);
             const local = p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local';
             const connection = sourceConnection(p);
-            return <button type="button" className="orbit-app-card one-program-card" key={p.id} onClick={() => onOpenPlatform(p.id)} aria-label={'فتح تفاصيل ' + p.nameAr}>
+            return <button type="button" className={'orbit-app-card one-program-card ' + (issue ? 'is-issue' : verified ? 'is-verified' : 'is-gap')} key={p.id} onClick={() => onOpenPlatform(p.id)} aria-label={'فتح تفاصيل ' + p.nameAr}>
               <span className="one-program-top"><span className="one-program-icon"><Icon size={22} strokeWidth={1.65}/></span><span className={'one-connection-indicator one-connection-' + connection.tone} role="status" aria-label={connection.label} title={connection.label}><span className="one-connection-dot"/>{connection.label}</span><ArrowUpLeft size={17}/></span>
               <strong>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}</strong>
               <span className="one-program-code" dir="ltr">{p.codeName}</span>
