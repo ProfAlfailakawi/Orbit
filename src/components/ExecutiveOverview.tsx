@@ -16,6 +16,7 @@ interface ExecutiveOverviewProps {
   onOpenIncident: (id: string) => void;
   onOpenRadar: () => void;
   onOpenFleet: () => void;
+  onQuickAdd: (name: string, url: string) => Promise<string>;
 }
 
 type Filter = 'all' | 'issues' | 'gaps';
@@ -63,9 +64,25 @@ export function getConfirmedProductionIncidents(incidents: IncidentCaseFile[], e
 }
 
 export function ExecutiveOverview({
-  platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar, onOpenFleet,
+  platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar, onOpenFleet, onQuickAdd,
 }: ExecutiveOverviewProps) {
   const [filter, setFilter] = useState<Filter>('all');
+  const [showAllIssues, setShowAllIssues] = useState(false);
+  const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newLink, setNewLink] = useState('');
+  const [addFeedback, setAddFeedback] = useState('');
+  const [adding, setAdding] = useState(false);
+  const submitAdd = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAdding(true); setAddFeedback('');
+    try {
+      const message = await onQuickAdd(newName, newLink);
+      setAddFeedback(message); setNewName(''); setNewLink('');
+    } catch (error) { setAddFeedback(error instanceof Error ? error.message : 'تعذر إضافة البرنامج'); }
+    finally { setAdding(false); }
+  };
   const [query, setQuery] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
   const [notifyEnabled, setNotifyEnabled] = useState(false);
@@ -168,7 +185,7 @@ export function ExecutiveOverview({
             <button className="one-button one-button-primary" type="button" onClick={onOpenRadar}>
               <Radar size={17}/> عرض المشاكل <ArrowLeft size={17}/>
             </button>
-            <button className="one-button one-button-ghost" type="button" onClick={onOpenFleet}>
+            <button className="one-button one-button-ghost" type="button" onClick={() => { setAddOpen(true); document.getElementById("orbit-one-programs")?.scrollIntoView({behavior:"smooth"}); }}>
               <Plus size={17}/> إضافة برنامج
             </button>
           </div>
@@ -210,14 +227,14 @@ export function ExecutiveOverview({
       </section>
 
       <div className="one-content-grid">
-        <section className="one-panel one-incidents" aria-label="الحوادث التي تحتاج انتباهك">
+        <section id="orbit-one-incidents" className="one-panel one-incidents" aria-label="الحوادث التي تحتاج انتباهك">
           <header className="one-panel-heading">
             <div><span className="one-section-tag">الأهم الآن</span><h2>ما يحتاج تدخّلك</h2></div>
             <span className={'one-counter ' + (confirmed.length ? 'one-counter-alert' : '')}>{confirmed.length}</span>
           </header>
           {confirmed.length ? (
             <div className="one-incidents-list">
-              {confirmed.slice(0, 4).map(incident => {
+              {(showAllIssues ? confirmed : confirmed.slice(0, 4)).map(incident => {
                 const p = fleet.find(p => p.codeName.toUpperCase() === incident.appId.toUpperCase());
                 return (
                   <article className="one-issue" key={incident.incidentId}>
@@ -240,21 +257,28 @@ export function ExecutiveOverview({
                         {copied === incident.incidentId ? <Check size={16}/> : <Copy size={16}/>}
                         {copied === incident.incidentId ? 'تم نسخ المهمة' : 'انسخ المهمة لكلود أو ChatGPT'}
                       </button>
-                      <button className="one-button one-button-link" type="button" onClick={() => onOpenIncident(incident.incidentId)}>
+                      <button className="one-button one-button-link" type="button" onClick={() => setExpandedIssue(expandedIssue === incident.incidentId ? null : incident.incidentId)}>
                         الأدلة <ChevronLeft size={16}/>
                       </button>
                     </div>
+                    {expandedIssue === incident.incidentId && (
+                      <div className="one-incident-evidence">
+                        <strong>أدلة المشكلة</strong>
+                        <p>{incident.confirmedEvidence.length ? incident.confirmedEvidence.slice(0, 4).join(' • ') : 'تحتاج أدلة إضافية قبل تحديد السبب.'}</p>
+                        <span>السبب الجذري لا يُعتمد قبل التحقق. انسخ المهمة للتحليل الآمن.</span>
+                      </div>
+                    )}
                   </article>
                 );
               })}
-              {confirmed.length > 4 && <button type="button" className="one-inline-action" onClick={onOpenRadar}>عرض بقية المشاكل <ArrowUpLeft size={15}/></button>}
+              {confirmed.length > 4 && <button type="button" className="one-inline-action" onClick={() => setShowAllIssues(!showAllIssues)}>{showAllIssues ? 'عرض أقل' : 'عرض بقية المشاكل'} <ArrowUpLeft size={15}/></button>}
             </div>
           ) : (
             <div className="one-no-incident">
               <div className="one-no-incident-icon"><ShieldCheck size={31} strokeWidth={1.6}/></div>
               <h3>لا توجد مشاكل إنتاج مؤكدة حالياً</h3>
               <p>{gaps.length ? 'هذا لا يعني سلامة كل البرامج؛ هناك برامج تحتاج استكمال الرصد.' : 'المصادر المتحققة لم تسجل حادثة مفتوحة.'}</p>
-              {gaps.length > 0 && <button className="one-inline-action" type="button" onClick={onOpenFleet}>استكمال ربط المراقبة <ArrowLeft size={15}/></button>}
+              {gaps.length > 0 && <button className="one-inline-action" type="button" onClick={() => { setAddOpen(true); document.getElementById("orbit-one-programs")?.scrollIntoView({behavior:"smooth"}); }}>استكمال ربط المراقبة <ArrowLeft size={15}/></button>}
             </div>
           )}
         </section>
@@ -289,11 +313,22 @@ export function ExecutiveOverview({
         </aside>
       </div>
 
-      <section className="one-program-section" aria-label="دليل البرامج">
+      <section id="orbit-one-programs" className="one-program-section" aria-label="دليل البرامج">
         <header className="one-program-heading">
           <div><span className="one-section-tag">مدارك الرقمية</span><h2>برامجك <span>{fleet.length}</span></h2><p>حالة واضحة لكل برنامج، بدون تفاصيل تقنية مزعجة.</p></div>
-          <button className="one-button one-button-light" onClick={onOpenFleet} type="button"><Plus size={17}/> إضافة وإدارة</button>
+          <button className="one-button one-button-light" onClick={() => { setAddOpen(true); document.getElementById("orbit-one-programs")?.scrollIntoView({behavior:"smooth"}); }} type="button"><Plus size={17}/> إضافة وإدارة</button>
         </header>
+        {addOpen && <form className="one-quick-add" onSubmit={submitAdd} aria-label="إضافة برنامج جديد">
+          <div className="one-quick-add-intro"><strong>إضافة برنامج</strong><p>الاسم والرابط فقط. بدون إعدادات برمجية.</p></div>
+          <label>اسم البرنامج<input type="text" value={newName} maxLength={100} onChange={event => setNewName(event.target.value)} required placeholder="مثال: برنامجي الجديد"/></label>
+          <label>رابط GitHub أو الموقع<input type="url" value={newLink} onChange={event => setNewLink(event.target.value)} required placeholder="https://github.com/owner/project" dir="ltr"/></label>
+          <div className="one-quick-add-actions">
+            <button className="one-button one-button-primary" disabled={adding} type="submit">{adding ? 'جاري الإضافة…' : 'إضافة البرنامج'} <Plus size={16}/></button>
+            <button type="button" className="one-button one-button-light" onClick={() => setAddOpen(false)}>إغلاق</button>
+          </div>
+          {addFeedback && <p className="one-quick-add-feedback" role="status">{addFeedback}</p>}
+          <small>إضافة البرنامج لا تعني أن مراقبة مستخدميه متصلة؛ سيظهر «الرصد غير مكتمل» حتى يثبت العكس.</small>
+        </form>}
         <div className="one-program-tools">
           <div className="orbit-filter-tabs" role="group" aria-label="تصفية البرامج">
             <button type="button" className={filter === 'all' ? 'active' : ''} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>الكل <span>{fleet.length}</span></button>

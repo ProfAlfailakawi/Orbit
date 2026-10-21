@@ -39,49 +39,62 @@ try {
   assert.equal(state.incidents.some(i => i.appId === 'ORBIT-CANARY' && i.dataIntegrity === 'Live'), false, 'Test incidents must not be treated as live');
 
   await page.screenshot({ path: 'test-artifacts/orbit-desktop.png', fullPage: true });
-  const nav = page.locator('.orbit-desktop-nav .orbit-nav-link');
-  await nav.nth(1).click();
-  await page.locator('.orbit-workspace-overview[data-mode="radar"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-radar.png', fullPage: true });
-  await nav.nth(2).click();
-  await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
-  await page.locator('.orbit-more-menu-desktop > summary').click();
-  await page.getByRole('button', { name: 'الرؤى' }).click();
-  await page.locator('.orbit-workspace-overview[data-mode="intelligence"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
-  await page.locator('.orbit-more-menu-desktop > summary').click();
-  await page.getByRole('button', { name: 'الحماية' }).click();
-  await page.locator('.orbit-workspace-overview[data-mode="operations"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-governance.png', fullPage: true });
-  await nav.first().click();
-  await page.locator('.orbit-executive').waitFor();
-  await page.locator('.orbit-filter-tabs button').last().click();
-  await page.locator('.orbit-filter-tabs button').first().click();
+  assert.equal(await page.locator('.orbit-desktop-nav, .orbit-mobile-nav, .orbit-more-menu').count(), 0, 'No dashboard tab bar or More menu should exist');
+  assert.equal(await page.locator('.orbit-executive').count(), 1, 'Only one owner dashboard should exist');
+
+  await page.getByRole('button', { name: /عرض المشاكل/ }).click();
+  await page.locator('#orbit-one-incidents').waitFor();
+
+  await page.getByRole('button', { name: /إضافة برنامج/ }).first().click();
+  await page.getByRole('form', { name: 'إضافة برنامج جديد' }).waitFor();
+  await page.getByRole('button', { name: 'إغلاق' }).click();
+
   await page.locator('.orbit-app-card').first().click();
-  assert.equal(await page.locator('.orbit-executive').count(), 0, 'Program detail navigation not working');
+  await page.getByRole('dialog', { name: 'تفاصيل أوربت' }).waitFor();
   await page.locator('.orbit-program-page').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-program.png', fullPage: true });
+  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
+  assert.equal(await page.getByRole('dialog').count(), 0, 'Program detail must close within same owner page');
 
+  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.one-specialist-only > summary').click();
+  const specialist = page.locator('.one-specialist-menu');
+  await specialist.getByRole('button', { name: 'تشخيص الحوادث' }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.locator('.orbit-workspace-overview[data-mode="radar"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-radar.png', fullPage: true });
+  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
+
+  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.one-specialist-only > summary').click();
+  await specialist.getByRole('button', { name: 'إعدادات البرامج' }).click();
+  await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-fleet.png', fullPage: true });
+  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
+
+  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.one-specialist-only > summary').click();
+  await specialist.getByRole('button', { name: 'التحليلات' }).click();
+  await page.locator('.orbit-workspace-overview[data-mode="intelligence"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-intelligence.png', fullPage: true });
+  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
+
+  await page.getByRole('button', { name: 'الإعدادات' }).click();
+  await page.locator('.one-specialist-only > summary').click();
+  await specialist.getByRole('button', { name: 'الحماية والاختبارات' }).click();
+  await page.locator('.orbit-workspace-overview[data-mode="operations"]').waitFor();
+  await page.screenshot({ path: 'test-artifacts/orbit-governance.png', fullPage: true });
+  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
+
+  await page.locator('.orbit-filter-tabs button').last().click();
+  await page.locator('.orbit-filter-tabs button').first().click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.orbit-mobile-tab').first().click();
-  await page.waitForSelector('.orbit-executive', { state: 'visible' });
+  await page.locator('.orbit-executive').waitFor();
   await page.screenshot({ path: 'test-artifacts/orbit-mobile.png', fullPage: true });
-
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3);
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
 
-  await page.locator('.orbit-mobile-tab').nth(1).click();
-  await page.locator('.orbit-workspace-overview[data-mode="radar"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-mobile-radar.png', fullPage: true });
-  await page.locator('#orbit-advanced-radar > summary').click();
-  await page.locator('.orbit-radar-page').waitFor();
-  await page.locator('.orbit-mobile-tab').nth(2).click();
-  await page.locator('.orbit-workspace-overview[data-mode="fleet"]').waitFor();
-  await page.screenshot({ path: 'test-artifacts/orbit-mobile-fleet.png', fullPage: true });
-  await page.locator('.orbit-mobile-tab').first().click();
-  await page.locator('.orbit-tools-menu > summary').click();
-  assert.equal(await page.locator('.orbit-tools-popover').isVisible(), true, 'Utility menu should open');
+  await page.getByRole('button', { name: 'الإعدادات' }).click();
   await page.getByRole('button', { name: 'المظهر الداكن' }).click();
   assert.equal(await page.locator('.orbit-shell.orbit-dark').count(), 1, 'Dark appearance not applied');
   await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
@@ -115,7 +128,7 @@ try {
   assert.equal(loggedOut.status(), 401, 'Logout must revoke the server session');
 
   assert.deepEqual(runtimeErrors, [], 'Browser must not have uncaught runtime exceptions');
-  console.log('ORBIT browser smoke PASS: login, auth, dashboard, fleet, mobile, tools, logout.');
+  console.log('ORBIT ONE smoke PASS: one page, quick add, expert overlays, mobile, session, sensor safety.');
 } catch (err) {
   await page.screenshot({ path: 'test-artifacts/orbit-failure.png', fullPage: true }).catch(() => {});
   throw err;
