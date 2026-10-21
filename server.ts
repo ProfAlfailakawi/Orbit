@@ -799,11 +799,33 @@ async function startServer() {
               siteEvidence = `Production URL unavailable: ${error instanceof Error ? error.message.slice(0, 120) : 'request failed'}.`;
             }
           }
+          // ORBIT's defined anonymous-entry journey checks the public entry,
+          // unauthenticated session response, and protected-state boundary. It is
+          // read-only and never signs in or uses the operator passkey.
+          let userJourneyHealthy = plat.fourState?.userJourneyHealthy ?? null;
+          let journeyEvidence = userJourneyHealthy === null ? 'User journey is not tested.' : `User journey is ${userJourneyHealthy ? 'healthy' : 'unhealthy'}.`;
+          if (isOrbitRepository && productionUrl && siteReachable === true) {
+            try {
+              const origin = new URL(productionUrl).origin;
+              const sessionResponse = await fetch(`${origin}/api/auth/session`, {
+                headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(5000),
+              });
+              const session = sessionResponse.ok ? await sessionResponse.json() as { authenticated?: boolean } : null;
+              const privateStateResponse = await fetch(`${origin}/api/state`, {
+                headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(5000),
+              });
+              userJourneyHealthy = session?.authenticated === false && privateStateResponse.status === 401;
+              journeyEvidence = `Anonymous session HTTP ${sessionResponse.status} (authenticated=${String(session?.authenticated)}); protected dashboard HTTP ${privateStateResponse.status}.`;
+            } catch (error) {
+              userJourneyHealthy = false;
+              journeyEvidence = `Anonymous entry/auth-boundary journey failed: ${error instanceof Error ? error.message.slice(0, 120) : 'request failed'}.`;
+            }
+          }
           const fourState: PlatformRecord['fourState'] = {
             ciPassed: githubCiPassed,
             deploymentSucceeded,
             siteReachable,
-            userJourneyHealthy: plat.fourState?.userJourneyHealthy ?? null,
+            userJourneyHealthy,
           };
           const confirmedChecks = Object.values(fourState).filter(value => value !== null).length;
           const monitoringCoveragePct = Math.round(confirmedChecks * 100 / 4);
@@ -828,7 +850,7 @@ async function startServer() {
                   releaseShield: 'Insufficient Evidence',
                   releaseConfidencePct: 0,
                   lastVerifiedTimestamp: new Date().toISOString(),
-                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}; deployment ${deploymentSucceeded === null ? 'not evidenced' : deploymentSucceeded ? 'succeeded' : 'failed'}; ${siteEvidence} User journey is ${fourState.userJourneyHealthy === null ? 'not tested' : fourState.userJourneyHealthy ? 'healthy' : 'unhealthy'}.`,
+                  lastVerifiedEvidence: `GitHub repository HTTP 200 (last push: ${repoData.pushed_at || 'unknown'}); GitHub Actions ${actionsChecked ? 'read' : 'unavailable'}; deployment ${deploymentSucceeded === null ? 'not evidenced' : deploymentSucceeded ? 'succeeded' : 'failed'}; ${siteEvidence} ${journeyEvidence}`,
                 }
               : p
           );
