@@ -63,6 +63,7 @@ jobs:
           SERVICE_URL="$(gcloud run services describe orbit-api --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
           gcloud run services update orbit-api --region "$REGION" --project "$PROJECT_ID" \
             --update-env-vars "SCHEDULER_AUDIENCE=$SERVICE_URL,SCHEDULER_SERVICE_ACCOUNT=${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}"
+          gcloud run services update-traffic orbit-api --region "$REGION" --project "$PROJECT_ID" --to-latest
           for attempt in $(seq 1 20); do
             if curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/healthz/" >/dev/null \
               && curl --fail --silent --show-error --max-time 10 "$SERVICE_URL/api/version" \
