@@ -70,6 +70,7 @@ export function ExecutiveOverview({
   platforms, incidents, events, onOpenPlatform, onOpenIncident, onOpenRadar, onOpenFleet, onQuickAdd,
   onSyncGithub, isGithubSyncing,
 }: ExecutiveOverviewProps) {
+  const [syncSeconds, setSyncSeconds] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
   const [showAllIssues, setShowAllIssues] = useState(false);
   const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
@@ -92,6 +93,16 @@ export function ExecutiveOverview({
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyMessage, setNotifyMessage] = useState('');
   const seenRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isGithubSyncing) {
+      setSyncSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => setSyncSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [isGithubSyncing]);
 
   const fleet = useMemo(
     () => platforms.filter(p => p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived'),
@@ -178,17 +189,27 @@ export function ExecutiveOverview({
               status === 'incomplete' ? 'لا توجد مشاكل مؤكدة معروضة، لكن الرصد غير مكتمل' :
               'لا توجد مشاكل مؤكدة ضمن نطاق المراقبة المثبت'}</span>
           </div>
+          {status === 'incomplete' && (
+            <p className="one-monitoring-gap" role="status">
+              مزامنة GitHub تفحص المستودع ونتائج CI؛ اكتمال الرصد يتطلب أيضاً فحص رابط الموقع ورحلة الاستخدام.
+            </p>
+          )}
           <div className="one-hero-actions">
             <button className="one-button one-button-primary" type="button" onClick={onOpenRadar}>
               <Radar size={17}/> عرض المشاكل <ArrowLeft size={17}/>
             </button>
             <button className="one-button one-button-ghost" type="button" onClick={onSyncGithub} disabled={isGithubSyncing} aria-busy={isGithubSyncing}>
-              <RefreshCw size={17} className={isGithubSyncing ? 'animate-spin' : ''}/>{isGithubSyncing ? 'جارٍ فحص GitHub…' : 'مزامنة GitHub الآن'}
+              <RefreshCw size={17} className={isGithubSyncing ? 'animate-spin' : ''}/>{isGithubSyncing ? `جارٍ فحص GitHub · ${syncSeconds} ث` : 'مزامنة GitHub الآن'}
             </button>
             <button className="one-button one-button-ghost" type="button" onClick={() => { setAddOpen(true); document.getElementById("orbit-one-programs")?.scrollIntoView({behavior:"smooth"}); }}>
               <Plus size={17}/> إضافة برنامج
             </button>
           </div>
+          {isGithubSyncing && (
+            <p className="one-sync-progress" role="status" aria-live="polite">
+              نفحص المستودعات المسجلة ونتائج GitHub Actions بالتتابع. قد يستغرق الفحص نحو نصف دقيقة.
+            </p>
+          )}
         </div>
         <div className="one-orbit-art" aria-label={'تم التحقق من تجربة المستخدم في ' + checked.length + ' من ' + fleet.length + ' برامج'}>
           <div className="one-orbit-glow"/>
