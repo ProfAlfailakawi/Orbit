@@ -7,12 +7,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
-  MAX_LOGO_BYTES, declaredSize, discoverSiteLogo, isPublicIp, isUsableLogo, pickFirstUsable, resolveHttps, toDataUri,
-  type FoundLogo, type IconCandidate, type LogoDeps,
+  MAX_LOGO_BYTES, discoverSiteLogo, findManifestPaths, isPublicIp, isUsableLogo, pickRepoLogoPaths, resolveHttps, toDataUri,
+  type FoundLogo, type LogoDeps, type RepoFile,
 } from './logo.ts';
 import type { PlatformRecord } from './types.ts';
 
-interface Entry { dataUri: string | null; source: 'site' | 'github' | 'none'; sourceUrl: string; fetchedAt: number; attemptedAt: number }
+/** Bump when the discovery rules change: older results (e.g. favicons of unrelated sites) are then ignored and looked up again. */
+const RULES_VERSION = 2;
+interface Entry { dataUri: string | null; source: 'site' | 'github' | 'none'; sourceUrl: string; fetchedAt: number; attemptedAt: number; v?: number }
 export interface PublicLogo { src: string; source: 'site' | 'github' }
 
 const DAY = 24 * 60 * 60_000;
@@ -69,66 +71,56 @@ const siteDeps: LogoDeps = {
   fetchBytes: async url => (await safeGet(url, { accept: 'image/*,*/*;q=0.1', maxBytes: MAX_LOGO_BYTES }))?.bytes ?? null,
 };
 
-const REPO_ICON_PATHS = [
-  'public/apple-touch-icon.png', 'public/icon.svg', 'public/favicon.svg', 'public/logo.svg', 'public/logo.png',
-  'public/pwa-512x512.png', 'public/icons/icon-512x512.png', 'public/favicon.ico', 'logo.svg', 'logo.png',
-];
-
-/** The program's own icon files in its GitHub repository (read-only), for programs with no reachable site. */
+/** The program's own icon files in its GitHub repository (read-only), chosen from its web-app manifest or by name. */
 async function repositoryLogo(p: PlatformRecord, token: string | undefined): Promise<FoundLogo | null> {
   const headers: Record<string, string> = { 'User-Agent': 'ORBIT-LogoFetcher/1 (+read-only)' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const base = `https://api.github.com/repos/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.repoName)}`;
   let requests = 0, blocked = false;
   const get = async (apiPath: string, accept: string, max: number): Promise<Uint8Array | null> => {
-    if (blocked || requests >= 10) return null;
+    if (blocked || requests >= 12) return null;
     requests += 1;
     try {
-      const response = await fetch(`${base}${apiPath}`, { headers: { ...headers, Accept: accept }, signal: AbortSignal.timeout(4500) });
+      const response = await fetch(`${base}${apiPath}`, { headers: { ...headers, Accept: accept }, signal: AbortSignal.timeout(6000) });
       if (response.status === 403 || response.status === 429) blocked = true;
       if (!response.ok) return null;
       const bytes = new Uint8Array(await response.arrayBuffer());
       return bytes.length <= max ? bytes : null;
     } catch { return null; }
   };
+  const raw = (repoPath: string, max: number) => get(`/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}`, 'application/vnd.github.raw+json', max);
 
+  // One request lists every file with its size; no guessing of paths.
+  const treeBytes = await get('/git/trees/HEAD?recursive=1', 'application/vnd.github+json', 8_000_000);
+  let files: RepoFile[] = [];
+  if (treeBytes) {
+    try {
+      const tree = (JSON.parse(new TextDecoder().decode(treeBytes)) as { tree?: Array<{ path?: string; type?: string; size?: number }> }).tree || [];
+      files = tree.filter(t => t.type === 'blob' && typeof t.path === 'string').map(t => ({ path: t.path as string, size: Number(t.size) || 0 }));
+    } catch { /* unreadable tree */ }
+  }
+
+  if (files.length) {
+    const manifests: Array<{ path: string; json: unknown }> = [];
+    for (const manifestPath of findManifestPaths(files)) {
+      const bytes = await raw(manifestPath, 100_000);
+      try { manifests.push({ path: manifestPath, json: bytes ? JSON.parse(new TextDecoder().decode(bytes)) : null }); } catch { /* not JSON */ }
+    }
+    for (const repoPath of pickRepoLogoPaths(files, manifests, 4)) {
+      const bytes = await raw(repoPath, MAX_LOGO_BYTES);
+      const mime = bytes && isUsableLogo(bytes);
+      if (bytes && mime) return { dataUri: toDataUri(bytes, mime), sourceUrl: `https://github.com/${p.owner}/${p.repoName}/blob/HEAD/${repoPath}` };
+    }
+  }
+
+  // Last resort: the homepage the repository's owner declared on GitHub.
   const meta = await get('', 'application/vnd.github+json', 200_000);
   if (meta) {
     try {
       const homepage = (JSON.parse(new TextDecoder().decode(meta)) as { homepage?: unknown }).homepage;
       const site = typeof homepage === 'string' ? resolveHttps(homepage, 'https://github.com/') : null;
-      if (site && (!p.productionUrl || new URL(site).host !== new URL(p.productionUrl).host)) {
-        const found = await discoverSiteLogo(site, siteDeps);
-        if (found) return found;
-      }
+      if (site) return await discoverSiteLogo(site, siteDeps);
     } catch { /* homepage unreadable */ }
-  }
-
-  const fromFile = async (repoPath: string) => {
-    const bytes = await get(`/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}`, 'application/vnd.github.raw+json', MAX_LOGO_BYTES);
-    const mime = bytes && isUsableLogo(bytes);
-    return bytes && mime ? { dataUri: toDataUri(bytes, mime), sourceUrl: `https://github.com/${p.owner}/${p.repoName}/blob/HEAD/${repoPath}` } : null;
-  };
-
-  // A PWA manifest names the real icons; map its paths back to the repository.
-  for (const manifestPath of ['public/manifest.json', 'public/manifest.webmanifest']) {
-    const raw = await get(`/contents/${manifestPath}`, 'application/vnd.github.raw+json', 100_000);
-    if (!raw) continue;
-    try {
-      const icons = ((JSON.parse(new TextDecoder().decode(raw)) as { icons?: Array<{ src?: unknown; sizes?: unknown; purpose?: unknown }> }).icons || []) as Array<{ src?: unknown; sizes?: unknown; purpose?: unknown }>;
-      const ranked = icons.filter(i => typeof i.src === 'string' && !/maskable/i.test(String(i.purpose || '')) && !/^https?:/i.test(String(i.src)))
-        .sort((a, b) => Math.min(declaredSize(String(b.sizes || '')), 256) - Math.min(declaredSize(String(a.sizes || '')), 256)).slice(0, 2);
-      for (const icon of ranked) {
-        const found = await fromFile('public/' + String(icon.src).replace(/^\/+/, '').replace(/\?.*$/, ''));
-        if (found) return found;
-      }
-    } catch { /* manifest unreadable */ }
-    break;
-  }
-  for (const repoPath of REPO_ICON_PATHS) {
-    const found = await fromFile(repoPath);
-    if (found) return found;
-    if (blocked || requests >= 10) break;
   }
   return null;
 }
@@ -172,26 +164,30 @@ export function createLogoService(options: {
     const out: Record<string, PublicLogo> = {};
     for (const p of options.getPlatforms()) {
       const entry = entries.get(p.id);
-      if (entry?.dataUri && entry.source !== 'none') out[p.id] = { src: entry.dataUri, source: entry.source };
+      if (entry?.v === RULES_VERSION && entry.dataUri && entry.source !== 'none') out[p.id] = { src: entry.dataUri, source: entry.source };
     }
     return out;
   }
 
+  /**
+   * The program's own repository is the source of truth for its logo. A site is consulted only when the owner supplied it
+   * themselves (a program added by hand): the seeded production URLs are unverified and may belong to someone else.
+   */
   async function discover(p: PlatformRecord): Promise<{ found: FoundLogo | null; source: Entry['source'] }> {
-    if (p.productionUrl) {
-      const found = await discoverSiteLogo(p.productionUrl, siteDeps).catch(() => null);
-      if (found) return { found, source: 'site' };
-    }
     if (p.runtimeMode !== 'non-github-web') {
       const found = await repositoryLogo(p, options.githubToken()).catch(() => null);
       if (found) return { found, source: found.sourceUrl.startsWith('https://github.com/') ? 'github' : 'site' };
+    }
+    if (p.isCustomAdded && p.productionUrl) {
+      const found = await discoverSiteLogo(p.productionUrl, siteDeps).catch(() => null);
+      if (found) return { found, source: 'site' };
     }
     return { found: null, source: 'none' };
   }
 
   const due = (p: PlatformRecord, force: boolean, now: number) => {
     const entry = entries.get(p.id);
-    if (force || !entry) return true;
+    if (force || !entry || entry.v !== RULES_VERSION) return true;
     if (entry.dataUri) return now - entry.fetchedAt > REFRESH_AFTER;
     return now - entry.attemptedAt > RETRY_AFTER;
   };
@@ -210,9 +206,9 @@ export function createLogoService(options: {
         const result = await discover(p).catch(() => ({ found: null, source: 'none' as const }));
         const previous = entries.get(p.id);
         entries.set(p.id, result.found
-          ? { dataUri: result.found.dataUri, source: result.source, sourceUrl: result.found.sourceUrl, fetchedAt: Date.now(), attemptedAt: Date.now() }
+          ? { dataUri: result.found.dataUri, source: result.source, sourceUrl: result.found.sourceUrl, fetchedAt: Date.now(), attemptedAt: Date.now(), v: RULES_VERSION }
           // A failed refresh never erases a logo we already have.
-          : { dataUri: previous?.dataUri ?? null, source: previous?.dataUri ? previous.source : 'none', sourceUrl: previous?.sourceUrl ?? '', fetchedAt: previous?.fetchedAt ?? 0, attemptedAt: Date.now() });
+          : { dataUri: previous?.v === RULES_VERSION ? previous.dataUri : null, source: previous?.v === RULES_VERSION && previous.dataUri ? previous.source : 'none', sourceUrl: previous?.v === RULES_VERSION ? previous.sourceUrl : '', fetchedAt: previous?.v === RULES_VERSION ? previous.fetchedAt : 0, attemptedAt: Date.now(), v: RULES_VERSION });
         if (result.found) found += 1;
         await persist(p.id);
       }

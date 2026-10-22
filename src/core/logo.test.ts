@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  extractIconCandidates, iconsFromManifest, sniffImageMime, isUsableLogo, isPublicIp, discoverSiteLogo, declaredSize, resolveHttps,
+  extractIconCandidates, iconsFromManifest, rankRepoIcons, findManifestPaths, manifestIconRepoPaths, pickRepoLogoPaths, sniffImageMime, isUsableLogo, isPublicIp, discoverSiteLogo, declaredSize, resolveHttps,
 } from './logo.ts';
 
 const png = (side: number, extra = 100) => {
@@ -94,4 +94,40 @@ test('discovery still tries the conventional favicon when the page itself cannot
   });
   assert.equal(result?.sourceUrl, 'https://down.example/favicon.svg');
   assert.equal(await discoverSiteLogo('http://insecure.example', { fetchText: async () => null, fetchBytes: async () => null }), null);
+});
+
+const f = (path: string, size = 5000) => ({ path, size });
+
+test('repository icons: the owner\'s manifest wins; a portrait icon is respected, a data manifest is ignored', () => {
+  // Modelled on real programs: Dr.Ahmad (portrait app icon), Admin (versioned icons, an unrelated root logo.svg).
+  const files = [
+    f('public/manifest.webmanifest'), f('public/icon-192.png', 46000), f('public/icon-512.png', 246000), f('public/logo.svg', 3400),
+    f('quran-sources/crosswalk/x/MANIFEST.json'), f('docs/monteur/distinct-icon-families.png', 52000),
+  ];
+  assert.deepEqual(findManifestPaths(files), ['public/manifest.webmanifest']);
+  const manifest = { icons: [{ src: '/icon-192.png', sizes: '192x192', purpose: 'any' }, { src: '/icon-512.png', sizes: '512x512', purpose: 'any' }] };
+  assert.deepEqual(pickRepoLogoPaths(files, [{ path: 'public/manifest.webmanifest', json: manifest }]), ['public/icon-192.png', 'public/logo.svg']);
+
+  const admin = [f('logo.svg', 393), f('logo.png', 69000), f('public/app-icon-v3.svg', 516), f('public/ios-icon-192-v8.png', 24000), f('public/manifest.json')];
+  const adminManifest = { icons: [{ src: '/ios-icon-192-v8.png?v=8.0.0', sizes: '192x192', purpose: 'any' }] };
+  assert.equal(pickRepoLogoPaths(admin, [{ path: 'public/manifest.json', json: adminManifest }])[0], 'public/ios-icon-192-v8.png');
+});
+
+test('without a manifest the heuristic prefers app icons, skips maskable/mono/social files and oversized images', () => {
+  const ranked = rankRepoIcons([
+    f('public/favicon.svg', 560), f('public/og.png', 40000), f('public/icon-maskable.svg', 700), f('public/icon-mono.svg', 346),
+    f('docs/screenshots/icon.png', 3000), f('public/logo.png', 90000), f('public/icon-512.png', 250000), f('node_modules/x/icon.svg', 500),
+  ]);
+  assert.deepEqual(ranked, ['public/favicon.svg', 'public/logo.png']);
+});
+
+test('manifest icons: maskable-only and missing files are skipped, relative paths resolve against the manifest', () => {
+  const sizes = new Map([['app/icons/a.png', 9000], ['app/icons/m.png', 9000]]);
+  const manifest = { icons: [
+    { src: 'icons/m.png', sizes: '192x192', purpose: 'maskable' },
+    { src: 'icons/a.png', sizes: '192x192' },
+    { src: 'icons/missing.png', sizes: '192x192' },
+    { src: 'https://cdn.example/x.png', sizes: '192x192' },
+  ] };
+  assert.deepEqual(manifestIconRepoPaths('app/manifest.json', manifest, sizes), ['app/icons/a.png']);
 });

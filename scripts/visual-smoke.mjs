@@ -68,9 +68,8 @@ try {
   assert.equal(typeof (await logos.json()).logos, 'object');
   const refreshed = await page.request.post(base + '/api/logos/refresh', { headers: { Origin: base }, data: { id: 'no-such-program' } });
   assert.equal(refreshed.status(), 200, 'Refreshing an unknown program is a harmless no-op');
-  await page.locator('.orbit').hover({ position: { x: 4, y: 4 } }); // hovering pauses the rotation
   const sat = page.locator('.sat').first();
-  await sat.click();
+  await sat.click({ force: true }); // satellites orbit, so skip the stable-box wait
   await page.locator('.detail').waitFor();
   assert.ok((await page.locator('.detail strong').innerText()).length > 0, 'Detail must name the program');
   const rowCopy = page.locator('.detail .btn-copy');

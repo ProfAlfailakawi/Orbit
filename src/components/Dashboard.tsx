@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PlatformRecord } from '../core/types';
+import { displayName } from '../core/displayName';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
 
 export type Logos = Record<string, { src: string }>;
@@ -14,7 +15,7 @@ interface DashboardProps {
   onRemove: (id: string) => Promise<void>;
 }
 
-const shortName = (p: PlatformRecord) => p.nameAr.replace(/\s*\([^)]*\)/g, '');
+const shortName = displayName;
 
 async function copyToClipboard(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through to the legacy path */ }
@@ -58,17 +59,17 @@ function Avatar({ platform, src }: { platform: PlatformRecord; src?: string }) {
   );
 }
 
-/** Ring geometry as a percentage of the orbit box (viewBox 360): outer r=152, inner r=96. */
-const RING = { out: 42.2, inn: 26.7 } as const;
-
 function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
   rows: ProgramRow[]; logos: Logos; working: number; total: number; selectedId: string | null; onSelect: (id: string | null) => void;
 }) {
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const active = rows.find(r => r.platform.id === (hoverId ?? selectedId));
   // Problems come first, so they sit on the inner ring, nearest the core.
   const inner = rows.length > 4 ? Math.round(rows.length * 0.36) : 0;
+  // The inner ring is drawn last, so satellites with problems are never hidden when the rings cross.
   const rings = [
-    { key: 'inn', items: rows.slice(0, inner), phase: 24 },
     { key: 'out', items: rows.slice(inner), phase: 0 },
+    { key: 'inn', items: rows.slice(0, inner), phase: 24 },
   ].filter(ring => ring.items.length);
   const frac = total ? working / total : 0;
   const arc = 2 * Math.PI * 74;
@@ -84,15 +85,24 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
           </linearGradient>
         </defs>
         <circle cx="180" cy="180" r="178" fill="url(#orb-glow)" className="orbit-breathe" />
-        <circle cx="180" cy="180" r="96" className="orbit-line orbit-line-fill" />
+        <circle cx="180" cy="180" r="106" className="orbit-line orbit-line-fill" />
         <circle cx="180" cy="180" r="62" fill="url(#orb-core)" className="orbit-core-disc" />
         <circle cx="180" cy="180" r="74" className="orbit-arc-track" />
         <circle cx="180" cy="180" r="74" className="orbit-arc" strokeDasharray={`${arc * frac} ${arc}`} transform="rotate(-90 180 180)" />
       </svg>
-      <div className="orbit-core" aria-hidden="true">
-        <i>ORBIT ONE</i>
-        <b>{total ? working : '—'}</b>
-        <small>{total ? `تعمل من ${total}` : 'لا برامج'}</small>
+      <div className={'orbit-core' + (active ? ' is-named' : '')} data-tone={active?.tone} aria-hidden="true">
+        {active ? (
+          <>
+            <strong className={'orbit-name orbit-name-' + active.tone} dir="ltr">{shortName(active.platform)}</strong>
+            <small>{active.text}</small>
+          </>
+        ) : (
+          <>
+            <i>ORBIT ONE</i>
+            <b>{total ? working : '—'}</b>
+            <small>{total ? `تعمل من ${total}` : 'لا برامج'}</small>
+          </>
+        )}
       </div>
       {rings.map(({ key, items, phase }) => (
         <div key={key} className={'ring ring-' + key}>
@@ -100,16 +110,19 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
             const angle = ((-90 + (360 / items.length) * k + phase) * Math.PI) / 180;
             const p = row.platform;
             return (
-              <button key={p.id} type="button" className={'sat sat-' + row.tone + (Math.sin(angle) < -0.25 ? ' sat-up' : '') + (selectedId === p.id ? ' is-selected' : '')}
+              <button key={p.id} type="button" className={'sat sat-' + row.tone + (selectedId === p.id ? ' is-selected' : '')}
                 style={{ left: `${50 + 50 * Math.cos(angle)}%`, top: `${50 + 50 * Math.sin(angle)}%`, '--k': k } as React.CSSProperties}
                 aria-pressed={selectedId === p.id} aria-label={`${shortName(p)}: ${row.text}`}
+                onMouseEnter={() => setHoverId(p.id)} onMouseLeave={() => setHoverId(null)}
+                onFocus={() => setHoverId(p.id)} onBlur={() => setHoverId(null)}
                 onClick={() => onSelect(selectedId === p.id ? null : p.id)}>
                 <span className="sat-in">
-                  <span className="sat-dot">
-                    <Avatar platform={p} src={logos[p.id]?.src} />
-                    <span className="sat-flag"><Glyph tone={row.tone} size={11} /></span>
+                  <span className="sat-bob">
+                    <span className="sat-dot">
+                      <Avatar platform={p} src={logos[p.id]?.src} />
+                      <span className="sat-flag"><Glyph tone={row.tone} size={11} /></span>
+                    </span>
                   </span>
-                  <span className="sat-label">{shortName(p)}</span>
                 </span>
               </button>
             );
@@ -168,7 +181,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
                 <span className="sat-flag"><Glyph tone={selected.tone} size={11} /></span>
               </span>
               <div className="detail-info">
-                <strong>{shortName(selected.platform)}</strong>
+                <strong dir="ltr">{shortName(selected.platform)}</strong>
                 <span>{selected.text}</span>
               </div>
               {selected.needsCopy && (
@@ -220,7 +233,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
               <p className="muted">برامج أضفتها</p>
               {mine.map(p => (
                 <div className="mine-row" key={p.id}>
-                  <span>{shortName(p)}</span>
+                  <bdi dir="ltr">{shortName(p)}</bdi>
                   {removing === p.id
                     ? <button type="button" className="btn btn-danger" onClick={() => { setRemoving(null); void onRemove(p.id); }}>تأكيد الإزالة</button>
                     : <button type="button" className="btn" onClick={() => setRemoving(p.id)}>إزالة</button>}

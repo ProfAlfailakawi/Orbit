@@ -1,6 +1,7 @@
 /** ORBIT ONE intelligence: private, bounded, evidence-qualified and read-only. */
 import type { BlackBoxFrame, CrossAppPattern, IncidentCaseFile, PlatformRecord } from './types.ts';
 import { MANDATORY_CLAUDE_GUARDRAIL, sanitizeTelemetryPayload } from './engine.ts';
+import { displayName } from './displayName.ts';
 
 export type TruthEvidence = { uiReportedSuccess?: unknown; serverRecordConfirmed?: unknown; httpStatus?: unknown };
 export function evaluateTruthEvidence(input: TruthEvidence | null | undefined) {
@@ -148,16 +149,16 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
   ];
   if (!withProblems.length && !open.length) lines.push('- لا توجد مشاكل مؤكدة.');
   for (const { p, problems } of withProblems) {
-    lines.push('### ' + p.nameAr + ' (' + p.codeName + ') — ' + p.owner + '/' + p.repoName + ' · ' + p.defaultBranch);
+    lines.push('### ' + displayName(p) + ' — ' + p.owner + '/' + p.repoName + ' · ' + p.defaultBranch);
     problems.forEach(x => lines.push('- ' + x));
   }
   for (const i of open) lines.push('- [' + i.appId + '] ' + sanitizeTelemetryPayload(i.title).sanitized + ' (' + i.severity + ')');
   const linkIssues = fleet.map(p => ({ p, issue: getLinkIssue(p) })).filter(x => x.issue);
   if (linkIssues.length) {
     lines.push('', '## مشاكل الربط (برامج لا يقرأ أوربت بياناتها الحية)');
-    linkIssues.forEach(({ p, issue }) => lines.push('- ' + p.nameAr + ' (' + p.codeName + ', ' + p.owner + '/' + p.repoName + '): ' + issue));
+    linkIssues.forEach(({ p, issue }) => lines.push('- ' + displayName(p) + ' (' + p.owner + '/' + p.repoName + '): ' + issue));
   }
   const gaps = fleet.filter(p => !(p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true));
-  lines.push('', '## برامج رصدها غير مكتمل (ليست دليل سلامة)', gaps.length ? gaps.map(p => p.nameAr + ' (' + p.codeName + ')').join('، ') : 'لا يوجد.');
+  lines.push('', '## برامج رصدها غير مكتمل (ليست دليل سلامة)', gaps.length ? gaps.map(p => displayName(p)).join('، ') : 'لا يوجد.');
   return lines.join('\n');
 }
