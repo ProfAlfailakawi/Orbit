@@ -1,0 +1,171 @@
+/* ORBIT — round 2 polish layer. Presentation only, loaded after observatory.css.
+   Builds on the observatory tokens (--ob-*). Spacing scale: 4 / 8 / 12 / 16 / 24 / 32.
+   Radii: 12 (controls) / 18 (cards) / 24 (panels). Elevation: --pl-e1 (rest) / --pl-e2 (hover). */
+:root {
+  --pl-e1: 0 1px 2px rgba(27,24,70,.04), 0 6px 20px rgba(27,24,70,.05);
+  --pl-e2: 0 2px 4px rgba(27,24,70,.05), 0 16px 34px rgba(60,45,160,.11);
+  --pl-violet-soft: #ebe8ff;
+  --pl-violet-line: #cfc8fa;
+  --pl-mint-ink: #0b7a58;
+}
+
+/* ---------- Status banner: calm indigo instead of default sky blue ---------- */
+.orbit-shell > div[role="status"][aria-live="polite"] {
+  background: rgba(255,255,255,.72) !important; border-bottom: 1px solid var(--ob-line) !important;
+  color: var(--ob-ink) !important; padding: 10px 24px !important; font-size: 13px; font-weight: 500;
+}
+.orbit-shell > div[role="status"][aria-live="polite"] svg { color: var(--ob-violet) !important; }
+.orbit-shell > div[role="status"][aria-live="polite"] > button { color: var(--ob-muted) !important; border-radius: 999px; padding: 6px 12px; min-height: 32px; }
+.orbit-shell > div[role="status"][aria-live="polite"] > button:hover { background: #fff; color: var(--ob-ink) !important; }
+
+/* ---------- Dashboard: readable supporting copy inside white panels ---------- */
+.orbit-one .one-panel .one-monitoring-gap, .orbit-one .one-panel .one-sync-progress { color: var(--ob-muted); font-size: 12px; max-width: 640px; margin: 0 0 16px; }
+.orbit-one .one-panel { padding: 24px 28px; box-shadow: var(--pl-e1); }
+.orbit-one .one-panel-heading { margin-bottom: 16px; }
+.orbit-one .one-quiet-actions { display: inline-flex; align-items: center; gap: 8px; }
+.orbit-one .one-no-incident { position: relative; padding: 12px 4px 8px; }
+.orbit-one .one-no-incident-icon { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
+.orbit-one .one-no-incident-icon::before, .orbit-one .one-no-incident-icon::after { content: ''; position: absolute; border-radius: 50%; border: 1px solid var(--pl-violet-line); pointer-events: none; }
+.orbit-one .one-no-incident-icon::before { inset: -9px; opacity: .65; }
+.orbit-one .one-no-incident-icon::after { inset: -19px; opacity: .3; }
+.orbit-one .one-program-section { margin-top: 40px; }
+.orbit-one .one-program-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.orbit-one .one-program-heading p { color: var(--ob-muted); font-size: 13px; margin: 6px 0 0; }
+.orbit-one .one-program-heading h2 span { font-family: var(--ob-kufi); font-size: .62em; color: var(--ob-violet); background: var(--pl-violet-soft); border-radius: 999px; padding: 2px 10px; margin-inline-start: 6px; vertical-align: middle; }
+.orbit-one .one-program-tools { margin: 20px 0 18px; }
+.orbit-one .one-program-card { box-shadow: var(--pl-e1); }
+.orbit-one .one-program-card:hover { box-shadow: var(--pl-e2); }
+.orbit-one .one-program-card strong { line-height: 1.5; }
+/* Per-program connection chip: same real state, quieter presentation (dot + label, no pill chrome). */
+.orbit-one .one-connection-indicator { border-color: transparent; background: transparent; box-shadow: none; padding: 4px 2px; font-size: 11px; font-weight: 700; gap: 7px; }
+.orbit-one .one-connection-pending, .orbit-one .one-connection-stale { color: #8a5a00; }
+.orbit-one .one-connection-unavailable { color: #b03146; }
+.orbit-one .one-connection-connected { color: var(--pl-mint-ink); }
+.orbit-one .one-connection-local { color: var(--ob-muted); }
+.orbit-one .one-connection-connected .one-connection-dot { box-shadow: 0 0 0 3px rgba(45,194,135,.18); }
+.orbit-one .one-program-status { padding-top: 12px; margin-top: auto; border-top: 1px dashed var(--ob-line); }
+.orbit-one .one-program-card .one-program-top > svg:last-child { color: #b6b3d4; }
+.orbit-one .one-empty-filter { background: var(--ob-panel); border: 1px dashed var(--ob-line); border-radius: 18px; padding: 40px 24px; color: var(--ob-muted); font-size: 13px; }
+.orbit-one .one-empty-filter button { color: var(--ob-violet); font-weight: 700; }
+.orbit-one .one-footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--ob-line); font-size: 12px; }
+.orbit-one .one-quick-add { box-shadow: var(--pl-e1); border-color: var(--ob-line); background: var(--ob-panel); }
+.orbit-one .one-quick-add label input { background: #faf9fe; border-color: var(--ob-line); border-radius: 12px; }
+.orbit-one .one-quick-add label input:focus-visible { outline-offset: 1px; border-color: #9c90f5; }
+.orbit-one .one-search input { background: transparent; }
+
+/* ---------- Overlay chrome ---------- */
+.one-overlay-backdrop { background: rgba(21,18,60,.62); backdrop-filter: blur(8px); }
+.one-overlay-panel { box-shadow: 0 40px 100px rgba(8,5,40,.45); padding-block: 20px 28px; }
+.one-overlay-heading { border-bottom-color: var(--ob-line); }
+.one-overlay-heading > div span { letter-spacing: .14em; }
+
+/* ---------- Workspace tabs (radar / fleet / intelligence / operations) ---------- */
+.one-overlay-panel .orbit-workspace-overview { color: var(--ob-ink); }
+.one-overlay-panel .orbit-workspace-hero { background: linear-gradient(120deg, #fff 8%, #f7f6ff 62%, #ece9ff 100%); border-color: var(--ob-line); border-radius: 24px; box-shadow: var(--pl-e1); min-height: 210px; }
+.one-overlay-panel .orbit-workspace-heading h1 { font-family: var(--ob-kufi); font-weight: 700; letter-spacing: 0; color: var(--ob-ink); }
+.one-overlay-panel .orbit-workspace-heading > p { color: var(--ob-muted); font-size: 14px; }
+.one-overlay-panel .orbit-eyebrow { color: var(--ob-violet); }
+.one-overlay-panel .orbit-eyebrow-dot { background: var(--ob-violet); box-shadow: 0 0 0 4px var(--pl-violet-soft); }
+.one-overlay-panel .orbit-workspace-symbol { color: var(--ob-violet); background: radial-gradient(circle, #f7f6ff 0%, #ebe8ff 51%, transparent 72%); }
+.one-overlay-panel .orbit-workspace-symbol::before { border-color: #cfc8fa; }
+.one-overlay-panel .orbit-workspace-symbol::after { border-color: #e2defa; }
+.one-overlay-panel .orbit-workspace-aura { background: #e6e2ff; border-color: #cfc8fa; }
+.one-overlay-panel .orbit-main-button { background: var(--ob-night); color: #fff; box-shadow: 0 8px 20px rgba(21,18,60,.22); border-radius: 999px; }
+.one-overlay-panel .orbit-main-button:hover { background: var(--ob-night-2); box-shadow: 0 10px 24px rgba(21,18,60,.28); }
+.one-overlay-panel .orbit-quiet-button { color: var(--ob-ink); border-color: var(--ob-line); border-radius: 999px; background: #fff; }
+.one-overlay-panel .orbit-quiet-button:hover { background: #f7f6ff; color: var(--ob-violet); }
+.one-overlay-panel .orbit-workspace-stat-grid { margin-top: 16px; }
+.one-overlay-panel .orbit-workspace-stat { border-color: var(--ob-line); border-radius: 20px; box-shadow: var(--pl-e1); min-height: 140px; }
+.one-overlay-panel .orbit-workspace-stat strong { font-family: var(--ob-kufi); font-weight: 700; color: var(--ob-ink); font-size: 40px; }
+.one-overlay-panel .orbit-workspace-stat > span:nth-last-child(2) { color: var(--ob-ink); }
+.one-overlay-panel .orbit-workspace-stat > small { color: var(--ob-muted); }
+.one-overlay-panel .orbit-workspace-stat-icon { border-radius: 50%; }
+.one-overlay-panel .orbit-tone-blue, .one-overlay-panel .orbit-tone-violet { color: var(--ob-violet); background: var(--pl-violet-soft); }
+.one-overlay-panel .orbit-tone-coral { color: #c93f55; background: #ffe9ed; }
+.one-overlay-panel .orbit-tone-amber { color: #9a6200; background: #fff1d6; }
+.one-overlay-panel .orbit-tone-mint { color: var(--pl-mint-ink); background: #dcf6ec; }
+.one-overlay-panel .orbit-workspace-content { margin-top: 32px; }
+.one-overlay-panel .orbit-workspace-section-head h2 { font-family: var(--ob-kufi); font-weight: 700; color: var(--ob-ink); }
+.one-overlay-panel .orbit-workspace-source { color: var(--ob-muted); }
+.one-overlay-panel .orbit-workspace-source > span { background: var(--ob-amber); }
+.one-overlay-panel .orbit-workspace-fleet-item, .one-overlay-panel .orbit-workspace-case, .one-overlay-panel .orbit-workspace-tiles > button { border-color: var(--ob-line); box-shadow: var(--pl-e1); background: #fff; }
+.one-overlay-panel .orbit-workspace-fleet-item:hover, .one-overlay-panel .orbit-workspace-tiles > button:hover { border-color: #b3a9f2; box-shadow: var(--pl-e2); background: #fff; }
+.one-overlay-panel .orbit-workspace-fleet-icon { background: var(--pl-violet-soft); color: var(--ob-violet); border-radius: 50%; }
+.one-overlay-panel .orbit-workspace-fleet-text strong, .one-overlay-panel .orbit-workspace-tiles strong, .one-overlay-panel .orbit-workspace-case h3 { color: var(--ob-ink); font-family: var(--ob-kufi); }
+.one-overlay-panel .orbit-workspace-fleet-text small { color: var(--ob-muted); }
+.one-overlay-panel .orbit-workspace-mini-state { background: #fff1d6; color: #8a5a00; }
+.one-overlay-panel .orbit-workspace-mini-state.live { background: #dcf6ec; color: var(--pl-mint-ink); }
+.one-overlay-panel .orbit-workspace-fleet-arrow, .one-overlay-panel .orbit-workspace-tiles > button > svg { color: #b6b3d4; }
+.one-overlay-panel .orbit-workspace-tiles > button { min-height: 168px; }
+.one-overlay-panel .orbit-workspace-tiles > button > span:first-child { border-radius: 50%; width: 52px; height: 52px; }
+.one-overlay-panel .orbit-workspace-tiles small, .one-overlay-panel .orbit-workspace-case p { color: var(--ob-muted); }
+.one-overlay-panel .orbit-workspace-blank { background: #fff; border-color: var(--ob-line); border-style: dashed; }
+.one-overlay-panel .orbit-workspace-blank > svg { color: var(--ob-violet); background: var(--pl-violet-soft); border-radius: 50%; }
+.one-overlay-panel .orbit-workspace-blank h3 { color: var(--ob-ink); font-family: var(--ob-kufi); }
+.one-overlay-panel .orbit-workspace-blank p { color: var(--ob-muted); }
+.one-overlay-panel .orbit-workspace-search { border-radius: 999px; }
+.one-overlay-panel .orbit-workspace-footnote { color: var(--ob-muted); font-size: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--ob-line); }
+.one-overlay-panel .orbit-workspace-footnote svg { color: var(--ob-violet); opacity: .6; }
+.one-overlay-panel .orbit-incident-pill { background: #ffe9ed; color: #b03146; }
+/* Real-ratio rail (connected sources / registered programs, proven criteria / all criteria). */
+.orbit-workspace-rail { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; color: var(--ob-violet); font-size: 12px; font-weight: 700; direction: rtl; }
+.orbit-workspace-rail-num { font-family: var(--ob-kufi); font-variant-numeric: tabular-nums; color: var(--ob-ink); direction: ltr; }
+.orbit-workspace-rail-track { flex: 1; max-width: 360px; height: 6px; border-radius: 99px; background: #e8e6f4; overflow: hidden; display: block; }
+.orbit-workspace-rail-track > i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--ob-violet), #8f81ff); transform-origin: right center; }
+
+/* ---------- Disclosure cards (advanced tools) ---------- */
+.one-overlay-panel .orbit-advanced { border-color: var(--ob-line); border-radius: 18px; box-shadow: var(--pl-e1); }
+.one-overlay-panel .orbit-advanced > summary { color: var(--ob-muted); }
+.one-overlay-panel .orbit-specialist-advanced[open] > summary { color: var(--ob-violet) !important; }
+.one-overlay-panel .orbit-specialist-advanced > summary { color: var(--ob-muted) !important; }
+
+/* ---------- Program detail ---------- */
+.one-overlay-panel .orbit-program-page > div:first-child { border-radius: 24px; border-color: var(--ob-line) !important; background: #fff !important; box-shadow: var(--pl-e1); }
+.one-overlay-panel .orbit-program-page h1 { font-family: var(--ob-kufi); font-weight: 700; color: var(--ob-ink); letter-spacing: 0; }
+.one-overlay-panel .orbit-program-page .bg-sky-600 { background: var(--ob-night) !important; color: #fff; border-radius: 999px; }
+.one-overlay-panel .orbit-program-page .hover\:bg-sky-500:hover { background: var(--ob-night-2) !important; }
+.one-overlay-panel .orbit-program-page .bg-emerald-500 { background: #46dcab !important; color: #053b2b; border-radius: 999px; }
+.one-overlay-panel .orbit-program-page .bg-emerald-500:hover { background: #6ee7bd !important; }
+.one-overlay-panel .orbit-program-page [class*="rounded-lg"][class*="border"] { border-radius: 999px; border-color: var(--ob-line) !important; background: #fff; }
+.one-overlay-panel .orbit-program-page [class*="rounded-lg"][class*="border-amber"] { border-color: #f1d9a8 !important; background: #fffaf0; }
+.one-overlay-panel .orbit-program-page .text-sky-400, .one-overlay-panel .orbit-program-page .text-sky-300 { color: var(--ob-violet) !important; }
+.one-overlay-panel .orbit-program-page .grid.rounded-lg { border-radius: 18px; border: 1px solid var(--ob-line) !important; background: #faf9fe !important; box-shadow: none; padding: 16px 18px; row-gap: 12px; }
+.one-overlay-panel .orbit-program-page .grid.rounded-lg .font-mono { font-family: inherit; font-weight: 700; color: var(--ob-ink); }
+.one-overlay-panel .orbit-program-page .grid.rounded-lg > div:first-child { color: var(--ob-violet); border-bottom-color: var(--ob-line) !important; }
+.one-overlay-panel .orbit-program-tabs { gap: 6px; }
+.one-overlay-panel .orbit-program-tabs button { border-radius: 999px; color: var(--ob-muted); position: relative; }
+.one-overlay-panel .orbit-program-tabs button:hover { background: #f4f2fd; color: var(--ob-violet); }
+.one-overlay-panel .orbit-program-tabs button[aria-current="page"] { background: var(--pl-violet-soft); color: var(--ob-violet); border-color: var(--pl-violet-line); }
+.one-overlay-panel .orbit-program-more select { border-radius: 999px; border-color: var(--ob-line); color: var(--ob-muted); }
+
+/* ---------- Advanced engineering views: harmonise blue accents with the indigo palette ---------- */
+.one-overlay-panel .bg-sky-500, .one-overlay-panel .bg-blue-600 { background: var(--ob-night) !important; color: #fff !important; }
+.one-overlay-panel .hover\:bg-sky-400:hover, .one-overlay-panel .hover\:bg-sky-500:hover { background: var(--ob-night-2) !important; }
+.one-overlay-panel .bg-sky-500\/15, .one-overlay-panel .bg-sky-950\/25 { background: var(--pl-violet-soft) !important; }
+.one-overlay-panel .border-sky-500\/40, .one-overlay-panel .border-sky-500\/30, .one-overlay-panel .border-sky-500, .one-overlay-panel .border-sky-400 { border-color: var(--pl-violet-line) !important; }
+.one-overlay-panel main .text-sky-400, .one-overlay-panel .text-sky-400, .one-overlay-panel .text-sky-300 { color: var(--ob-violet) !important; }
+.one-overlay-panel .orbit-advanced .rounded-xl, .one-overlay-panel .orbit-advanced [class*="rounded-2xl"] { border-radius: 18px !important; }
+
+/* ---------- Small screens: keep the overlay content inside its panel ---------- */
+@media (max-width: 760px) {
+  .orbit-one .one-panel { padding: 20px 18px; }
+  .one-overlay-panel .orbit-workspace-hero { padding: 24px 20px; }
+  .one-overlay-panel .orbit-workspace-symbol { display: none; }
+  .one-overlay-panel .orbit-workspace-stat strong { font-size: 34px; }
+  .one-overlay-panel .orbit-advanced { padding-inline: 14px; }
+  .one-overlay-panel .orbit-advanced pre, .one-overlay-panel .orbit-advanced code { overflow-x: auto; max-width: 100%; }
+}
+
+/* Program detail: keep white text on dark primary buttons, soften the dark rules (index.css remaps text-white). */
+.one-overlay-panel .orbit-program-page .bg-sky-600, .one-overlay-panel .orbit-program-page .bg-sky-600 * { color: #fff !important; }
+.one-overlay-panel .orbit-program-page .bg-emerald-500, .one-overlay-panel .orbit-program-page .bg-emerald-500 * { color: #053b2b !important; }
+.one-overlay-panel .orbit-program-page [class*="border-slate-800"], .one-overlay-panel .orbit-program-page [class*="border-slate-700"] { border-color: var(--ob-line) !important; }
+.one-overlay-panel .bg-sky-500, .one-overlay-panel .bg-sky-500 * , .one-overlay-panel .bg-blue-600 { color: #fff !important; }
+
+/* Long Latin incident titles must wrap inside the card instead of widening the grid. */
+.orbit-workspace-case-list, .orbit-workspace-fleet, .orbit-workspace-tiles { min-width: 0; }
+.orbit-workspace-case { min-width: 0; }
+.orbit-workspace-case h3, .orbit-workspace-case p { overflow-wrap: anywhere; max-width: 100%; }
+@media (max-width: 760px) {
+  .orbit-workspace-case-list, .orbit-workspace-fleet { grid-template-columns: minmax(0, 1fr) !important; }
+}
