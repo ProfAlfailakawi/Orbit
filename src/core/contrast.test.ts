@@ -23,6 +23,8 @@ const pairs: Array<[string, string]> = [
   ['btn-ink', 'btn'], ['btn-ink', 'btn2'], ['btn', 'card'], ['btn', 'bg'],
   ['muted', 'bad-bg'], ['muted', 'warn-bg'], ['muted', 'ok-bg'],
   ['bad-ink', 'card'], ['warn-ink', 'card'],
+  ['hero-ink', 'hero-1'], ['hero-ink', 'hero-2'], ['hero-muted', 'hero-1'], ['hero-muted', 'hero-2'], ['hero-btn-ink', 'hero-btn'],
+  ['hero-1', 'hero-ok'], ['hero-bad', 'hero-1'], ['hero-warn', 'hero-1'], ['hero-ok', 'hero-1'],
   ['bad-ink', 'bad-bg'], ['warn-ink', 'warn-bg'], ['ok-ink', 'card'], ['ok-ink', 'ok-bg'],
   ['ink', 'bad-bg'], ['ink', 'warn-bg'], ['ink', 'ok-bg'], ['bad-ink', 'card'],
 ];
@@ -32,6 +34,7 @@ const shapes: Array<[string, string]> = [
   ['on-bad', 'bad-edge'], ['on-warn', 'warn-edge'], ['ok-ink', 'ok-bg'],
   ['bad-edge', 'card'], ['warn-edge', 'card'], ['ok-edge', 'card'],
   ['bad-edge', 'bad-bg'], ['warn-edge', 'warn-bg'], ['ok-edge', 'ok-bg'],
+  ['hero-1', 'hero-bad'], ['hero-1', 'hero-warn'], ['hero-1', 'hero-local'], ['hero-local', 'hero-1'], ['hero-local', 'hero-2'],
 ];
 const colour = (theme: Record<string, string>, key: string) => (key.startsWith('#') ? key : theme[key]);
 

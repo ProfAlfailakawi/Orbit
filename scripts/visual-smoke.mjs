@@ -65,6 +65,14 @@ try {
   await rowCopy.click();
   await page.getByText('تم النسخ', { exact: true }).first().waitFor();
 
+  // The orbit: each program is a satellite. Hovering names it; tapping jumps to its card.
+  assert.ok(await page.locator('.node').count() >= 8, 'Every program must appear as a satellite');
+  const node = page.locator('.node').first();
+  await node.hover();
+  assert.ok((await page.locator('.orbit-name').innerText()).length > 0, 'Hovering a satellite must name the program');
+  await node.click();
+  await page.locator('.pcard.is-flash').waitFor({ timeout: 3000 });
+
   await page.getByRole('button', { name: 'إضافة برنامج' }).click();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).waitFor();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).getByRole('button', { name: 'إغلاق' }).click();
