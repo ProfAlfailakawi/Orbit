@@ -227,7 +227,19 @@ export interface PlatformRecord {
   sensorCheckedAt?: string;
   /** What those visitors did just before the error (privacy-safe: tags and paths only) and where it threw. */
   sensorEvidence?: Array<{ text: string; page: string; visitors: number; stack: string[]; steps: string[] }>;
-  browserVisit?: { at: string; ok: boolean; problems: string[]; warnings?: string[]; hash?: string };
+  /** `sensor`: whether the robot found the ORBIT sensor script on the program's pages (undefined = not checked). */
+  browserVisit?: { at: string; ok: boolean; problems: string[]; warnings?: string[]; hash?: string; sensor?: 'installed' | 'absent' };
+  /** Last time the sensor's daily self-test note (sent by the robot through the program's own page) reached ORBIT. */
+  sensorProbeAt?: string;
+  /** Errors in the program's own server logs (Cloud Run), grouped by message; checked every watch when a log source is configured. */
+  serverErrors?: Array<{ text: string; count: number; lastAt: string }>;
+  serverLogsCheckedAt?: string;
+  /** Why the log source could not be read (no permission, wrong project), so a silent gap is never mistaken for "no errors". */
+  serverLogsIssue?: string;
+  /** Speed before the newest commit, to tell whether that release made the site slower. */
+  releaseWatch?: { sha: string; at: string; beforeMs?: number };
+  /** When each problem first showed, newest last (capped); the weekly report is built from it. */
+  problemLog?: Array<{ at: string; text: string }>;
   /** Response time and page size of each watch visit, newest last; used to notice a slow drift before an outage. */
   vitals?: Array<{ at: string; ms: number; bytes: number }>;
   /** Security certificate of the program's site (checked about once a day). */

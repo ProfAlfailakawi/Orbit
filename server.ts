@@ -19,6 +19,9 @@ import { applyDomain, domainDue, registrableDomain } from './src/core/expiry.ts'
 import { readDomainExpiry } from './src/core/rdap.ts';
 import { createTokenWatch } from './src/core/tokenWatch.ts';
 import { applyRepoRenames } from './src/core/repoRenames.ts';
+import { applyServerErrors, createCloudLogReader, LOG_WINDOW_MS, parseLogSources, summarizeLogEntries } from './src/core/cloudLogs.ts';
+import { applyProbe, splitProbe } from './src/core/sensorChannel.ts';
+import { buildWeeklyDigest, logProblems } from './src/core/weeklyReport.ts';
 import { buildRows } from './src/core/fleetStatus.ts';
 import { visitSite, type VisitDeps } from './src/core/visitor.ts';
 import { safeGet } from './src/core/safeFetch.ts';
@@ -334,6 +337,16 @@ async function startServer() {
   /** Tell the owner's devices about new problems and recoveries since the last time anything was sent. */
   async function notifyChanges() {
     try {
+      // Remember what went wrong and when: the weekly report is built from this log.
+      const stamp = new Date().toISOString();
+      let logged = false;
+      platforms = platforms.map(p => {
+        if (p.lifecycleState === 'unlinked' || p.lifecycleState === 'archived') return p;
+        const next = logProblems(p, [...getProgramProblems(p), ...getProgramWarnings(p)], stamp);
+        logged = logged || next !== p;
+        return next;
+      });
+      if (logged) saveStateToDisk();
       const { messages, next } = computeAlertChanges(buildRows(platforms, incidents, events), pushService.alerts());
       await pushService.setAlerts(next);
       if (messages.length) await pushService.send(messages);
@@ -342,6 +355,13 @@ async function startServer() {
     }
   }
   // The visitor judges the answer itself, so every status is returned (never throws on 4xx/5xx).
+  // Server logs: opt-in per program through ORBIT_LOG_SOURCES; authenticated as ORBIT's own runtime service account.
+  const logSources = parseLogSources(process.env.ORBIT_LOG_SOURCES);
+  let logAuth: { getAccessToken(): Promise<string | null | undefined> } | null = null;
+  const logReader = createCloudLogReader(async () => {
+    if (!logAuth) { const { GoogleAuth } = await import('google-auth-library'); logAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/logging.read'] }); }
+    return logAuth.getAccessToken();
+  });
   const visitDeps: VisitDeps = { get: (url, opts) => safeGet(url, { ...opts, acceptStatus: () => true }) };
   const asyncRoute = (handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>) =>
     (req: express.Request, res: express.Response, next: express.NextFunction) => { void handler(req, res, next).catch(next); };
@@ -642,7 +662,12 @@ async function startServer() {
     // Unknown origins and rate-limited callers get the same quiet answer: nothing to learn from probing.
     if (!programId || !sensorHub.allow(`ip:${req.ip}`, 20, 60_000) || !sensorHub.allow(`app:${programId}`, 300, 60_000)) return res.status(204).end();
     res.set({ 'Access-Control-Allow-Origin': origin, Vary: 'Origin' });
-    const reports = parseSensorBody(req.body);
+    const { probe, rest: reports } = splitProbe(parseSensorBody(req.body));
+    if (probe) { // the robot's daily self-test: proof the channel works, never a finding
+      const at = new Date().toISOString();
+      platforms = platforms.map(p => p.id === programId ? applyProbe(p, at) : p);
+      saveStateToDisk();
+    }
     if (reports.length) {
       sensorHub.add(programId, reports);
       const now = new Date().toISOString();
@@ -1134,6 +1159,17 @@ async function startServer() {
       const domains = await pool(domainTargets, 2, 12_000, async t => ({ id: t.id, expiresAt: await readDomainExpiry(t.domain) }));
       const domainById = new Map(domains.map(d => [d.id, d.expiresAt] as const));
       if (domainById.size) platforms = platforms.map(p => domainById.has(p.id) ? applyDomain(p, domainById.get(p.id) ?? null, now) : p);
+      // Server-side errors from each program's own Cloud Run logs (only for programs listed in ORBIT_LOG_SOURCES).
+      if (logSources.length) {
+        const since = new Date(Date.now() - LOG_WINDOW_MS).toISOString();
+        const read = await pool(logSources, 3, 30_000, async source => ({ source, result: await logReader.read(source, since) }));
+        const byCode = new Map(read.map(r => [r.source.codeName, r.result] as const));
+        platforms = platforms.map(p => {
+          const result = byCode.get(p.codeName.toUpperCase());
+          if (!result) return p;
+          return 'entries' in result ? applyServerErrors(p, summarizeLogEntries(result.entries), null, now) : applyServerErrors(p, null, result.error, now);
+        });
+      }
       await tokenWatch.check(process.env.GITHUB_READ_ONLY_TOKEN);
       broadcastRealtimeUpdate('SITE_WATCH');
       await persistenceQueue;
@@ -1142,6 +1178,16 @@ async function startServer() {
       return { checked: visited.length, problems: visited.filter(v => !v.visit.ok).length, withoutSite: withoutSite.size };
     } finally { watchActive = false; }
   }
+
+  // Weekly summary: pushed to the owner's phone by a Monday schedule, and readable (to copy) from the dashboard.
+  app.post('/internal/scheduler/weekly-report', asyncRoute(async (req, res) => {
+    const rejection = await schedulerRejection(req);
+    if (rejection) return res.status(rejection.status).json({ error: rejection.error });
+    const digest = buildWeeklyDigest(platforms, tokenWatch.expiresAt());
+    const sent = await pushService.send([digest.push]);
+    return res.json({ completedAt: new Date().toISOString(), ...sent });
+  }));
+  app.get('/api/weekly-report', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ text: buildWeeklyDigest(platforms, tokenWatch.expiresAt()).text }); });
 
   app.post('/internal/scheduler/watch', asyncRoute(async (req, res) => {
     const rejection = await schedulerRejection(req);

@@ -1,0 +1,44 @@
+name: ORBIT weekly report
+
+on:
+  schedule:
+    # Every Monday ~08:00 Kuwait time (05:00 UTC); GitHub may delay a run by a few minutes.
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: orbit-weekly-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Ask ORBIT to send the weekly summary to the owner's devices
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          SCHEDULER_SERVICE_ACCOUNT: ${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SERVICE_URL="$(gcloud run services describe orbit-api --project "$PROJECT_ID" --region me-central1 --format='value(status.url)')"
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$SCHEDULER_SERVICE_ACCOUNT" \
+            --audiences="$SERVICE_URL" --include-email)"
+          RESPONSE="$(curl --fail --silent --show-error --max-time 60 \
+            -X POST -H "Authorization: Bearer $TOKEN" \
+            "$SERVICE_URL/internal/scheduler/weekly-report")"
+          unset TOKEN
+          printf '%s' "$RESPONSE" | jq -e '(.completedAt != null)' >/dev/null
+          printf '%s\n' "$RESPONSE" | jq -c '{completedAt, sent, removed}'

@@ -58,3 +58,42 @@ test('certificate checks are rate-limited and expire with their evidence', () =>
   assert.equal(certDue({} as PlatformRecord, now), true);
   assert.deepEqual(certProblems(p, now + 100 * 3_600_000), [], 'a check from days ago proves nothing');
 });
+
+import { releaseSlowdown, trackRelease } from './vitals.ts';
+import { applyVisit } from './watch.ts';
+
+const commit = (sha: string, timestamp: string) => ({ sha, author: 'a', message: 'm', timestamp, branch: 'main', changedFiles: [], riskLevel: 'Low' as const, dataIntegrity: 'Live' as const });
+
+test('speed before the newest commit is remembered, and a lasting slowdown after it names that commit', () => {
+  const base = { vitals: series(steady), recentCommits: [commit('abcdef1234567', at(31))] } as unknown as PlatformRecord;
+  const watch = trackRelease(base)!;
+  assert.equal(watch.sha, 'abcdef1234567');
+  assert.ok(watch.beforeMs && watch.beforeMs < 400, 'median of the visits before the commit');
+  // 4 slow visits well after the 10-minute settling time
+  const slowAfter = { ...base, releaseWatch: watch, vitals: [...series(steady), ...series([...Array(40).fill(300), 2500, 2600, 2400, 2700]).slice(40).map((s, i) => ({ ...s, at: at(34 + i) }))] } as PlatformRecord;
+  const out = releaseSlowdown(slowAfter, Date.parse(at(40)));
+  assert.equal(out.length, 1);
+  assert.match(out[0], /abcdef1.*2.[56] ث.*0.3 ث/);
+});
+
+test('no slowdown is claimed without enough before/after evidence, or long after the release', () => {
+  const fresh = trackRelease({ vitals: series([300, 300]), recentCommits: [commit('abcdef1234567', at(5))] } as unknown as PlatformRecord)!;
+  assert.equal(fresh.beforeMs, undefined, 'too few earlier visits: nothing to compare against');
+  assert.deepEqual(releaseSlowdown({ releaseWatch: fresh, vitals: series([5000, 5000, 5000, 5000, 5000]) } as unknown as PlatformRecord, Date.parse(at(60))), []);
+  const old = { sha: 'abcdef1234567', at: at(0), beforeMs: 300 };
+  assert.deepEqual(releaseSlowdown({ releaseWatch: old, vitals: series([300, 300, 300, 300, 300, 300, 3000, 3000, 3000, 3000]) } as unknown as PlatformRecord, Date.parse(at(0)) + 72 * 3_600_000), []);
+});
+
+test('the same commit does not reset the baseline; a new one does', () => {
+  const p = { vitals: series(steady), recentCommits: [commit('aaaaaaa1', at(31))] } as unknown as PlatformRecord;
+  const w1 = trackRelease(p)!;
+  assert.equal(trackRelease({ ...p, releaseWatch: w1, vitals: series(steady.map(() => 3000)) } as PlatformRecord), w1);
+  const w2 = trackRelease({ ...p, releaseWatch: w1, recentCommits: [commit('bbbbbbb2', at(35)), ...p.recentCommits] } as PlatformRecord)!;
+  assert.equal(w2.sha, 'bbbbbbb2');
+});
+
+test('a watch visit records the release baseline on the program', () => {
+  const p = { id: 'p', fourState: {}, vitals: series(steady), recentCommits: [commit('abcdef1234567', at(31))] } as unknown as PlatformRecord;
+  const next = applyVisit(p, 'https://x.example', { ok: true, reachable: true, problems: [], ms: 300, htmlBytes: 4000 } as never, at(32));
+  assert.equal(next.releaseWatch?.sha, 'abcdef1234567');
+});

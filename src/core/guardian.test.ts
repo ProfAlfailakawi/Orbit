@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  evaluateTruthEvidence, buildPrivacySafeTimeline, buildSharedDependencyAdvisory,
  rankPostReleaseChecks, buildRepairIntelligenceAddendum, classifyReadOnlyProbe,
- getProgramProblems, buildFleetReportForClaude, getLinkIssue,
+ getProgramProblems, buildFleetReportForClaude, getLinkIssue, getProgramWarnings, releaseSuspect,
 } from './guardian.ts';
 import { inspectRepositoryCapabilities } from './engine.ts';
 import type { IncidentCaseFile, PlatformRecord } from './types.ts';
@@ -94,4 +94,30 @@ test('site visitor findings become problems while fresh, are de-duplicated, and 
  assert.deepEqual(getProgramProblems(p),['الموقع لا يستجيب']);
  p.siteCheckedAt=new Date(Date.now()-48*3_600_000).toISOString();
  assert.deepEqual(getProgramProblems(p),['الموقع لا يستجيب'], 'only the explicit siteReachable=false remains once the finding is stale');
+});
+
+import type { PlatformRecord as PR } from './types.ts';
+
+test('a problem that began after the newest commit names that commit and links to it', () => {
+  const p = {
+    id: 'p', codeName: 'P', repoUrl: 'https://github.com/owner/repo', siteLastOkAt: '2026-10-22T10:00:00Z',
+    fourState: { siteReachable: false }, recentRuns: [],
+    recentCommits: [{ sha: 'abcdef1234567890', message: 'change login', timestamp: '2026-10-22T11:00:00Z', changedFiles: ['src/login.ts'], dataIntegrity: 'Live', branch: 'main', author: 'a', riskLevel: 'Low' }],
+  } as unknown as PR;
+  const text = releaseSuspect(p) || '';
+  assert.match(text, /abcdef1/);
+  assert.match(text, /https:\/\/github\.com\/owner\/repo\/commit\/abcdef1234567890/);
+  assert.equal(releaseSuspect({ ...p, repoUrl: 'javascript:alert(1)' } as PR)?.includes('javascript:'), false, 'only github links are ever printed');
+});
+
+test('server log errors and sensor-channel gaps reach the program problems and warnings', () => {
+  const now = Date.now();
+  const p = {
+    id: 'p', codeName: 'P', fourState: {}, recentRuns: [],
+    serverLogsCheckedAt: new Date(now).toISOString(), serverErrors: [{ text: 'db down', count: 5, lastAt: '' }, { text: 'once', count: 1, lastAt: '' }],
+    browserVisit: { at: new Date(now).toISOString(), ok: true, problems: [], sensor: 'installed' },
+  } as unknown as PR;
+  assert.ok(getProgramProblems(p).some(x => /db down/.test(x)));
+  assert.ok(getProgramWarnings(p).some(x => /once/.test(x)));
+  assert.ok(getProgramWarnings(p).some(x => /بلاغه التجريبي لم يصل/.test(x)));
 });
