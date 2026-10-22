@@ -18,6 +18,7 @@ import { explainProgram } from './src/core/causes.ts';
 import { applyDomain, domainDue, registrableDomain } from './src/core/expiry.ts';
 import { readDomainExpiry } from './src/core/rdap.ts';
 import { createTokenWatch } from './src/core/tokenWatch.ts';
+import { applyRepoRenames } from './src/core/repoRenames.ts';
 import { buildRows } from './src/core/fleetStatus.ts';
 import { visitSite, type VisitDeps } from './src/core/visitor.ts';
 import { safeGet } from './src/core/safeFetch.ts';
@@ -311,6 +312,9 @@ const LOGO_SNAPSHOT_PATH = path.join(__dirname, '.orbit-logos.json');
 const SITE_SNAPSHOT_PATH = path.join(__dirname, '.orbit-sites.json');
 const PUSH_SNAPSHOT_PATH = path.join(__dirname, '.orbit-push.json');
 
+/** Programs whose repository changed at boot; their site and logo are looked up again from the new repository. */
+let movedProgramIds: string[] = [];
+
 async function startServer() {
   const app = express();
   const logoService = createLogoService({
@@ -325,6 +329,7 @@ async function startServer() {
   await pushService.load();
   const tokenWatch = createTokenWatch({ firestore });
   await tokenWatch.load();
+  for (const id of movedProgramIds) { void siteService.refresh({ id, force: true }).catch(() => undefined); void logoService.refresh({ id, force: true }).catch(() => undefined); }
 
   /** Tell the owner's devices about new problems and recoveries since the last time anything was sent. */
   async function notifyChanges() {
@@ -1996,6 +2001,9 @@ async function main() {
     throw new Error('Production requires Firestore and an ORBIT_OPERATOR_PASSKEY secret of at least 16 characters.');
   }
   await loadPersistentState();
+  // A program that moved to a new repository (see repoRenames.ts): saved state still points at the old one.
+  const moved = applyRepoRenames(platforms);
+  if (moved.renamed.length) { platforms = moved.platforms; movedProgramIds = moved.renamed; saveStateToDisk(); }
   await startServer();
 }
 
