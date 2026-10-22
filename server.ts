@@ -1,5 +1,6 @@
 import { applySensor, createSensorHub, originOf, parseSensorBody } from './src/core/sensor.ts';
 import { applyBrowserVisit, parseBrowserReports } from './src/core/browserVisit.ts';
+import { hasCiVerdict } from './src/core/ciStatus.ts';
 import 'dotenv/config';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -878,10 +879,10 @@ async function startServer() {
                 timestamp: run.created_at || '',
                 dataIntegrity: 'Live',
               }));
-              const latestCompleted = (result.workflow_runs || []).find(run => run.status === 'completed');
+              const latestCompleted = (result.workflow_runs || []).find(hasCiVerdict);
               if (latestCompleted) githubCiPassed = latestCompleted.conclusion === 'success';
               const latestDeployment = (result.workflow_runs || []).find(run =>
-                run.status === 'completed' && /deploy/i.test(`${run.path || ''} ${run.name || ''}`)
+                hasCiVerdict(run) && /deploy/i.test(`${run.path || ''} ${run.name || ''}`)
               );
               if (latestDeployment) deploymentSucceeded = latestDeployment.conclusion === 'success';
             }
