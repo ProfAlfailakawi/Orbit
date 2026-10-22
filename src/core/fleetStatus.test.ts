@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRows, sharedLinkReason, summarize, programsPhrase, lastCheckLabel, buildCopyText } from './fleetStatus.ts';
+import { buildRows, sharedLinkReason, summarize, programsPhrase, lastCheckLabel, buildCopyText, watchHealth, minutesPhrase } from './fleetStatus.ts';
+import { applyCert } from './certs.ts';
+import { applySensor } from './sensor.ts';
 import { inspectRepositoryCapabilities } from './engine.ts';
 import type { PlatformRecord } from './types.ts';
 
@@ -64,4 +66,44 @@ test('a link reason shared by several programs is written once in the summary, n
   assert.deepEqual(rows.map(r => r.text), ['غير مربوط', 'غير مربوط', 'غير مربوط']);
   assert.equal(summarize(rows, sharedLinkReason(unlinked)).reason, 'المستودع خاص ولم يُضبط توكن GitHub');
   assert.equal(sharedLinkReason([unlinked[0]]), null);
+});
+
+test('an early warning is a warn row that says so, and the headline does not claim missing monitoring', () => {
+  const soon = applyCert(working('SOON'), { expiresAt: new Date(Date.now() + 9 * 86_400_000).toISOString(), problem: null }, new Date().toISOString());
+  const rows = buildRows([soon, working('OK')], [], []);
+  assert.deepEqual(rows.map(r => [r.tone, Boolean(r.early)]), [['warn', true], ['ok', false]]);
+  assert.match(rows[0].text, /شهادة الأمان.*بعد 9 أيام/);
+  const summary = summarize(rows);
+  assert.equal(summary.tone, 'warn');
+  assert.match(summary.headline, /لا شيء معطل.*تحذير مبكر/);
+});
+
+test('a certificate that ends in two days is a real problem', () => {
+  const dying = applyCert(working('DYING'), { expiresAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), problem: null }, new Date().toISOString());
+  const [row] = buildRows([dying], [], []);
+  assert.equal(row.tone, 'bad');
+  assert.match(row.text, /تنتهي بعد يومين/);
+});
+
+test('the copied report names the trail, the probable cause and the suspect commit', () => {
+  const now = Date.now();
+  const sick = applySensor(working('PAY'), [{ text: 'خطأ برمجي ظهر لزوّار الموقع: x is null', page: '/pay', visitors: 1, stack: ['at pay (/app.js:3:9)'], steps: ['نقر button#pay في /pay'] }], new Date(now).toISOString());
+  sick.siteLastOkAt = new Date(now - 6 * 3_600_000).toISOString();
+  sick.recentCommits = [{ sha: 'abcdef1234567', author: 'a', message: 'refactor pay', timestamp: new Date(now - 3_600_000).toISOString(), branch: 'main', changedFiles: ['src/pay.ts'], riskLevel: 'Low', dataIntegrity: 'Live' }];
+  const rows = buildRows([sick], [], []);
+  const text = buildCopyText(rows, 'all');
+  assert.match(text, /ما فعله الزائر قبل الخطأ: نقر button#pay/);
+  assert.match(text, /موضع الخطأ: at pay/);
+  assert.match(text, /المشكلة بدأت بعد آخر تعديل: abcdef1 «refactor pay» — الملفات: src\/pay\.ts/);
+  const older = { ...sick, recentCommits: [{ ...sick.recentCommits[0], timestamp: new Date(now - 9 * 3_600_000).toISOString() }] };
+  assert.doesNotMatch(buildCopyText(buildRows([older], [], []), 'all'), /المشكلة بدأت بعد آخر تعديل/);
+});
+
+test('the owner is told when the automatic watch itself has gone quiet', () => {
+  const now = Date.parse('2026-05-01T12:00:00Z');
+  const seen = (minutesAgo: number) => app('A', { siteCheckedAt: new Date(now - minutesAgo * 60_000).toISOString() });
+  assert.deepEqual(watchHealth([seen(10)], now), { stale: false, minutes: 10 });
+  assert.deepEqual(watchHealth([seen(200), seen(400)], now), { stale: true, minutes: 200 });
+  assert.equal(watchHealth([app('B')], now), null, 'no site to watch means nothing to be stale');
+  assert.deepEqual([minutesPhrase(45), minutesPhrase(200), minutesPhrase(60 * 30)], ['45 دقيقة', '3 ساعات', 'يوم']);
 });

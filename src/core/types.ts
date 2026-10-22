@@ -225,7 +225,17 @@ export interface PlatformRecord {
   /** Errors that several real visitors hit, reported by the program's own browser sensor. */
   sensorProblems?: string[];
   sensorCheckedAt?: string;
-  browserVisit?: { at: string; ok: boolean; problems: string[] };
+  /** What those visitors did just before the error (privacy-safe: tags and paths only) and where it threw. */
+  sensorEvidence?: Array<{ text: string; page: string; visitors: number; stack: string[]; steps: string[] }>;
+  browserVisit?: { at: string; ok: boolean; problems: string[]; warnings?: string[]; hash?: string };
+  /** Response time and page size of each watch visit, newest last; used to notice a slow drift before an outage. */
+  vitals?: Array<{ at: string; ms: number; bytes: number }>;
+  /** Security certificate of the program's site (checked about once a day). */
+  certExpiresAt?: string;
+  certProblem?: string;
+  certCheckedAt?: string;
+  /** Last time the site visit found the program healthy, to tell whether a problem started after a commit. */
+  siteLastOkAt?: string;
   branchHeads?: Array<{ name: string; sha: string }>;
   createdAt: string;
   isCustomAdded?: boolean;

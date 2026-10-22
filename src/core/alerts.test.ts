@@ -35,3 +35,12 @@ test('a burst of new problems collapses into one summary', () => {
   const { messages } = computeAlertChanges(rows, memory);
   assert.equal(messages.length, 1); assert.equal(messages[0].kind, 'summary'); assert.match(messages[0].body, /5 برامج/);
 });
+
+test('an early warning is announced once like a problem, and clearing it counts as recovery', () => {
+  const early = (id: string, text: string): ProgramRow => ({ ...row(id, 'warn', text), early: true });
+  const memory = { initialized: true, signatures: { a: '' } };
+  const first = computeAlertChanges([early('a', 'الموقع يتباطأ')], memory);
+  assert.deepEqual(first.messages.map(m => [m.kind, m.body]), [['problem', 'الموقع يتباطأ']]);
+  assert.deepEqual(computeAlertChanges([early('a', 'الموقع يتباطأ')], first.next).messages, []);
+  assert.equal(computeAlertChanges([row('a', 'ok', 'يعمل')], first.next).messages[0].kind, 'recovered');
+});

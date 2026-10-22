@@ -17,7 +17,7 @@ concurrency:
 jobs:
   visit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,4 +43,4 @@ jobs:
           TOKEN="$(gcloud auth print-identity-token \
             --impersonate-service-account="$SCHEDULER_SERVICE_ACCOUNT" \
             --audiences="$SERVICE_URL" --include-email)"
-          ORBIT_URL="$SERVICE_URL" ORBIT_TOKEN="$TOKEN" node scripts/browser-visitor.mjs
+          ORBIT_URL="$SERVICE_URL" ORBIT_TOKEN="$TOKEN" npx tsx scripts/browser-visitor.mjs

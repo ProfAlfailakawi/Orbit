@@ -7,7 +7,7 @@ const key = process.env.ORBIT_OPERATOR_PASSKEY;
 if (!key || key.length < 16) throw new Error('CI-only ORBIT_OPERATOR_PASSKEY is required');
 await fs.mkdir('test-artifacts', { recursive: true });
 
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'], ...(process.env.ORBIT_CHROMIUM_PATH ? { executablePath: process.env.ORBIT_CHROMIUM_PATH } : {}) });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'ar-KW' });
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base }).catch(() => {});
 const page = await context.newPage();
@@ -60,7 +60,7 @@ try {
   const copyAll = page.getByRole('button', { name: /^انسخ (كل المشاكل|التقرير)$/ });
   await copyAll.waitFor();
   await copyAll.click();
-  await page.getByText('تم النسخ', { exact: true }).first().waitFor();
+  await page.getByText('نُسخ — الصقه في كلود', { exact: true }).first().waitFor();
   const clipboard = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
   if (clipboard) assert.match(clipboard, /تقرير أوربت/, 'Copied text must be the ORBIT report');
   // The orbit is the whole interface: tap a satellite to see its name and its problem, then copy it.
@@ -78,7 +78,7 @@ try {
   const rowCopy = page.locator('.detail .btn-copy');
   await rowCopy.waitFor();
   await rowCopy.click();
-  await page.locator('.detail').getByText('تم النسخ', { exact: true }).waitFor();
+  await page.locator('.detail').getByText('نُسخ', { exact: true }).waitFor();
   await page.locator('.detail-close').click();
   await page.locator('.detail').waitFor({ state: 'detached' });
 
