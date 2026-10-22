@@ -365,8 +365,10 @@ export function ExecutiveOverview({
           )}
           {linkIssues.length > 0 && (
             <div className="one-link-issues" role="status">
-              <strong>سبب عدم ربط بعض البرامج</strong>
-              <ul>{linkIssues.map(({ p, issue }) => <li key={p.id}><b>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}:</b> {issue}</li>)}</ul>
+              <details>
+                <summary><CloudOff size={16} aria-hidden="true"/><strong>سبب عدم ربط بعض البرامج</strong><span className="one-link-count">{linkIssues.length}</span><ChevronLeft size={15} className="one-link-chevron" aria-hidden="true"/></summary>
+                <ul>{linkIssues.map(({ p, issue }) => <li key={p.id}><b>{p.nameAr.replace(/\s*\([^)]*\)/g, '')}:</b> {issue}</li>)}</ul>
+              </details>
               <button className="one-button one-button-link" type="button" onClick={() => void copyReport(fleet, 'all')}>
                 {copied === 'all' ? <Check size={16}/> : <Copy size={16}/>} انسخ التقرير لكلود
               </button>
