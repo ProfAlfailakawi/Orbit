@@ -812,7 +812,7 @@ export const INITIAL_PLATFORMS: PlatformRecord[] = [
     techStack: ['React', 'TypeScript', 'Tailwind CSS'],
     runtimeMode: 'github-web',
     environments: ['production'],
-    productionUrl: 'https://nahj.app',
+    productionUrl: 'https://nahjq8.ai.studio',
     productionUrlVerified: false,
     apiServices: ['Pathway API'],
     databasesAndIntegrations: ['Cloud Document Store'],

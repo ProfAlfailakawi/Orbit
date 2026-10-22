@@ -2,14 +2,14 @@
  * Server side of program logos: SSRF-safe fetching, GitHub repository fallback, and durable storage.
  * Logos live apart from the main state document so they can never push it over Firestore's size limit.
  */
-import dns from 'node:dns/promises';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
-  MAX_LOGO_BYTES, discoverSiteLogo, findManifestPaths, isPublicIp, isUsableLogo, pickRepoLogoPaths, resolveHttps, toDataUri,
+  MAX_LOGO_BYTES, discoverSiteLogo, findManifestPaths, isUsableLogo, pickRepoLogoPaths, resolveHttps, toDataUri,
   type FoundLogo, type LogoDeps, type RepoFile,
 } from './logo.ts';
+import { safeGet } from './safeFetch.ts';
 import type { PlatformRecord } from './types.ts';
 
 /** Bump when the discovery rules change: older results (e.g. favicons of unrelated sites) are then ignored and looked up again. */
@@ -23,52 +23,15 @@ const RETRY_AFTER = 6 * 60 * 60_000;
 const BUDGET_MS = 24_000;
 const MAX_PER_RUN = 6;
 
-async function assertPublicHost(hostname: string) {
-  const host = hostname.toLowerCase();
-  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') ||
-      /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':')) throw new Error('not a public hostname');
-  const addresses = await dns.lookup(host, { all: true });
-  if (!addresses.length || !addresses.every(a => isPublicIp(a.address))) throw new Error('resolves to a non-public address');
-}
-
-/** GET over https to a public host only; redirects are re-validated hop by hop and bodies are size-capped. */
-async function safeGet(url: string, opts: { accept: string; maxBytes: number; timeoutMs?: number }, hop = 0): Promise<{ bytes: Uint8Array; finalUrl: string } | null> {
-  let target: URL;
-  try { target = new URL(url); } catch { return null; }
-  if (target.protocol !== 'https:' || target.username || target.password || (target.port && target.port !== '443')) return null;
-  try { await assertPublicHost(target.hostname); } catch { return null; }
-  const response = await fetch(target, {
-    redirect: 'manual',
-    headers: { Accept: opts.accept, 'User-Agent': 'ORBIT-LogoFetcher/1 (+read-only)' },
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
-  });
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers.get('location');
-    await response.body?.cancel().catch(() => undefined);
-    const next = location && hop < 3 ? resolveHttps(location, target.toString()) : null;
-    return next ? safeGet(next, opts, hop + 1) : null;
-  }
-  if (!response.ok || !response.body) { await response.body?.cancel().catch(() => undefined); return null; }
-  if (Number(response.headers.get('content-length')) > opts.maxBytes) { await response.body.cancel().catch(() => undefined); return null; }
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const reader = response.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > opts.maxBytes) { await reader.cancel().catch(() => undefined); return null; }
-    chunks.push(value);
-  }
-  return { bytes: Buffer.concat(chunks), finalUrl: target.toString() };
-}
-
 const siteDeps: LogoDeps = {
   fetchText: async url => {
     const result = await safeGet(url, { accept: 'text/html,application/json;q=0.9,*/*;q=0.1', maxBytes: 600_000 });
-    return result ? { text: new TextDecoder().decode(result.bytes), finalUrl: result.finalUrl } : null;
+    return result && result.status >= 200 && result.status < 300 ? { text: new TextDecoder().decode(result.bytes), finalUrl: result.finalUrl } : null;
   },
-  fetchBytes: async url => (await safeGet(url, { accept: 'image/*,*/*;q=0.1', maxBytes: MAX_LOGO_BYTES }))?.bytes ?? null,
+  fetchBytes: async url => {
+    const result = await safeGet(url, { accept: 'image/*,*/*;q=0.1', maxBytes: MAX_LOGO_BYTES });
+    return result && result.status >= 200 && result.status < 300 ? result.bytes : null;
+  },
 };
 
 /** The program's own icon files in its GitHub repository (read-only), chosen from its web-app manifest or by name. */

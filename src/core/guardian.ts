@@ -117,9 +117,11 @@ export function getProgramProblems(p: PlatformRecord): string[] {
   if (f?.deploymentSucceeded === false) out.push('آخر نشر لم ينجح');
   if (f?.siteReachable === false) out.push('الموقع لا يستجيب');
   if (f?.userJourneyHealthy === false) out.push('تجربة المستخدم الأساسية تحتاج مراجعة');
+  // What the site visitor found on the public page (a broken app file, an error page), while the finding is fresh.
+  if (p.siteProblems?.length && p.siteCheckedAt && Date.now() - Date.parse(p.siteCheckedAt) < 36 * 3_600_000) out.push(...p.siteProblems);
   const failed = (p.recentRuns || []).find(r => r.dataIntegrity === 'Live' && r.status === 'failure');
   if (failed && f?.ciPassed === false) out.push('آخر عملية فاشلة: ' + sanitizeTelemetryPayload(failed.workflowName + ' — ' + failed.commitMessage).sanitized.slice(0, 160));
-  return out;
+  return [...new Set(out)];
 }
 
 /** Plain-Arabic reason a program is not linked to live evidence, or null when linked / intentionally local. */

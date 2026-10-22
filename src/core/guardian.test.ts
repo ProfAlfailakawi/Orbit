@@ -85,3 +85,13 @@ test('link issue explains why a program is not linked and ignores local programs
  assert.match(buildFleetReportForClaude([p],[],'2026-01-01'),/مشاكل الربط/);
  assert.equal(getLinkIssue({...app('L'),runtimeMode:'local-only'}),null);
 });
+
+test('site visitor findings become problems while fresh, are de-duplicated, and expire',()=>{
+ const p=app('ONE');
+ p.siteProblems=['ملف التطبيق app.js لا يُحمَّل (HTTP 404)']; p.siteCheckedAt=new Date().toISOString();
+ assert.deepEqual(getProgramProblems(p),['ملف التطبيق app.js لا يُحمَّل (HTTP 404)']);
+ p.fourState={...p.fourState,siteReachable:false}; p.siteProblems=['الموقع لا يستجيب'];
+ assert.deepEqual(getProgramProblems(p),['الموقع لا يستجيب']);
+ p.siteCheckedAt=new Date(Date.now()-48*3_600_000).toISOString();
+ assert.deepEqual(getProgramProblems(p),['الموقع لا يستجيب'], 'only the explicit siteReachable=false remains once the finding is stale');
+});

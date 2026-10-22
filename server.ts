@@ -7,6 +7,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { createLogoService } from './src/core/logoService.ts';
+import { createSiteService } from './src/core/siteService.ts';
+import { visitSite, type VisitDeps } from './src/core/visitor.ts';
+import { safeGet } from './src/core/safeFetch.ts';
+import { applyVisit, clearSite, pool } from './src/core/watch.ts';
 import { buildPrivacySafeTimeline, buildSharedDependencyAdvisory, evaluateTruthEvidence } from './src/core/guardian.ts';
 import { GoogleGenAI } from '@google/genai';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -293,6 +297,7 @@ loadStateFromDisk();
 const processedIdempotencyKeys = new Set<string>();
 
 const LOGO_SNAPSHOT_PATH = path.join(__dirname, '.orbit-logos.json');
+const SITE_SNAPSHOT_PATH = path.join(__dirname, '.orbit-sites.json');
 
 async function startServer() {
   const app = express();
@@ -300,6 +305,12 @@ async function startServer() {
     firestore, snapshotPath: LOGO_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
   });
   await logoService.load();
+  const siteService = createSiteService({
+    firestore, snapshotPath: SITE_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
+  });
+  await siteService.load();
+  // The visitor judges the answer itself, so every status is returned (never throws on 4xx/5xx).
+  const visitDeps: VisitDeps = { get: (url, opts) => safeGet(url, { ...opts, acceptStatus: () => true }) };
   const asyncRoute = (handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>) =>
     (req: express.Request, res: express.Response, next: express.NextFunction) => { void handler(req, res, next).catch(next); };
   app.disable('x-powered-by');
@@ -653,6 +664,16 @@ async function startServer() {
     });
   });
 
+  // Real website of each program, discovered from its repository; and an on-demand visit of every site.
+  app.get('/api/sites', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ sites: siteService.list() }); });
+  app.post('/api/sites/refresh', asyncRoute(async (req, res) => {
+    const id = typeof req.body?.id === 'string' ? req.body.id.slice(0, 120) : undefined;
+    const result = await siteService.refresh({ id, force: Boolean(id && req.body?.force) });
+    res.set('Cache-Control', 'no-store');
+    res.json({ ...result, sites: siteService.list() });
+  }));
+  app.post('/api/watch/run', asyncRoute(async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(await runWatch()); }));
+
   // Program logos: found from each program's own site or repository, stored apart from the main state.
   app.get('/api/logos', (_req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -792,35 +813,20 @@ async function startServer() {
             actionsChecked = false;
             actionsNote = actionsNote || `تعذر قراءة آخر تعديلات المستودع: ${error instanceof Error ? error.message.slice(0, 100) : 'فشل الطلب'}.`;
           }
-          // For ORBIT itself, use the known public production host when no URL was
-          // saved yet. Probe only public HTTPS hosts; never follow redirects off-host.
+          // A program's real website comes from its own repository (siteService); ORBIT itself uses its known host.
+          // The visitor opens the page and checks that its app files load, not merely that something answers.
           const isOrbitRepository = plat.owner.toLowerCase() === 'profalfailakawi' && plat.repoName.toLowerCase() === 'orbit';
-          const productionUrl = plat.productionUrl || (isOrbitRepository ? process.env.ORBIT_PRODUCTION_URL || null : null);
+          const productionUrl = isOrbitRepository
+            ? (plat.productionUrl || process.env.ORBIT_PRODUCTION_URL || siteService.url(plat))
+            : siteService.url(plat);
           let siteReachable: boolean | null = null;
-          let siteEvidence = 'Production site not configured or not checked.';
+          let siteEvidence = 'لا يوجد موقع مؤكد لهذا البرنامج.';
+          let siteProblems: string[] = [];
           if (productionUrl) {
-            try {
-              const parsed = new URL(productionUrl);
-              const host = parsed.hostname.toLowerCase();
-              if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
-                  host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
-                  host.endsWith('.internal') || host === 'metadata.google.internal' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':')) {
-                throw new Error('Production URL must be a public HTTPS hostname.');
-              }
-              const startedAt = Date.now();
-              const response = await fetch(parsed, {
-                method: 'GET',
-                headers: { Accept: 'text/html,application/json;q=0.9,*/*;q=0.1', Range: 'bytes=0-0' },
-                redirect: 'manual',
-                signal: AbortSignal.timeout(5000),
-              });
-              siteReachable = response.status >= 200 && response.status < 400;
-              siteEvidence = `Production URL HTTP ${response.status} (${Date.now() - startedAt}ms).`;
-              await response.body?.cancel().catch(() => undefined);
-            } catch (error) {
-              siteReachable = false;
-              siteEvidence = `Production URL unavailable: ${error instanceof Error ? error.message.slice(0, 120) : 'request failed'}.`;
-            }
+            const visit = await visitSite(productionUrl, visitDeps);
+            siteReachable = visit.reachable;
+            siteEvidence = visit.evidence;
+            siteProblems = visit.problems;
           }
           // ORBIT's defined anonymous-entry journey checks the public entry,
           // unauthenticated session response, and protected-state boundary. It is
@@ -853,7 +859,7 @@ async function startServer() {
           const confirmedChecks = Object.values(fourState).filter(value => value !== null).length;
           const monitoringCoveragePct = Math.round(confirmedChecks * 100 / 4);
           const healthStatus = siteReachable === false ? 'Offline'
-            : githubCiPassed === false || deploymentSucceeded === false || fourState.userJourneyHealthy === false ? 'Degraded'
+            : githubCiPassed === false || deploymentSucceeded === false || fourState.userJourneyHealthy === false || siteProblems.length ? 'Degraded'
             : confirmedChecks === 4 ? 'Healthy' : 'Monitoring Gap';
           platforms = platforms.map((p) =>
             p.id === plat.id
@@ -861,6 +867,8 @@ async function startServer() {
                   ...p,
                   productionUrl,
                   productionUrlVerified: siteReachable === true,
+                  siteProblems,
+                  siteCheckedAt: new Date().toISOString(),
                   defaultBranch: repoData.default_branch || p.defaultBranch,
                   dataIntegrity: actionsChecked && recentCommits.length > 0 ? 'Live' : 'Unavailable',
                   connectionVerified: actionsChecked && recentCommits.length > 0,
@@ -971,19 +979,56 @@ async function startServer() {
     }
   }));
 
-  app.post('/internal/scheduler/github-sync', asyncRoute(async (req, res) => {
+  /** Cloud Scheduler / GitHub Actions identity: a Google ID token for the scheduler service account, audience = this service. */
+  async function schedulerRejection(req: express.Request): Promise<{ status: number; error: string } | null> {
     const audience = process.env.SCHEDULER_AUDIENCE;
     const expectedServiceAccount = process.env.SCHEDULER_SERVICE_ACCOUNT;
     const authHeader = req.get('authorization') || '';
-    if (!audience || !expectedServiceAccount) return res.status(503).json({ error: 'Scheduler identity is not configured' });
-    if (!authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Scheduler identity required' });
+    if (!audience || !expectedServiceAccount) return { status: 503, error: 'Scheduler identity is not configured' };
+    if (!authHeader.startsWith('Bearer ')) return { status: 401, error: 'Scheduler identity required' };
     try {
       const { OAuth2Client } = await import('google-auth-library');
       const ticket = await new OAuth2Client().verifyIdToken({ idToken: authHeader.slice(7), audience });
       const email = ticket.getPayload()?.email;
-      if (!email || email !== expectedServiceAccount) return res.status(403).json({ error: 'Scheduler identity rejected' });
-    } catch { return res.status(401).json({ error: 'Invalid scheduler identity' }); }
-    if (!firestore) return res.status(503).json({ error: 'Durable scheduler state is unavailable' });
+      if (!email || email !== expectedServiceAccount) return { status: 403, error: 'Scheduler identity rejected' };
+    } catch { return { status: 401, error: 'Invalid scheduler identity' }; }
+    if (!firestore) return { status: 503, error: 'Durable scheduler state is unavailable' };
+    return null;
+  }
+
+  // Frequent, cheap check: find real sites, visit each one, update the record. Used by the dashboard and by the 15-minute watch.
+  let watchActive = false;
+  async function runWatch() {
+    if (watchActive) return { skipped: 'already running' as const };
+    watchActive = true;
+    try {
+      await siteService.refresh({});
+      const now = new Date().toISOString();
+      const eligible = platforms.filter(p => p.lifecycleState === 'active' && p.runtimeMode !== 'local-only' && p.runtimeMode !== 'github-local');
+      const targets = eligible.map(p => ({ id: p.id, url: siteService.url(p) })).filter((t): t is { id: string; url: string } => Boolean(t.url));
+      const visited = await pool(targets, 3, 70_000, async t => ({ ...t, visit: await visitSite(t.url, visitDeps) }));
+      const byId = new Map(visited.map(v => [v.id, v]));
+      const withoutSite = new Set(eligible.filter(p => !siteService.url(p)).map(p => p.id));
+      platforms = platforms.map(p => {
+        const v = byId.get(p.id);
+        if (v) return applyVisit(p, v.url, v.visit, now);
+        return withoutSite.has(p.id) ? clearSite(p) : p;
+      });
+      broadcastRealtimeUpdate('SITE_WATCH');
+      await persistenceQueue;
+      return { checked: visited.length, problems: visited.filter(v => !v.visit.ok).length, withoutSite: withoutSite.size };
+    } finally { watchActive = false; }
+  }
+
+  app.post('/internal/scheduler/watch', asyncRoute(async (req, res) => {
+    const rejection = await schedulerRejection(req);
+    if (rejection) return res.status(rejection.status).json({ error: rejection.error });
+    return res.json({ completedAt: new Date().toISOString(), ...(await runWatch()) });
+  }));
+
+  app.post('/internal/scheduler/github-sync', asyncRoute(async (req, res) => {
+    const rejection = await schedulerRejection(req);
+    if (rejection) return res.status(rejection.status).json({ error: rejection.error });
     const lease = await claimGithubSyncLease(false);
     const acquired = lease;
     if (!acquired.acquired) return res.status(202).json({ skipped: acquired.reason, ...('nextDueAt' in acquired ? { nextDueAt: acquired.nextDueAt } : {}) });

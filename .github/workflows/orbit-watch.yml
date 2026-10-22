@@ -1,0 +1,44 @@
+name: ORBIT frequent site watch
+
+on:
+  schedule:
+    # Every 15 minutes (GitHub may delay a run by a few minutes under load).
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: orbit-site-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Ask ORBIT to visit every program's website
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          SCHEDULER_SERVICE_ACCOUNT: ${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SERVICE_URL="$(gcloud run services describe orbit-api --project "$PROJECT_ID" --region me-central1 --format='value(status.url)')"
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$SCHEDULER_SERVICE_ACCOUNT" \
+            --audiences="$SERVICE_URL" --include-email)"
+          RESPONSE="$(curl --fail --silent --show-error --max-time 180 \
+            -X POST -H "Authorization: Bearer $TOKEN" \
+            "$SERVICE_URL/internal/scheduler/watch")"
+          unset TOKEN
+          printf '%s' "$RESPONSE" | jq -e '(.completedAt != null)' >/dev/null
+          printf '%s\n' "$RESPONSE" | jq -c '{completedAt, checked, problems, withoutSite, skipped}'

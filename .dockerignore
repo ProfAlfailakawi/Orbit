@@ -4,3 +4,4 @@ node_modules
 .orbit-data.json
 test-artifacts
 .orbit-logos.json
+.orbit-sites.json

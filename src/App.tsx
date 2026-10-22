@@ -138,6 +138,30 @@ export default function App() {
     } catch { /* monograms stand in */ }
   };
 
+  // Real website of each program, found from its repository (the server does a few per request).
+  const refreshSites = async (id?: string) => {
+    try {
+      for (let round = 0; round < 5; round += 1) {
+        const res = await apiFetch('/api/sites/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(id ? { id, force: true } : {}),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (id || !data.remaining) return;
+      }
+    } catch { /* the next visit retries */ }
+  };
+
+  // Visit every site now (page + app files) and show the result.
+  const runWatch = async () => {
+    try {
+      const res = await apiFetch('/api/watch/run', { method: 'POST' });
+      if (res.ok) await fetchServerState();
+    } catch { /* the 15-minute watch covers it */ }
+  };
+
   const handleSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -175,6 +199,8 @@ export default function App() {
       }
       if (!data || autoSyncedRef.current) return;
       autoSyncedRef.current = true;
+      await refreshSites();
+      await runWatch();
       // Link on open: refresh once if any GitHub-backed program was never verified or its evidence is over 6 hours old.
       const sixHours = 6 * 60 * 60_000;
       const needsLink = data.platforms.some(p =>
@@ -258,7 +284,10 @@ export default function App() {
     if (!response.ok) throw new Error(data.error || 'تعذر إضافة البرنامج.');
     if (data.platforms) setPlatforms(data.platforms);
     // The new program gets its own logo right away, from its site or repository.
-    if (data.platform?.id) void refreshLogos(data.platform.id);
+    if (data.platform?.id) {
+      void refreshLogos(data.platform.id);
+      void refreshSites(data.platform.id).then(runWatch);
+    }
     return 'تمت الإضافة. اضغط «تحديث» لربطه.';
   };
 
