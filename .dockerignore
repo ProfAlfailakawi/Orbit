@@ -5,3 +5,4 @@ node_modules
 test-artifacts
 .orbit-logos.json
 .orbit-sites.json
+.orbit-push.json

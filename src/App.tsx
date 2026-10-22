@@ -9,6 +9,7 @@ import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEve
 import { buildRows, sharedLinkReason, summarize } from './core/fleetStatus';
 import { Dashboard, type Logos } from './components/Dashboard';
 import { Mark } from './components/Mark';
+import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
 
@@ -35,6 +36,7 @@ export default function App() {
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [logos, setLogos] = useState<Logos>({});
+  const [pushState, setPushState] = useState<PushState>('unsupported');
   const autoSyncedRef = useRef(false);
   const logosAskedRef = useRef(false);
   const bannerTimer = useRef<number | undefined>(undefined);
@@ -243,6 +245,21 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!isLocked) void readPushState().then(setPushState);
+  }, [isLocked]);
+
+  const handlePush = async () => {
+    if (pushState === 'ios-install') return showBanner('لتفعيل التنبيهات على الآيفون: من Safari اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتح أوربت من هناك.');
+    if (pushState === 'blocked') return showBanner('التنبيهات محجوبة. فعّلها من إعدادات المتصفح لهذا الموقع.');
+    try {
+      const next = pushState === 'on' ? await disablePush() : await enablePush();
+      setPushState(next);
+      if (next === 'on') showBanner('تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.');
+      if (next === 'blocked') showBanner('التنبيهات محجوبة. فعّلها من إعدادات المتصفح لهذا الموقع.');
+    } catch { showBanner('تعذر تفعيل التنبيهات الآن.'); }
+  };
+
   const handleLogout = () => {
     void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => {
       clearOrbitSessionToken();
@@ -327,6 +344,11 @@ export default function App() {
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
             {isSyncing ? 'جارٍ الفحص…' : 'تحديث'}
           </button>
+          {pushState !== 'unsupported' && (
+            <button type="button" className={'btn' + (pushState === 'on' ? ' is-on' : '')} onClick={() => void handlePush()} aria-pressed={pushState === 'on'}>
+              {pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}
+            </button>
+          )}
           <button type="button" className="btn" onClick={handleLogout}>خروج</button>
         </div>
       </header>
