@@ -7,7 +7,7 @@ import { sanitizeTelemetryPayload } from './engine.ts';
 import type { PlatformRecord } from './types.ts';
 
 export interface SensorReport {
-  kind: 'error' | 'rejection' | 'resource' | 'request' | 'console';
+  kind: 'error' | 'rejection' | 'resource' | 'request';
   message: string; page: string; session: string;
   /** Where it threw (first frames, no query strings) and what the visitor did just before. Only for errors. */
   stack: string[]; steps: string[];
@@ -15,7 +15,8 @@ export interface SensorReport {
   own: boolean;
 }
 
-const KINDS = new Set(['error', 'rejection', 'resource', 'request', 'console']);
+// «console» was dropped on purpose: console.error often prints whole objects (user ids, emails). Old copies that still send it are ignored.
+const KINDS = new Set(['error', 'rejection', 'resource', 'request']);
 export const SENSOR_MAX_BODY = 16_000;
 const MAX_BODY = SENSOR_MAX_BODY;
 /** Noise every site has: not worth a phone alert. */
@@ -25,13 +26,21 @@ const strip = (value: string) => sanitizeTelemetryPayload(value.replace(/[\u0000
 
 /** A path segment that looks like an identifier: digits, uuid, long token, letters mixed with digits, an email or an encoded value. */
 const isIdSegment = (segment: string) =>
-  /^\d{2,}$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) || /^[0-9a-f]{16,}$/i.test(segment) || /^[A-Za-z0-9_-]{20,}$/.test(segment) ||
-  (/\d/.test(segment) && /[A-Za-z]/.test(segment) && segment.length >= 8) || segment.includes('@') || segment.includes('%');
+  /^\d{2,}$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) || /^[A-Za-z0-9_-]{20,}$/.test(segment) || (/^[A-Za-z0-9_-]{12,}$/.test(segment) && !/^[a-z-]+$/.test(segment)) ||
+  (/\d/.test(segment) && /[A-Za-z]/.test(segment) && segment.length >= 6) || segment.includes('@') || segment.includes('%');
 
 /**
- * Identifiers never travel in page paths or request breadcrumbs. The browser script already does this; doing it again here protects
- * against older copies of the script that sites host themselves.
+ * Error messages can quote what a visitor typed or uploaded: emails, long numbers and long tokens are masked, and a quoted value is kept
+ * only when it is a plain identifier («reading 'total'»). The browser script does this too; repeating it here covers older copies.
  */
+export function scrubText(text: string): string {
+  return text
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]')
+    .replace(/\+?\d[\d\s().-]{6,}\d/g, '[num]')
+    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, '[token]')
+    .replace(/(["'`])((?:(?!\1).){1,200}?)\1/g, (m, q: string, v: string) => (/^[A-Za-z_$][\w$]{0,30}$/.test(v) ? m : `${q}...${q}`));
+}
+
 const FILE_NAME = /\.(m?js|css|html?|map|tsx?|jsx|json|svg|png|webp|woff2?)$/i;
 export function redactPathIds(text: string): string {
   return text.replace(/\/[^\s/\u2190?#]+/g, seg => {
@@ -58,14 +67,14 @@ export function parseSensorBody(raw: unknown): SensorReport[] {
     const r = item as { k?: unknown; m?: unknown; p?: unknown; t?: unknown; b?: unknown; o?: unknown } | null;
     if (!r || typeof r.k !== 'string' || !KINDS.has(r.k) || typeof r.m !== 'string') continue;
     const cleaned = strip(r.m).slice(0, 160);
-    const message = redactPathIds(cleaned);
+    const message = scrubText(redactPathIds(cleaned));
     if (!message || BENIGN.test(message)) continue;
     let page = '/';
     if (typeof r.p === 'string') { try { page = redactPathIds(new URL(r.p, 'https://x.invalid').pathname).slice(0, 80); } catch { /* keep "/" */ } }
     const isError = r.k === 'error' || r.k === 'rejection';
     out.push({
       kind: r.k as SensorReport['kind'], message, page, session,
-      stack: isError ? lines(r.t, 4, 110).map(redactPathIds) : [], steps: isError ? lines(r.b, 12, 70).map(redactPathIds) : [],
+      stack: isError ? lines(r.t, 4, 110).map(x => scrubText(redactPathIds(x))) : [], steps: isError ? lines(r.b, 12, 70).map(x => scrubText(redactPathIds(x))) : [],
       own: isError && r.o === 1,
     });
   }
@@ -79,7 +88,6 @@ export function originOf(url: string | null | undefined): string | null {
 
 const KIND_LABEL: Record<SensorReport['kind'], string> = {
   error: 'خطأ برمجي ظهر لزوّار الموقع', rejection: 'عملية داخل الموقع فشلت عند الزوّار', resource: 'ملف لا يُحمَّل عند الزوّار', request: 'طلب من الموقع يفشل عند الزوّار',
-  console: 'رسالة خطأ يطلقها الموقع في المتصفح',
 };
 export interface SensorFinding { text: string; page: string; visitors: number; stack: string[]; steps: string[] }
 export const SENSOR_WINDOW_MS = 24 * 3_600_000;

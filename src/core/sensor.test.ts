@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, sensorTrailLines } from './sensor.ts';
+import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, scrubText, sensorTrailLines } from './sensor.ts';
 import type { PlatformRecord } from './types.ts';
 
 const body = (s: string, r: unknown[]) => JSON.stringify({ s, r });
@@ -109,4 +109,21 @@ test('identifiers are redacted from paths and request breadcrumbs, even from old
   assert.equal(out[0].page, '/participant/:id/results');
   assert.ok(out[1].steps[0].includes('/api/participants/:id'));
   assert.ok(!JSON.stringify(out).includes('48213'));
+});
+
+test('what a visitor typed or uploaded does not leave through an error message, and console reports are dropped', () => {
+  assert.equal(scrubText('Failed for ahmad@example.com'), 'Failed for [email]');
+  assert.equal(scrubText('call 965 5551 2345 failed'), 'call [num] failed');
+  assert.equal(scrubText('bad token abcdefghijklmnopqrstuvwxyz012345'), 'bad token [token]');
+  assert.equal(scrubText('File "holiday photo 2026.png" is too large'), 'File "..." is too large');
+  assert.equal(scrubText("Cannot read properties of null (reading 'total')"), "Cannot read properties of null (reading 'total')", 'a plain property name stays');
+  assert.equal(redactPathIds('/share/aB3dE5gH7jKl'), '/share/:id', 'a share-link token is redacted');
+  assert.equal(redactPathIds('/api/participants/list'), '/api/participants/list', 'long lowercase route words are not tokens');
+  const out = parseSensorBody(body('sess_123456', [
+    { k: 'console', m: 'user object {"uid":"u1","email":"a@b.co"}' },
+    { k: 'error', m: 'Upload failed: "my private scan.pdf" by a@b.co', p: '/s/aB3dE5gH7jKl', o: 1 },
+  ]));
+  assert.equal(out.length, 1, 'console reports are ignored');
+  assert.equal(out[0].message, 'Upload failed: "..." by [REDACTED_EMAIL]');
+  assert.equal(out[0].page, '/s/:id');
 });
