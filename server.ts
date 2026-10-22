@@ -1,3 +1,4 @@
+import { applySensor, createSensorHub, originOf, parseSensorBody } from './src/core/sensor.ts';
 import { applyBrowserVisit, parseBrowserReports } from './src/core/browserVisit.ts';
 import 'dotenv/config';
 import crypto from 'crypto';
@@ -612,6 +613,32 @@ async function startServer() {
     appendAudit('ORBIT Sensor', 'AUTHENTICATED_SENSOR_INGEST', appId, 'تم استقبال حدث مصادق عليه وتسجيله بعد تنقية بياناته الحساسة.');
     broadcastRealtimeUpdate('SENSOR_EVENT_INGESTED');
     return res.status(202).json({ accepted: true, eventId: outcome.event.eventId, incidentId: outcome.incident.incidentId, deduplicated: outcome.isDeduplicated });
+  });
+
+  // Browser sensor: anonymous error notes from the programs' own pages. Open to the internet, so strictly bounded.
+  const sensorHub = createSensorHub();
+  const sensorOrigins = () => new Map(platforms.map(p => [originOf(siteService.url(p)), p.id] as const).filter(([o]) => o !== null) as Array<[string, string]>);
+  app.options('/api/public-sensor', (req, res) => {
+    const origin = req.get('origin') || '';
+    if (sensorOrigins().has(origin)) { res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', Vary: 'Origin' }); }
+    res.status(204).end();
+  });
+  app.post('/api/public-sensor', express.text({ type: '*/*', limit: '9kb' }), (req, res) => {
+    const origin = req.get('origin') || '';
+    const programId = sensorOrigins().get(origin);
+    // Unknown origins and rate-limited callers get the same quiet answer: nothing to learn from probing.
+    if (!programId || !sensorHub.allow(`ip:${req.ip}`, 20, 60_000) || !sensorHub.allow(`app:${programId}`, 300, 60_000)) return res.status(204).end();
+    res.set({ 'Access-Control-Allow-Origin': origin, Vary: 'Origin' });
+    const reports = parseSensorBody(req.body);
+    if (reports.length) {
+      sensorHub.add(programId, reports);
+      const now = new Date().toISOString();
+      const found = sensorHub.problems(programId);
+      let changed = false;
+      platforms = platforms.map(p => { if (p.id !== programId) return p; const next = applySensor(p, found, now); changed = changed || next !== p; return next; });
+      if (changed) { broadcastRealtimeUpdate('SENSOR'); void persistenceQueue.then(() => notifyChanges()).catch(() => {}); }
+    }
+    return res.status(204).end();
   });
 
   app.use('/api', asyncRoute(async (req, res, next) => {
