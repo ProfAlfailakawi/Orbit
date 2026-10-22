@@ -58,6 +58,6 @@ test('only deploy-like workflow files are worth reading', () => {
 
 test('a site the owner confirmed by name is used as given', async () => {
   const { confirmedSite } = await import('./ownerSites.ts');
-  assert.equal(confirmedSite('nahj'), 'https://nahjq8.ai.studio');
-  assert.equal(confirmedSite('MIRAS'), null);
+  assert.equal(confirmedSite('nahj'), 'https://nahj-os.web.app');
+  assert.equal(confirmedSite('ALFA'), null, 'a program with no confirmed site is discovered instead');
 });
