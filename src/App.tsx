@@ -242,7 +242,7 @@ export default function App() {
 
   if (isLocked) {
     return (
-      <div className="login-wrap" dir="rtl">
+      <main className="login-wrap" dir="rtl">
         <form className="card login" onSubmit={handleLogin}>
           <h1>أوربت</h1>
           <label htmlFor="orbit-passkey-input">رمز الدخول</label>
@@ -250,7 +250,7 @@ export default function App() {
           {authError && <p role="alert" className="error">{authError}</p>}
           <button type="submit" className="btn btn-primary">دخول</button>
         </form>
-      </div>
+      </main>
     );
   }
 

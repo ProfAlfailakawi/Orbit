@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Check, CircleCheck, Copy, HardDrive, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { PlatformRecord } from '../core/types';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type Summary } from '../core/fleetStatus';
 
@@ -10,6 +11,10 @@ interface DashboardProps {
   onAdd: (name: string, link: string) => Promise<string>;
   onRemove: (id: string) => Promise<void>;
 }
+
+const toneIcon: Record<ProgramRow['tone'], LucideIcon> = { bad: OctagonAlert, warn: TriangleAlert, ok: CircleCheck, local: HardDrive };
+const toneLabel: Record<ProgramRow['tone'], string> = { bad: 'مشاكل', warn: 'رصد ناقص', ok: 'تعمل', local: 'محلية' };
+const tones: ProgramRow['tone'][] = ['bad', 'warn', 'ok', 'local'];
 
 const shortName = (p: PlatformRecord) => p.nameAr.replace(/\s*\([^)]*\)/g, '');
 
@@ -56,15 +61,31 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
     finally { setBusy(false); }
   };
 
+  const counts = tones.map(t => ({ tone: t, n: rows.filter(r => r.tone === t).length })).filter(c => c.n > 0);
+  const SummaryIcon = toneIcon[summary.tone];
+
   const mine = platforms.filter(p => p.isCustomAdded && p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived');
 
   return (
     <main className="page">
       <section className={'summary summary-' + summary.tone} aria-live="polite">
-        <h1>{summary.headline}</h1>
+        <div className="summary-head">
+          <span className="summary-mark" aria-hidden="true"><SummaryIcon strokeWidth={2} /></span>
+          <h1>{summary.headline}</h1>
+        </div>
+        {counts.length > 1 && (
+          <div className="tally">
+            <div className="rail" aria-hidden="true">
+              {counts.map(c => <i key={c.tone} className={'t-' + c.tone} style={{ flexGrow: c.n }} />)}
+            </div>
+            <ul className="pills">
+              {counts.map(c => <li key={c.tone} className={'pill pill-' + c.tone}><b>{c.n}</b> {toneLabel[c.tone]}</li>)}
+            </ul>
+          </div>
+        )}
         {summary.buttonLabel && (
-          <button type="button" className="btn btn-primary" onClick={() => void copy('all')}>
-            {copied === 'all' ? 'تم النسخ' : summary.buttonLabel}
+          <button type="button" className="btn btn-primary btn-icon" onClick={() => void copy('all')}>
+            {copied === 'all' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied === 'all' ? 'تم النسخ' : summary.buttonLabel}
           </button>
         )}
         {summary.reason && <p className="reason">{'السبب: ' + summary.reason}</p>}
@@ -81,19 +102,20 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
       )}
 
       <ul className="rows">
-        {rows.map(({ platform: p, tone, text, needsCopy }) => (
+        {rows.map(({ platform: p, tone, text, needsCopy }) => { const Icon = toneIcon[tone]; return (
           <li key={p.id} className={'row program-row row-' + tone}>
+            <span className="row-mark" aria-hidden="true"><Icon strokeWidth={2} /></span>
             <div className="row-info">
               <strong>{shortName(p)}</strong>
               <span className="row-text">{text}</span>
             </div>
             {needsCopy && (
               <button type="button" className="btn btn-copy" aria-label={'انسخ مشكلة: ' + shortName(p)} onClick={() => void copy(p.id)}>
-                {copied === p.id ? 'تم النسخ' : 'انسخ'}
+                {copied === p.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied === p.id ? 'تم النسخ' : 'انسخ'}
               </button>
             )}
           </li>
-        ))}
+        ); })}
       </ul>
 
       {addOpen ? (

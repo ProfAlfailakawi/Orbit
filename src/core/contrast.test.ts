@@ -22,7 +22,7 @@ const pairs: Array<[string, string]> = [
   ['ink', 'bg'], ['ink', 'card'], ['muted', 'bg'], ['muted', 'card'],
   ['btn-ink', 'btn'], ['btn', 'card'], ['btn', 'bg'],
   ['bad-ink', 'bad-bg'], ['warn-ink', 'warn-bg'], ['ok-ink', 'card'], ['ok-ink', 'ok-bg'],
-  ['ink', 'bad-bg'], ['ink', 'warn-bg'], ['ink', 'ok-bg'], ['bad-ink', 'card'],
+  ['ink', 'bad-bg'], ['ink', 'warn-bg'], ['ink', 'ok-bg'], ['bad-ink', 'card'], ['warn-ink', 'card'], ['muted', 'ok-bg'],
 ];
 
 for (const [name, theme] of [['light', light], ['dark', dark]] as const) {
