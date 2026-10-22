@@ -130,7 +130,7 @@ export function getLinkIssue(p: PlatformRecord): string | null {
     return reason && !/^GitHub repository HTTP/.test(reason) ? reason : 'تعذر قراءة GitHub لهذا البرنامج';
   }
   if (p.dataIntegrity === 'Cached') return 'بيانات قديمة تحتاج مزامنة';
-  return 'لم يُفحص بعد — اضغط «مزامنة GitHub الآن»';
+  return 'لم يُفحص بعد — اضغط «تحديث»';
 }
 
 /** One copy-paste report for Claude: every program with a problem, plus the monitoring gaps, read-only. */
