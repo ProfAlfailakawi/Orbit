@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, sensorTrailLines } from './sensor.ts';
+import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, sensorTrailLines } from './sensor.ts';
 import type { PlatformRecord } from './types.ts';
 
 const body = (s: string, r: unknown[]) => JSON.stringify({ s, r });
@@ -91,4 +91,22 @@ test('the trail lines tell Claude where and what happened', () => {
   assert.match(text, /ما فعله الزائر قبل الخطأ: نقر button#pay/);
   assert.match(text, /موضع الخطأ: at pay \(\/app\.js:3:9\)/);
   assert.deepEqual(sensorTrailLines({ id: 'a' } as PlatformRecord), []);
+});
+
+test('identifiers are redacted from paths and request breadcrumbs, even from older copies of the script', () => {
+  assert.equal(redactPathIds('/api/participants/48213/answers'), '/api/participants/:id/answers');
+  assert.equal(redactPathIds('/s/3f2b8c1e-9a4d-4b7e-8c11-2a5d6e7f8091/run'), '/s/:id/run');
+  assert.equal(redactPathIds('/u/ahmad%40example.com'), '/u/:id');
+  assert.equal(redactPathIds('/session/ab12cd34ef56'), '/session/:id');
+  assert.equal(redactPathIds('/api/save'), '/api/save', 'plain route words stay');
+  assert.equal(redactPathIds('at run (/assets/index-BVx95H3k.js:10:5)'), 'at run (/assets/index-BVx95H3k.js:10:5)', 'a file name stays readable in a stack');
+  assert.equal(redactPathIds('Uncaught Error: boom @/participant/48213/:4'), 'Uncaught Error: boom @/participant/:id/:4');
+  const out = parseSensorBody(body('sess_123456', [
+    { k: 'request', m: 'HTTP 500 /api/participants/48213', p: '/participant/48213/results' },
+    { k: 'error', m: 'x is null', p: '/pay', b: ['\u0637\u0644\u0628 /api/participants/48213 \u2190 500', 'click in /pay'], o: 1 },
+  ]));
+  assert.equal(out[0].message, 'HTTP 500 /api/participants/:id');
+  assert.equal(out[0].page, '/participant/:id/results');
+  assert.ok(out[1].steps[0].includes('/api/participants/:id'));
+  assert.ok(!JSON.stringify(out).includes('48213'));
 });

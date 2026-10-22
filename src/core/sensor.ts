@@ -23,6 +23,25 @@ const BENIGN = /ResizeObserver loop|^script error\.?$|(?:chrome|moz|safari)-exte
 
 const strip = (value: string) => sanitizeTelemetryPayload(value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/https?:\/\/[^\s)'"]+/g, u => u.split(/[?#]/)[0])).sanitized.trim();
 
+/** A path segment that looks like an identifier: digits, uuid, long token, letters mixed with digits, an email or an encoded value. */
+const isIdSegment = (segment: string) =>
+  /^\d{2,}$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) || /^[0-9a-f]{16,}$/i.test(segment) || /^[A-Za-z0-9_-]{20,}$/.test(segment) ||
+  (/\d/.test(segment) && /[A-Za-z]/.test(segment) && segment.length >= 8) || segment.includes('@') || segment.includes('%');
+
+/**
+ * Identifiers never travel in page paths or request breadcrumbs. The browser script already does this; doing it again here protects
+ * against older copies of the script that sites host themselves.
+ */
+const FILE_NAME = /\.(m?js|css|html?|map|tsx?|jsx|json|svg|png|webp|woff2?)$/i;
+export function redactPathIds(text: string): string {
+  return text.replace(/\/[^\s/\u2190?#]+/g, seg => {
+    const name = seg.slice(1);
+    const core = name.split(/[:)]/)[0]; // «index-abc123.js:10:5)» → the file name, keeping the position after it
+    const suffix = name.slice(core.length);
+    return isIdSegment(core) && !(FILE_NAME.test(core) && !/[@%]/.test(core)) ? '/:id' + suffix : seg;
+  });
+}
+
 const lines = (value: unknown, count: number, width: number): string[] =>
   Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string').slice(0, count).map(x => strip(x).slice(0, width)).filter(Boolean) : [];
 
@@ -38,14 +57,15 @@ export function parseSensorBody(raw: unknown): SensorReport[] {
   for (const item of list.slice(0, 5)) {
     const r = item as { k?: unknown; m?: unknown; p?: unknown; t?: unknown; b?: unknown; o?: unknown } | null;
     if (!r || typeof r.k !== 'string' || !KINDS.has(r.k) || typeof r.m !== 'string') continue;
-    const message = strip(r.m).slice(0, 160);
+    const cleaned = strip(r.m).slice(0, 160);
+    const message = redactPathIds(cleaned);
     if (!message || BENIGN.test(message)) continue;
     let page = '/';
-    if (typeof r.p === 'string') { try { page = new URL(r.p, 'https://x.invalid').pathname.slice(0, 80); } catch { /* keep "/" */ } }
+    if (typeof r.p === 'string') { try { page = redactPathIds(new URL(r.p, 'https://x.invalid').pathname).slice(0, 80); } catch { /* keep "/" */ } }
     const isError = r.k === 'error' || r.k === 'rejection';
     out.push({
       kind: r.k as SensorReport['kind'], message, page, session,
-      stack: isError ? lines(r.t, 4, 110) : [], steps: isError ? lines(r.b, 12, 70) : [],
+      stack: isError ? lines(r.t, 4, 110).map(redactPathIds) : [], steps: isError ? lines(r.b, 12, 70).map(redactPathIds) : [],
       own: isError && r.o === 1,
     });
   }
