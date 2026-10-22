@@ -1,0 +1,46 @@
+name: ORBIT daily browser visitor
+
+on:
+  schedule:
+    # Every morning ~07:00 Kuwait time (04:00 UTC); GitHub may delay a run by a few minutes.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: orbit-browser-visitor
+  cancel-in-progress: false
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Open every program's website in a real browser and report to ORBIT
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          SCHEDULER_SERVICE_ACCOUNT: ${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SERVICE_URL="$(gcloud run services describe orbit-api --project "$PROJECT_ID" --region me-central1 --format='value(status.url)')"
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$SCHEDULER_SERVICE_ACCOUNT" \
+            --audiences="$SERVICE_URL" --include-email)"
+          ORBIT_URL="$SERVICE_URL" ORBIT_TOKEN="$TOKEN" node scripts/browser-visitor.mjs
