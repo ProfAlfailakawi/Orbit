@@ -28,4 +28,5 @@ jobs:
       - name: Browser visitor and sensor script syntax
         run: |
           node --check scripts/browser-visitor.mjs
+          node --check scripts/ai-visit.mjs
           node --check public/orbit-sensor.js

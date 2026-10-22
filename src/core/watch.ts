@@ -32,7 +32,7 @@ export function applyVisit(p: PlatformRecord, url: string, visit: VisitResult, n
 export function clearSite(p: PlatformRecord): PlatformRecord {
   if (!p.productionUrl && p.fourState.siteReachable === null && !p.siteProblems?.length && !p.productionUrlVerified) return p;
   const fourState = { ...p.fourState, siteReachable: null };
-  return { ...p, productionUrl: null, productionUrlVerified: false, fourState, monitoringCoveragePct: Math.round(confirmedChecks(fourState) * 100 / 4), siteProblems: [], siteCheckedAt: undefined, vitals: undefined, certExpiresAt: undefined, certProblem: undefined, certCheckedAt: undefined };
+  return { ...p, productionUrl: null, productionUrlVerified: false, fourState, monitoringCoveragePct: Math.round(confirmedChecks(fourState) * 100 / 4), siteProblems: [], siteCheckedAt: undefined, vitals: undefined, certExpiresAt: undefined, certProblem: undefined, certCheckedAt: undefined, domainExpiresAt: undefined, domainCheckedAt: undefined };
 }
 
 /** Run `fn` over items with bounded concurrency and an overall deadline; items not started by then are skipped. */

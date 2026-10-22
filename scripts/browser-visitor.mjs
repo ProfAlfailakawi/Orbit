@@ -5,6 +5,8 @@
 // Local trial without ORBIT: ORBIT_DRY_RUN_URLS="http://localhost:8080,https://example.com" prints the reports instead of posting them.
 import { chromium, devices } from 'playwright';
 import { auditHeaders, auditSnapshot, averageHash, crawlTargets, scanForSecrets } from '../src/core/pageAudit.ts';
+import { createBudget, parseTestLogins } from '../src/core/aiExplorer.ts';
+import { exploreSite } from './ai-visit.mjs';
 
 const dry = (process.env.ORBIT_DRY_RUN_URLS || '').split(',').map(x => x.trim()).filter(Boolean);
 const base = (process.env.ORBIT_URL || '').replace(/\/+$/, '');
@@ -16,6 +18,24 @@ const call = async (path, body) => {
   if (!response.ok) throw new Error(`${path} -> HTTP ${response.status}`);
   return response.json();
 };
+
+// The smart visitor is opt-in: it needs GEMINI_API_KEY, and ORBIT_AI_EXPLORE=0 turns it off. Calls are capped for the whole run.
+const AI_ON = Boolean(process.env.GEMINI_API_KEY) && process.env.ORBIT_AI_EXPLORE !== '0';
+const aiBudget = createBudget(Number(process.env.ORBIT_AI_MAX_CALLS) || 40);
+const testLogins = parseTestLogins(process.env.ORBIT_TEST_LOGINS);
+let askModel = null;
+async function ask(prompt, jpeg) {
+  if (!askModel) {
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    askModel = async (text, image) => (await ai.models.generateContent({
+      model: process.env.ORBIT_AI_MODEL || 'gemini-3.8-flash',
+      contents: [{ role: 'user', parts: [{ text }, ...(image ? [{ inlineData: { mimeType: 'image/jpeg', data: image.toString('base64') } }] : [])] }],
+      config: { responseMimeType: 'application/json', temperature: 0.2 },
+    })).text;
+  }
+  return askModel(prompt, jpeg);
+}
 
 const SITE_BUDGET_MS = 240_000;
 const RUN_BUDGET_MS = 17 * 60_000;
@@ -143,6 +163,11 @@ async function visit(browser, target, runStarted) {
     problems.push(...result.problems.map(x => label + x)); warnings.push(...result.warnings.map(x => label + x));
   }
   // The same finding on every device is one finding: keep the first (desktop) wording, and keep phone-only ones tagged.
+  if (AI_ON && Date.now() - runStarted < RUN_BUDGET_MS) {
+    const creds = testLogins[String(target.codeName || '').toUpperCase()];
+    const explored = await exploreSite(browser, target, { ask, creds, allowWrites: process.env.ORBIT_AI_ALLOW_WRITES === '1', maxSteps: Number(process.env.ORBIT_AI_MAX_STEPS) || 8, budget: aiBudget }).catch(() => null);
+    if (explored) { problems.push(...explored.problems); warnings.push(...explored.warnings); }
+  }
   const unique = list => { const seen = new Set(); return list.filter(x => { const key = x.replace(/^(صفحة [^:]*: )?\[(?:جوال|جوال بطيء)\] /, '$1'); return seen.has(key) ? false : (seen.add(key), true); }); };
   const finalProblems = unique(problems).slice(0, 10);
   return { id: target.id, url: target.url, ok: finalProblems.length === 0, problems: finalProblems, warnings: unique(warnings).slice(0, 8), hash };

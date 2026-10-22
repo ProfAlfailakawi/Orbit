@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
+import { tokenNotice } from './core/expiry';
 import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
 import { Mark } from './components/Mark';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
@@ -33,6 +34,7 @@ export default function App() {
   const [events, setEvents] = useState<RadarEvent[]>([]);
   const [incidents, setIncidents] = useState<IncidentCaseFile[]>([]);
   const [githubTokenConfigured, setGithubTokenConfigured] = useState<boolean | undefined>(undefined);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [logos, setLogos] = useState<Logos>({});
@@ -109,6 +111,7 @@ export default function App() {
       setEvents(data.events);
       setIncidents(data.incidents);
       if (typeof data.hasGithubTokenConfigured === 'boolean') setGithubTokenConfigured(data.hasGithubTokenConfigured);
+      setTokenExpiresAt(typeof data.githubTokenExpiresAt === 'string' ? data.githubTokenExpiresAt : null);
       return data as { platforms: PlatformRecord[] };
     } catch {
       // Offline: keep the last state on screen.
@@ -322,6 +325,7 @@ export default function App() {
   const rows = useMemo(() => buildRows(platforms, incidents, events), [platforms, incidents, events]);
   const summary = useMemo(() => summarize(rows, sharedLinkReason(platforms)), [rows, platforms]);
   const watch = useMemo(() => watchHealth(platforms), [platforms]);
+  const tokenWarning = useMemo(() => tokenNotice(tokenExpiresAt), [tokenExpiresAt]);
 
   const handleExplain = async (id: string): Promise<Explanation> => {
     const response = await apiFetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
@@ -361,6 +365,7 @@ export default function App() {
       </header>
       {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
       {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
+      {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
       {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
       <Dashboard
         rows={rows}

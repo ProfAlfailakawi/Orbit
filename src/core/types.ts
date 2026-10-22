@@ -234,6 +234,9 @@ export interface PlatformRecord {
   certExpiresAt?: string;
   certProblem?: string;
   certCheckedAt?: string;
+  /** When the program's domain name must be renewed (RDAP), checked about weekly. */
+  domainExpiresAt?: string;
+  domainCheckedAt?: string;
   /** Last time the site visit found the program healthy, to tell whether a problem started after a commit. */
   siteLastOkAt?: string;
   branchHeads?: Array<{ name: string; sha: string }>;

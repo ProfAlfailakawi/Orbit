@@ -15,6 +15,9 @@ import { computeAlertChanges } from './src/core/alerts.ts';
 import { applyCert, certDue } from './src/core/certs.ts';
 import { readCertificate } from './src/core/tlsExpiry.ts';
 import { explainProgram } from './src/core/causes.ts';
+import { applyDomain, domainDue, registrableDomain } from './src/core/expiry.ts';
+import { readDomainExpiry } from './src/core/rdap.ts';
+import { createTokenWatch } from './src/core/tokenWatch.ts';
 import { buildRows } from './src/core/fleetStatus.ts';
 import { visitSite, type VisitDeps } from './src/core/visitor.ts';
 import { safeGet } from './src/core/safeFetch.ts';
@@ -320,6 +323,8 @@ async function startServer() {
   await siteService.load();
   const pushService = createPushService({ firestore, snapshotPath: PUSH_SNAPSHOT_PATH });
   await pushService.load();
+  const tokenWatch = createTokenWatch({ firestore });
+  await tokenWatch.load();
 
   /** Tell the owner's devices about new problems and recoveries since the last time anything was sent. */
   async function notifyChanges() {
@@ -709,6 +714,7 @@ async function startServer() {
       canaryHistory,
       auditLogs,
       hasGithubTokenConfigured: Boolean(process.env.GITHUB_READ_ONLY_TOKEN),
+      githubTokenExpiresAt: tokenWatch.expiresAt(),
     });
   });
 
@@ -1117,6 +1123,13 @@ async function startServer() {
       const certs = await pool(certTargets, 3, 15_000, async t => ({ id: t.id, cert: await readCertificate(t.host) }));
       const certById = new Map(certs.filter(c => c.cert).map(c => [c.id, c.cert!] as const));
       if (certById.size) platforms = platforms.map(p => { const c = certById.get(p.id); return c ? applyCert(p, c, now) : p; });
+      // Domain names renew yearly: ask the public RDAP service about once a week, only for names the owner actually registers.
+      const domainTargets = visited.map(v => ({ id: v.id, domain: registrableDomain(new URL(v.url).hostname) }))
+        .filter((t): t is { id: string; domain: string } => Boolean(t.domain) && (() => { const p = platforms.find(x => x.id === t.id); return p ? domainDue(p) : false; })());
+      const domains = await pool(domainTargets, 2, 12_000, async t => ({ id: t.id, expiresAt: await readDomainExpiry(t.domain) }));
+      const domainById = new Map(domains.map(d => [d.id, d.expiresAt] as const));
+      if (domainById.size) platforms = platforms.map(p => domainById.has(p.id) ? applyDomain(p, domainById.get(p.id) ?? null, now) : p);
+      await tokenWatch.check(process.env.GITHUB_READ_ONLY_TOKEN);
       broadcastRealtimeUpdate('SITE_WATCH');
       await persistenceQueue;
       await notifyChanges();
@@ -1138,8 +1151,8 @@ async function startServer() {
     await siteService.refresh({});
     const targets = platforms
       .filter(p => p.lifecycleState === 'active' && p.runtimeMode !== 'local-only' && p.runtimeMode !== 'github-local')
-      .map(p => ({ id: p.id, url: siteService.url(p) }))
-      .filter((t): t is { id: string; url: string } => Boolean(t.url));
+      .map(p => ({ id: p.id, codeName: p.codeName, url: siteService.url(p) }))
+      .filter((t): t is { id: string; codeName: string; url: string } => Boolean(t.url));
     return res.json({ targets });
   }));
 
