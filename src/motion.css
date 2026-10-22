@@ -1,0 +1,94 @@
+/* ORBIT — round 2 motion system. Presentation only, loaded last.
+   Tokens: one easing curve, three durations, one stagger step.
+   Rules: transform / opacity / stroke-dashoffset only, 120-300ms, no loops, every animation runs once on mount.
+   Entrance animations use fill-mode `backwards`, so the element's own (static) style is the end state and
+   hover transforms keep working. Everything lives inside no-preference: with reduce, nothing here applies
+   and all content is simply visible. */
+:root {
+  --m-ease: cubic-bezier(.2, .7, .2, 1);
+  --m-fast: 120ms;
+  --m-base: 180ms;
+  --m-slow: 260ms;
+  --m-step: 40ms;
+  --m-rise: 8px;
+}
+
+@keyframes m-rise { from { opacity: 0; transform: translateY(var(--m-rise)); } }
+@keyframes m-fade { from { opacity: 0; } }
+@keyframes m-pop { from { opacity: 0; transform: scale(.94); } }
+@keyframes m-grow-x { from { transform: scaleX(0); } }
+@keyframes m-grow-y { from { transform: scaleY(0); } }
+@keyframes m-dash { from { stroke-dashoffset: var(--arc, 0); } to { stroke-dashoffset: 0; } }
+@keyframes m-drop { from { opacity: 0; transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Hero: copy and dial settle in (short items only). */
+  .orbit-one .one-hero-content > * { animation: m-rise var(--m-slow) var(--m-ease) backwards; }
+  .orbit-one .one-hero-content > :nth-child(2) { animation-delay: var(--m-step); }
+  .orbit-one .one-hero-content > :nth-child(3) { animation-delay: calc(var(--m-step) * 2); }
+  .orbit-one .one-hero-content > :nth-child(4) { animation-delay: calc(var(--m-step) * 3); }
+  .orbit-one .one-hero-content > :nth-child(n+5) { animation-delay: calc(var(--m-step) * 4); }
+  .one-dial .one-dial-core, .one-dial .one-dial-pct, .one-dial .one-dial-cap { animation: m-fade var(--m-slow) var(--m-ease) backwards; }
+  .one-dial .one-dial-nodes { animation: m-fade var(--m-slow) var(--m-ease) 80ms backwards; }
+  .one-dial .one-dial-arc { animation: m-dash var(--m-slow) var(--m-ease) 80ms backwards; }
+
+  /* Score strip: tiles rise in order; ticks fill once; ring fades in. */
+  .orbit-one .one-score-card { animation: m-rise var(--m-slow) var(--m-ease) backwards; }
+  .orbit-one .one-score-card:nth-child(2) { animation-delay: var(--m-step); }
+  .orbit-one .one-score-card:nth-child(3) { animation-delay: calc(var(--m-step) * 2); }
+  .orbit-one .one-score-card:nth-child(4) { animation-delay: calc(var(--m-step) * 3); }
+  .orbit-one .one-ticks i.on { transform-origin: bottom; animation: m-grow-y var(--m-slow) var(--m-ease) 120ms backwards; }
+  .orbit-one .one-ticks i.on:nth-child(n+4) { animation-delay: 160ms; }
+  .orbit-one .one-ticks i.on:nth-child(n+7) { animation-delay: 200ms; }
+  .orbit-one .one-ticks i.on:nth-child(n+10) { animation-delay: 240ms; }
+  .orbit-one .one-coverage-ring { animation: m-pop var(--m-slow) var(--m-ease) 120ms backwards; }
+
+  /* Panels and sections. */
+  .orbit-one .one-panel, .orbit-one .one-program-heading, .orbit-one .one-program-tools, .orbit-one .one-footer { animation: m-rise var(--m-slow) var(--m-ease) 80ms backwards; }
+  .orbit-one .one-quick-add { animation: m-rise var(--m-base) var(--m-ease) backwards; }
+  .orbit-one .one-issue { animation: m-rise var(--m-slow) var(--m-ease) backwards; }
+  .orbit-one .one-no-incident-icon { animation: m-pop var(--m-slow) var(--m-ease) 120ms backwards; }
+
+  /* Program cards: first eight stagger by 40ms, the rest share the last delay. */
+  .orbit-one .one-program-card { animation: m-rise var(--m-slow) var(--m-ease) 280ms backwards; transition: transform var(--m-base) var(--m-ease), box-shadow var(--m-base) var(--m-ease), border-color var(--m-base) var(--m-ease); }
+  .orbit-one .one-program-card:nth-child(1) { animation-delay: 80ms; }
+  .orbit-one .one-program-card:nth-child(2) { animation-delay: 120ms; }
+  .orbit-one .one-program-card:nth-child(3) { animation-delay: 160ms; }
+  .orbit-one .one-program-card:nth-child(4) { animation-delay: 200ms; }
+  .orbit-one .one-program-card:nth-child(5) { animation-delay: 240ms; }
+  .orbit-one .one-program-card:nth-child(6) { animation-delay: 280ms; }
+  .orbit-one .one-program-card:nth-child(7) { animation-delay: 320ms; }
+  .orbit-one .one-program-card:nth-child(8) { animation-delay: 360ms; }
+  .orbit-one .one-program-card:nth-child(n+9) { animation-delay: 360ms; }
+
+  /* Status banner / toast: drops in. */
+  .orbit-shell > div[role="status"][aria-live="polite"] { animation: m-drop var(--m-base) var(--m-ease) backwards; }
+
+  /* Overlay (program detail, workspace tabs): backdrop fades, panel rises, content cross-fades per tab. */
+  .one-overlay-backdrop { animation: m-fade var(--m-base) var(--m-ease) backwards; }
+  .one-overlay-panel { animation: m-rise var(--m-slow) var(--m-ease) backwards; }
+  .one-overlay-panel .orbit-workspace-overview, .one-overlay-panel .orbit-program-page > :not(:first-child) { animation: m-rise var(--m-slow) var(--m-ease) 40ms backwards; --m-rise: 6px; }
+  .orbit-workspace-hero, .orbit-program-page > :first-child { animation: m-fade var(--m-slow) var(--m-ease) backwards; }
+  .orbit-workspace-stat { animation: m-rise var(--m-slow) var(--m-ease) 80ms backwards; }
+  .orbit-workspace-stat:nth-child(2) { animation-delay: 120ms; }
+  .orbit-workspace-stat:nth-child(3) { animation-delay: 160ms; }
+  .orbit-workspace-stat:nth-child(4) { animation-delay: 200ms; }
+  .orbit-workspace-fleet-item, .orbit-workspace-tiles > button, .orbit-workspace-case { animation: m-rise var(--m-slow) var(--m-ease) 240ms backwards; }
+  .orbit-workspace-fleet-item:nth-child(-n+8), .orbit-workspace-tiles > button:nth-child(-n+8), .orbit-workspace-case:nth-child(-n+8) { animation-delay: 240ms; }
+  .orbit-workspace-fleet-item:nth-child(1), .orbit-workspace-tiles > button:nth-child(1), .orbit-workspace-case:nth-child(1) { animation-delay: 160ms; }
+  .orbit-workspace-fleet-item:nth-child(2), .orbit-workspace-tiles > button:nth-child(2), .orbit-workspace-case:nth-child(2) { animation-delay: 200ms; }
+  .orbit-workspace-rail-track > i { animation: m-grow-x var(--m-slow) var(--m-ease) 200ms backwards; }
+  .orbit-program-tabs button[aria-current="page"]::after { content: ''; position: absolute; inset-inline: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: currentColor; opacity: .55; animation: m-grow-x var(--m-base) var(--m-ease) backwards; }
+
+  /* Disclosures reveal with a quick fade (no movement over dense content). */
+  details[open] > :not(summary), .one-link-issues details[open] ul { animation: m-fade var(--m-base) var(--m-ease) backwards; }
+
+  /* Micro-interactions. */
+  .orbit-one .one-button, .orbit-main-button, .orbit-quiet-button, .one-close-overlay, .orbit-filter-tabs button { transition: transform var(--m-fast) var(--m-ease), background-color var(--m-base) var(--m-ease), box-shadow var(--m-base) var(--m-ease); }
+  .orbit-one .one-button:active, .orbit-main-button:active, .orbit-quiet-button:active, .one-close-overlay:active, .orbit-filter-tabs button:active { transform: scale(.98); }
+  .orbit-shell main .orbit-app-card:active, .orbit-shell main .orbit-workspace-fleet-item:active, .orbit-shell main .orbit-workspace-tiles > button:active { transform: scale(.99); }
+  .orbit-workspace-fleet-item, .orbit-workspace-tiles > button { transition: transform var(--m-base) var(--m-ease), box-shadow var(--m-base) var(--m-ease), border-color var(--m-base) var(--m-ease); }
+  .one-program-top > svg:last-child, .orbit-workspace-fleet-arrow, .orbit-workspace-tiles > button > svg { transition: transform var(--m-base) var(--m-ease); }
+  .one-program-card:hover .one-program-top > svg:last-child, .orbit-workspace-fleet-item:hover .orbit-workspace-fleet-arrow, .orbit-workspace-tiles > button:hover > svg { transform: translate(-2px, -2px); }
+  .one-close-overlay:hover svg { transform: translate(-1px, -1px); }
+}

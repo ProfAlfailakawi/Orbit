@@ -169,6 +169,19 @@ export function WorkspaceOverview({
           <span className="orbit-workspace-source"><span/> {view.note}</span>
         </div>
 
+        {(mode === 'fleet' ? fleet.length > 0 : mode === 'operations' ? totalCriteria > 0 : false) && (() => {
+          const part = mode === 'fleet' ? connected.length : proof;
+          const whole = mode === 'fleet' ? fleet.length : totalCriteria;
+          const RailIcon = mode === 'fleet' ? Wifi : ShieldCheck;
+          return (
+            <div className="orbit-workspace-rail" aria-hidden="true">
+              <RailIcon size={15}/>
+              <span className="orbit-workspace-rail-num">{part} / {whole}</span>
+              <span className="orbit-workspace-rail-track"><i style={{ transform: `scaleX(${whole ? part / whole : 0})` }}/></span>
+            </div>
+          );
+        })()}
+
         {mode === 'fleet' ? (
           <>
             <label className="orbit-searchbox orbit-workspace-search"><Search size={16}/><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث عن برنامج…" aria-label="تصفية دليل البرامج"/></label>

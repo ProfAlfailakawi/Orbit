@@ -102,7 +102,7 @@ function FleetDial({ fleet, affected, coverage }: {
         <line key={a} x1={C} y1={C - 170} x2={C} y2={C + 170} className="one-dial-spoke" transform={`rotate(${a} ${C} ${C})`}/>
       ))}
       <circle cx={C} cy={C} r={arcR} className="one-dial-arc-bg"/>
-      <circle cx={C} cy={C} r={arcR} className="one-dial-arc" strokeDasharray={`${(circ * coverage) / 100} ${circ}`} transform={`rotate(-90 ${C} ${C})`}/>
+      <circle cx={C} cy={C} r={arcR} className="one-dial-arc" style={{ '--arc': (circ * coverage) / 100 } as React.CSSProperties} strokeDasharray={`${(circ * coverage) / 100} ${circ}`} transform={`rotate(-90 ${C} ${C})`}/>
       <circle cx={C} cy={C} r={46} fill="url(#one-dial-core)" className="one-dial-core"/>
       <text x={C} y={C + 4} textAnchor="middle" className="one-dial-pct">{coverage}%</text>
       <text x={C} y={C + 24} textAnchor="middle" className="one-dial-cap">ORBIT</text>
