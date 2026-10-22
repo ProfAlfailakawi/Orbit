@@ -5,7 +5,9 @@ import { displayName } from './displayName.ts';
 import { freshBrowserProblems, freshBrowserWarnings } from './browserVisit.ts';
 import { freshSensorProblems, sensorTrailLines } from './sensor.ts';
 import { certProblems, certWarnings } from './certs.ts';
-import { driftWarnings } from './vitals.ts';
+import { driftWarnings, releaseSlowdown } from './vitals.ts';
+import { serverProblems, serverWarnings } from './cloudLogs.ts';
+import { sensorChannelWarnings } from './sensorChannel.ts';
 import { domainProblems, domainWarnings } from './expiry.ts';
 import { probableCause } from './causes.ts';
 
@@ -125,7 +127,7 @@ export function getProgramProblems(p: PlatformRecord): string[] {
   if (f?.userJourneyHealthy === false) out.push('تجربة المستخدم الأساسية تحتاج مراجعة');
   // What the site visitor found on the public page (a broken app file, an error page), while the finding is fresh.
   if (p.siteProblems?.length && p.siteCheckedAt && Date.now() - Date.parse(p.siteCheckedAt) < 36 * 3_600_000) out.push(...p.siteProblems);
-  out.push(...freshBrowserProblems(p), ...freshSensorProblems(p), ...certProblems(p), ...domainProblems(p));
+  out.push(...freshBrowserProblems(p), ...freshSensorProblems(p), ...serverProblems(p), ...certProblems(p), ...domainProblems(p));
   const failed = (p.recentRuns || []).find(r => r.dataIntegrity === 'Live' && r.status === 'failure');
   if (failed && f?.ciPassed === false) out.push('آخر عملية فاشلة: ' + sanitizeTelemetryPayload(failed.workflowName + ' — ' + failed.commitMessage).sanitized.slice(0, 160));
   return [...new Set(out)];
@@ -133,7 +135,7 @@ export function getProgramProblems(p: PlatformRecord): string[] {
 
 /** Early warnings: nothing is broken yet, but something is drifting or hygiene is missing. Never counted as a failure. */
 export function getProgramWarnings(p: PlatformRecord, now = Date.now()): string[] {
-  return [...new Set([...driftWarnings(p, now), ...certWarnings(p, now), ...domainWarnings(p, now), ...freshBrowserWarnings(p, now)])];
+  return [...new Set([...releaseSlowdown(p, now), ...driftWarnings(p, now), ...serverWarnings(p, now), ...sensorChannelWarnings(p, now), ...certWarnings(p, now), ...domainWarnings(p, now), ...freshBrowserWarnings(p, now)])];
 }
 
 /** If a problem is showing and the newest commit is later than the last time the site was healthy, name that commit. */
@@ -142,7 +144,8 @@ export function releaseSuspect(p: PlatformRecord): string | null {
   const commit = (p.recentCommits || []).find(c => c.dataIntegrity === 'Live' && /^[a-f0-9]{7,64}$/i.test(c.sha));
   if (!commit || !(Date.parse(commit.timestamp) > Date.parse(p.siteLastOkAt))) return null;
   const files = commit.changedFiles.slice(0, 5).map(f => sanitizeTelemetryPayload(f).sanitized).join('، ');
-  return `المشكلة بدأت بعد آخر تعديل: ${commit.sha.slice(0, 7)} «${sanitizeTelemetryPayload(commit.message).sanitized.split('\n')[0].slice(0, 100)}»${files ? ' — الملفات: ' + files : ''}. آخر مرة كان الموقع سليمًا: ${p.siteLastOkAt.slice(0, 16).replace('T', ' ')} UTC`;
+  const link = p.repoUrl && /^https:\/\/github\.com\//.test(p.repoUrl) ? ` — ${p.repoUrl.replace(/\/+$/, '')}/commit/${commit.sha}` : '';
+  return `المشكلة بدأت بعد آخر تعديل: ${commit.sha.slice(0, 7)} «${sanitizeTelemetryPayload(commit.message).sanitized.split('\n')[0].slice(0, 100)}»${files ? ' — الملفات: ' + files : ''}${link}. آخر مرة كان الموقع سليمًا: ${p.siteLastOkAt.slice(0, 16).replace('T', ' ')} UTC`;
 }
 
 /** Plain-Arabic reason a program is not linked to live evidence, or null when linked / intentionally local. */

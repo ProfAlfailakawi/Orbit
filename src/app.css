@@ -62,6 +62,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .btn.is-copied::before { content: '✓'; margin-inline-end: 6px; font-weight: 700; }
 .btn.is-on { color: var(--ok-ink); border-color: var(--ok-edge); background: var(--ok-bg); }
 .btn-danger { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-edge); }
+.row-center { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .btn-add { align-self: center; border-style: dashed; border-color: var(--muted); background: transparent; color: var(--ink); padding-inline: 22px; }
 
 .page { display: flex; flex-direction: column; gap: 18px; max-width: 1080px; margin: 0 auto; padding: 20px 16px max(44px, env(safe-area-inset-bottom)); }

@@ -1,7 +1,7 @@
 /** Applying a site visit to a program record. Pure, so the server routes stay thin and this is unit-tested. */
 import type { PlatformRecord } from './types.ts';
 import type { VisitResult } from './visitor.ts';
-import { addVital } from './vitals.ts';
+import { addVital, trackRelease } from './vitals.ts';
 
 const confirmedChecks = (fourState: PlatformRecord['fourState']) => Object.values(fourState).filter(v => v !== null).length;
 
@@ -13,6 +13,12 @@ function healthOf(p: PlatformRecord, fourState: PlatformRecord['fourState'], pro
 
 export function applyVisit(p: PlatformRecord, url: string, visit: VisitResult, nowIso: string): PlatformRecord {
   const fourState = { ...p.fourState, siteReachable: visit.reachable };
+  const next = withVisit(p, url, visit, nowIso, fourState);
+  const releaseWatch = trackRelease(next);
+  return releaseWatch === next.releaseWatch ? next : { ...next, releaseWatch };
+}
+
+function withVisit(p: PlatformRecord, url: string, visit: VisitResult, nowIso: string, fourState: PlatformRecord['fourState']): PlatformRecord {
   return {
     ...p,
     productionUrl: url,

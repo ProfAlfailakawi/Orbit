@@ -2,7 +2,7 @@
 import type { PlatformRecord } from './types.ts';
 import { VISUAL_CHANGE_BITS, hashDistance } from './pageAudit.ts';
 
-export interface BrowserVisitReport { id: string; url: string; ok: boolean; problems: string[]; warnings: string[]; hash?: string }
+export interface BrowserVisitReport { id: string; url: string; ok: boolean; problems: string[]; warnings: string[]; hash?: string; sensor?: 'installed' | 'absent' }
 
 const MAX_PROBLEMS = 10;
 const MAX_WARNINGS = 8;
@@ -21,7 +21,8 @@ export function parseBrowserReports(body: unknown): BrowserVisitReport[] {
       .filter(Boolean).slice(0, max);
     const problems = clean(r.problems, MAX_PROBLEMS);
     const hash = typeof r.hash === 'string' && /^[0-9a-f]{16}$/.test(r.hash) ? r.hash : undefined;
-    out.push({ id: r.id.slice(0, 80), url: r.url.slice(0, 300), ok: r.ok && problems.length === 0, problems, warnings: clean(r.warnings, MAX_WARNINGS), hash });
+    const sensor = r.sensor === 'installed' || r.sensor === 'absent' ? r.sensor : undefined;
+    out.push({ id: r.id.slice(0, 80), url: r.url.slice(0, 300), ok: r.ok && problems.length === 0, problems, warnings: clean(r.warnings, MAX_WARNINGS), hash, ...(sensor ? { sensor } : {}) });
   }
   return out;
 }
@@ -33,7 +34,7 @@ export function applyBrowserVisit(p: PlatformRecord, report: BrowserVisitReport,
   const before = p.browserVisit?.hash;
   const changed = before && report.hash && hashDistance(before, report.hash) >= VISUAL_CHANGE_BITS;
   const warnings = changed ? ['شكل الصفحة الرئيسية تغيّر بشدة عن الفحص السابق، تأكد أنه تغيير مقصود', ...report.warnings].slice(0, MAX_WARNINGS) : report.warnings;
-  return { ...p, browserVisit: { at: nowIso, ok: report.ok, problems: report.problems, warnings, hash: report.hash ?? before } };
+  return { ...p, browserVisit: { at: nowIso, ok: report.ok, problems: report.problems, warnings, hash: report.hash ?? before, ...(report.sensor ? { sensor: report.sensor } : {}) } };
 }
 
 /** Findings from the last browser visit while still fresh (a daily visit stays valid for 36 hours). */

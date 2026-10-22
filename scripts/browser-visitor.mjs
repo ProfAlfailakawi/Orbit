@@ -93,7 +93,21 @@ async function lookHash(browser, jpeg) {
   } catch { return undefined; } finally { await page.close(); }
 }
 
-async function openPage(browser, profile, url, { first, hashOf }) {
+/**
+ * Once per site, on the first page that carries the ORBIT sensor: make that page throw a marked test error through its own sensor
+ * and give the beacon time to leave. ORBIT records the arrival as proof the channel works (see src/core/sensorChannel.ts).
+ * The marked note never becomes a finding, and it is sent only through the sensor script the site already runs.
+ */
+async function probeSensor(page, probe) {
+  if (probe.done) return;
+  const installed = await page.evaluate(() => Boolean(document.querySelector('script[src*="orbit-sensor.js"]'))).catch(() => false);
+  if (!installed) return;
+  probe.seen = true; probe.done = true;
+  await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'ORBIT-SELFTEST', filename: location.origin + '/orbit-selftest.js', error: new Error('ORBIT-SELFTEST') }))).catch(() => {});
+  await page.waitForTimeout(4500);
+}
+
+async function openPage(browser, profile, url, { first, hashOf, probe }) {
   const problems = [];
   const warnings = [];
   const context = await browser.newContext({ ...profile.options, locale: 'ar', reducedMotion: 'reduce', serviceWorkers: 'block' });
@@ -125,12 +139,14 @@ async function openPage(browser, profile, url, { first, hashOf }) {
     headers = response ? response.headers() : {};
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     const facts = await page.evaluate(collect);
+    if (probe && !facts.blank) probe.pages += 1;
     if (facts.blank) problems.push(`${profile.tag}الصفحة تظهر فارغة بعد التحميل`);
     snapshot = { ...facts, consoleErrors: [...new Set(consoleErrors)].slice(0, 3), loadMs };
     if (first && profile.device === 'desktop') {
       const jpeg = await page.screenshot({ type: 'jpeg', quality: 60 }).catch(() => null);
       if (jpeg && !facts.blank) hash = await lookHash(browser, jpeg);
     }
+    if (probe && profile.device === 'desktop') await probeSensor(page, probe);
   } catch (e) {
     problems.push(profile.slow ? `${profile.tag}تعذر فتح الموقع على اتصال ضعيف: ${short(e.message)}` : `${profile.tag}تعذر فتح الموقع: ${short(e.message)}`);
   } finally {
@@ -148,10 +164,11 @@ async function openPage(browser, profile, url, { first, hashOf }) {
 async function visit(browser, target, runStarted) {
   const siteStarted = Date.now();
   const problems = []; const warnings = []; let hash; let links = [];
+  const probe = { done: false, seen: false, pages: 0 };
   for (const profile of PROFILES) {
     if (Date.now() - siteStarted > SITE_BUDGET_MS || Date.now() - runStarted > RUN_BUDGET_MS) { warnings.push('انتهى وقت الفحص قبل إكمال كل الأجهزة'); break; }
     const first = profile.device === 'desktop';
-    const result = await openPage(browser, profile, target.url, { first });
+    const result = await openPage(browser, profile, target.url, { first, probe });
     problems.push(...result.problems); warnings.push(...result.warnings);
     if (first) { hash = result.hash; links = result.links; }
   }
@@ -159,7 +176,7 @@ async function visit(browser, target, runStarted) {
   for (const page of crawlTargets(links, target.url, CRAWL_PAGES)) {
     if (Date.now() - siteStarted > SITE_BUDGET_MS || Date.now() - runStarted > RUN_BUDGET_MS) break;
     const label = `صفحة ${new URL(page).pathname}: `;
-    const result = await openPage(browser, PROFILES[0], page, { first: false });
+    const result = await openPage(browser, PROFILES[0], page, { first: false, probe });
     problems.push(...result.problems.map(x => label + x)); warnings.push(...result.warnings.map(x => label + x));
   }
   // The same finding on every device is one finding: keep the first (desktop) wording, and keep phone-only ones tagged.
@@ -170,7 +187,7 @@ async function visit(browser, target, runStarted) {
   }
   const unique = list => { const seen = new Set(); return list.filter(x => { const key = x.replace(/^(صفحة [^:]*: )?\[(?:جوال|جوال بطيء)\] /, '$1'); return seen.has(key) ? false : (seen.add(key), true); }); };
   const finalProblems = unique(problems).slice(0, 10);
-  return { id: target.id, url: target.url, ok: finalProblems.length === 0, problems: finalProblems, warnings: unique(warnings).slice(0, 8), hash };
+  return { id: target.id, url: target.url, ok: finalProblems.length === 0, problems: finalProblems, warnings: unique(warnings).slice(0, 8), hash, ...(probe.seen ? { sensor: 'installed' } : probe.pages ? { sensor: 'absent' } : {}) };
 }
 
 const runStarted = Date.now();

@@ -159,6 +159,18 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
     } else setManualText(text);
   };
 
+  const [weekly, setWeekly] = useState<'idle' | 'loading' | 'copied' | 'failed'>('idle');
+  const copyWeekly = async () => {
+    setWeekly('loading');
+    try {
+      const response = await fetch('/api/weekly-report', { credentials: 'same-origin' });
+      const { text } = await response.json() as { text?: string };
+      if (!response.ok || !text) throw new Error('empty');
+      if (await copyToClipboard(text)) { setManualText(null); setWeekly('copied'); window.setTimeout(() => setWeekly('idle'), 2500); }
+      else { setManualText(text); setWeekly('idle'); }
+    } catch { setWeekly('failed'); window.setTimeout(() => setWeekly('idle'), 2500); }
+  };
+
   const explain = async (id: string) => {
     setExplained({ id, state: 'loading' });
     try { setExplained({ id, state: await onExplain(id) }); } catch { setExplained({ id, state: 'failed' }); }
@@ -269,7 +281,12 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
           )}
         </form>
       ) : (
-        <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
+        <div className="row-center">
+          <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
+          <button type="button" className="btn btn-add" disabled={weekly === 'loading'} onClick={() => void copyWeekly()}>
+            {weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
+          </button>
+        </div>
       )}
 
       <footer className="foot">أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</footer>
