@@ -54,12 +54,12 @@ try {
   await page.getByRole('button', { name: 'تحديث', exact: true }).waitFor({ timeout: 90000 });
 
   // Every problem or monitoring gap has a copy button that really fills the clipboard.
-  const copyAll = page.getByRole('button', { name: /انسخ (كل المشاكل|التقرير) لكلود/ });
+  const copyAll = page.getByRole('button', { name: /^انسخ (كل المشاكل|التقرير)$/ });
   await copyAll.waitFor();
   await copyAll.click();
-  await page.getByText('تم النسخ — الصقه في كلود').waitFor();
+  await page.getByText('تم النسخ', { exact: true }).first().waitFor();
   const clipboard = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
-  if (clipboard) assert.match(clipboard, /تقرير أوربت لكلود/, 'Copied text must be the Claude report');
+  if (clipboard) assert.match(clipboard, /تقرير أوربت/, 'Copied text must be the ORBIT report');
   const rowCopy = page.locator('.program-row .btn-copy').first();
   await rowCopy.waitFor();
   await rowCopy.click();

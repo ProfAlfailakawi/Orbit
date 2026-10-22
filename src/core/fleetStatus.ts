@@ -75,8 +75,8 @@ export function programsPhrase(n: number): string {
 export function summarize(rows: ProgramRow[], reason: string | null = null): Summary {
   const bad = rows.filter(r => r.tone === 'bad').length;
   const warn = rows.filter(r => r.tone === 'warn').length;
-  if (bad) return { bad, warn, tone: 'bad', headline: (bad === 1 ? 'يوجد برنامج فيه مشكلة' : 'يوجد ' + programsPhrase(bad) + ' فيها مشاكل'), buttonLabel: 'انسخ كل المشاكل لكلود', reason };
-  if (warn) return { bad, warn, tone: 'warn', headline: 'لا توجد مشاكل مؤكدة، لكن الرصد ناقص في ' + programsPhrase(warn), buttonLabel: 'انسخ التقرير لكلود', reason };
+  if (bad) return { bad, warn, tone: 'bad', headline: (bad === 1 ? 'يوجد برنامج فيه مشكلة' : 'يوجد ' + programsPhrase(bad) + ' فيها مشاكل'), buttonLabel: 'انسخ كل المشاكل', reason };
+  if (warn) return { bad, warn, tone: 'warn', headline: 'لا توجد مشاكل مؤكدة، لكن الرصد ناقص في ' + programsPhrase(warn), buttonLabel: 'انسخ التقرير', reason };
   return { bad, warn, tone: 'ok', headline: rows.length ? 'كل البرامج تعمل' : 'لا توجد برامج بعد', buttonLabel: null, reason: null };
 }
 

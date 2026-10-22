@@ -139,7 +139,7 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
   const withProblems = fleet.map(p => ({ p, problems: getProgramProblems(p) })).filter(x => x.problems.length);
   const open = incidents.filter(i => i.dataIntegrity === 'Live' && !['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"].includes(i.status));
   const lines = [
-    '# تقرير أوربت لكلود — ' + today,
+    '# تقرير أوربت — ' + today,
     MANDATORY_CLAUDE_GUARDRAIL,
     '',
     'المطلوب: افحص المشاكل أدناه وحدد السبب بالدليل، ثم اقترح أقل تعديل ممكن للموافقة قبل التنفيذ.',

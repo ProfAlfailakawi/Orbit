@@ -64,7 +64,7 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
         <h1>{summary.headline}</h1>
         {summary.buttonLabel && (
           <button type="button" className="btn btn-primary" onClick={() => void copy('all')}>
-            {copied === 'all' ? 'تم النسخ — الصقه في كلود' : summary.buttonLabel}
+            {copied === 'all' ? 'تم النسخ' : summary.buttonLabel}
           </button>
         )}
         {summary.reason && <p className="reason">{'السبب: ' + summary.reason}</p>}
@@ -88,8 +88,8 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
               <span className="row-text">{text}</span>
             </div>
             {needsCopy && (
-              <button type="button" className="btn btn-copy" aria-label={'انسخ لكلود: ' + shortName(p)} onClick={() => void copy(p.id)}>
-                {copied === p.id ? 'تم النسخ' : 'انسخ لكلود'}
+              <button type="button" className="btn btn-copy" aria-label={'انسخ مشكلة: ' + shortName(p)} onClick={() => void copy(p.id)}>
+                {copied === p.id ? 'تم النسخ' : 'انسخ'}
               </button>
             )}
           </li>
