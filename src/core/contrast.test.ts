@@ -20,12 +20,29 @@ const ratio = (a: string, b: string) => {
 // Every text colour is only ever drawn on these backgrounds.
 const pairs: Array<[string, string]> = [
   ['ink', 'bg'], ['ink', 'card'], ['muted', 'bg'], ['muted', 'card'],
-  ['btn-ink', 'btn'], ['btn', 'card'], ['btn', 'bg'],
+  ['btn-ink', 'btn'], ['btn-ink', 'btn2'], ['btn', 'card'], ['btn', 'bg'],
+  ['muted', 'bad-bg'], ['muted', 'warn-bg'], ['muted', 'ok-bg'],
+  ['bad-ink', 'card'], ['warn-ink', 'card'],
   ['bad-ink', 'bad-bg'], ['warn-ink', 'warn-bg'], ['ok-ink', 'card'], ['ok-ink', 'ok-bg'],
   ['ink', 'bad-bg'], ['ink', 'warn-bg'], ['ink', 'ok-bg'], ['bad-ink', 'card'],
 ];
 
+// Shapes and strokes (status badges, ring) need 3:1. A literal hex may stand in for a token.
+const shapes: Array<[string, string]> = [
+  ['on-bad', 'bad-edge'], ['on-warn', 'warn-edge'], ['ok-ink', 'ok-bg'],
+  ['bad-edge', 'card'], ['warn-edge', 'card'], ['ok-edge', 'card'],
+  ['bad-edge', 'bad-bg'], ['warn-edge', 'warn-bg'], ['ok-edge', 'ok-bg'],
+];
+const colour = (theme: Record<string, string>, key: string) => (key.startsWith('#') ? key : theme[key]);
+
 for (const [name, theme] of [['light', light], ['dark', dark]] as const) {
+  test(`${name} theme: status shapes and the ring meet 3:1`, () => {
+    for (const [fg, bg] of shapes) {
+      const r = ratio(colour(theme, fg), colour(theme, bg));
+      assert.ok(r >= 3, `${fg} on ${bg} is ${r.toFixed(2)}:1 in ${name}`);
+    }
+  });
+
   test(`${name} theme: text/background pairs meet WCAG AA (4.5:1)`, () => {
     for (const [fg, bg] of pairs) {
       assert.ok(theme[fg] && theme[bg], `missing token ${fg} or ${bg}`);

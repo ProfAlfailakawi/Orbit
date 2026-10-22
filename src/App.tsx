@@ -8,6 +8,7 @@ import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/a
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, sharedLinkReason, summarize } from './core/fleetStatus';
 import { Dashboard } from './components/Dashboard';
+import { Mark } from './components/Mark';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
 
@@ -244,7 +245,7 @@ export default function App() {
     return (
       <div className="login-wrap" dir="rtl">
         <form className="card login" onSubmit={handleLogin}>
-          <h1>أوربت</h1>
+          <div className="login-brand"><Mark size={44} /><h1>أوربت</h1></div>
           <label htmlFor="orbit-passkey-input">رمز الدخول</label>
           <input id="orbit-passkey-input" type="password" autoComplete="current-password" value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
@@ -257,7 +258,7 @@ export default function App() {
   return (
     <div dir="rtl" className="shell">
       <header className="bar">
-        <span className="brand">أوربت</span>
+        <span className="brand"><Mark />أوربت</span>
         <div className="bar-actions">
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
             {isSyncing ? 'جارٍ الفحص…' : 'تحديث'}
