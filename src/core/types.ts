@@ -232,7 +232,7 @@ export interface PlatformRecord {
   /** Last time the sensor's daily self-test note (sent by the robot through the program's own page) reached ORBIT. */
   sensorProbeAt?: string;
   /** Errors in the program's own server logs (Cloud Run), grouped by message; checked every watch when a log source is configured. */
-  serverErrors?: Array<{ text: string; count: number; lastAt: string }>;
+  serverErrors?: Array<{ text: string; count: number; lastAt: string; /** Cloud Run revision that logged it: a new revision that fails to start serves no visitors. */ revision?: string; /** false = that revision gets no traffic (known from the service's traffic split); undefined = not known, treated as serving. */ serving?: boolean }>;
   serverLogsCheckedAt?: string;
   /** Why the log source could not be read (no permission, wrong project), so a silent gap is never mistaken for "no errors". */
   serverLogsIssue?: string;

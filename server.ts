@@ -1163,12 +1163,12 @@ async function startServer() {
       // Server-side errors from each program's own Cloud Run logs (only for programs listed in ORBIT_LOG_SOURCES).
       if (logSources.length) {
         const since = new Date(Date.now() - LOG_WINDOW_MS).toISOString();
-        const read = await pool(logSources, 3, 30_000, async source => ({ source, result: await logReader.read(source, since) }));
-        const byCode = new Map(read.map(r => [r.source.codeName, r.result] as const));
+        const read = await pool(logSources, 3, 30_000, async source => ({ source, result: await logReader.read(source, since), serving: await logReader.servingRevisions(source) }));
+        const byCode = new Map(read.map(r => [r.source.codeName, r] as const));
         platforms = platforms.map(p => {
-          const result = byCode.get(p.codeName.toUpperCase());
-          if (!result) return p;
-          return 'entries' in result ? applyServerErrors(p, summarizeLogEntries(result.entries), null, now) : applyServerErrors(p, null, result.error, now);
+          const got = byCode.get(p.codeName.toUpperCase());
+          if (!got) return p;
+          return 'entries' in got.result ? applyServerErrors(p, summarizeLogEntries(got.result.entries, got.serving), null, now) : applyServerErrors(p, null, got.result.error, now);
         });
       }
       await tokenWatch.check(process.env.GITHUB_READ_ONLY_TOKEN);
