@@ -52,6 +52,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .btn-primary { background: linear-gradient(135deg, var(--btn), var(--btn2)); color: var(--btn-ink); border-color: transparent; box-shadow: 0 8px 20px -8px var(--btn); }
 .btn.is-copied { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-edge); box-shadow: none; }
 .btn.is-copied::before { content: '✓'; margin-inline-end: 6px; font-weight: 700; }
+.btn.is-on { color: var(--ok-ink); border-color: var(--ok-edge); background: var(--ok-bg); }
 .btn-danger { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-edge); }
 .btn-add { align-self: center; border-style: dashed; border-color: var(--muted); background: transparent; color: var(--ink); padding-inline: 22px; }
 

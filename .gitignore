@@ -10,3 +10,4 @@ coverage/
 test-artifacts/
 .orbit-logos.json
 .orbit-sites.json
+.orbit-push.json

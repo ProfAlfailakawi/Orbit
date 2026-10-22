@@ -8,6 +8,9 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { createLogoService } from './src/core/logoService.ts';
 import { createSiteService } from './src/core/siteService.ts';
+import { createPushService, validSubscription } from './src/core/pushService.ts';
+import { computeAlertChanges } from './src/core/alerts.ts';
+import { buildRows } from './src/core/fleetStatus.ts';
 import { visitSite, type VisitDeps } from './src/core/visitor.ts';
 import { safeGet } from './src/core/safeFetch.ts';
 import { applyVisit, clearSite, pool } from './src/core/watch.ts';
@@ -298,6 +301,7 @@ const processedIdempotencyKeys = new Set<string>();
 
 const LOGO_SNAPSHOT_PATH = path.join(__dirname, '.orbit-logos.json');
 const SITE_SNAPSHOT_PATH = path.join(__dirname, '.orbit-sites.json');
+const PUSH_SNAPSHOT_PATH = path.join(__dirname, '.orbit-push.json');
 
 async function startServer() {
   const app = express();
@@ -309,6 +313,19 @@ async function startServer() {
     firestore, snapshotPath: SITE_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
   });
   await siteService.load();
+  const pushService = createPushService({ firestore, snapshotPath: PUSH_SNAPSHOT_PATH });
+  await pushService.load();
+
+  /** Tell the owner's devices about new problems and recoveries since the last time anything was sent. */
+  async function notifyChanges() {
+    try {
+      const { messages, next } = computeAlertChanges(buildRows(platforms, incidents, events), pushService.alerts());
+      await pushService.setAlerts(next);
+      if (messages.length) await pushService.send(messages);
+    } catch (error) {
+      console.warn('ORBIT alert check failed:', error instanceof Error ? error.message : 'unknown');
+    }
+  }
   // The visitor judges the answer itself, so every status is returned (never throws on 4xx/5xx).
   const visitDeps: VisitDeps = { get: (url, opts) => safeGet(url, { ...opts, acceptStatus: () => true }) };
   const asyncRoute = (handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>) =>
@@ -664,6 +681,19 @@ async function startServer() {
     });
   });
 
+  // Alerts on the owner's phone: subscribe a device, forget it, or send it a test message.
+  app.get('/api/push/key', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ publicKey: pushService.publicKey(), devices: pushService.count() }); });
+  app.post('/api/push/subscribe', asyncRoute(async (req, res) => {
+    if (!validSubscription(req.body?.subscription)) return res.status(400).json({ error: 'اشتراك غير صالح' });
+    await pushService.subscribe(req.body.subscription);
+    const test = await pushService.send([{ kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' }]);
+    res.json({ subscribed: true, devices: pushService.count(), test });
+  }));
+  app.post('/api/push/unsubscribe', asyncRoute(async (req, res) => {
+    if (typeof req.body?.endpoint === 'string') await pushService.unsubscribe(req.body.endpoint.slice(0, 1000));
+    res.json({ subscribed: false, devices: pushService.count() });
+  }));
+
   // Real website of each program, discovered from its repository; and an on-demand visit of every site.
   app.get('/api/sites', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ sites: siteService.list() }); });
   app.post('/api/sites/refresh', asyncRoute(async (req, res) => {
@@ -972,6 +1002,7 @@ async function startServer() {
       }
       const healthy = result.syncedResults.length > 0 && result.syncedResults.every(item => item.integrity === 'Live');
       await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}), successful: healthy });
+      await notifyChanges();
       res.json(result);
     } catch {
       await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}) });
@@ -1016,6 +1047,7 @@ async function startServer() {
       });
       broadcastRealtimeUpdate('SITE_WATCH');
       await persistenceQueue;
+      await notifyChanges();
       return { checked: visited.length, problems: visited.filter(v => !v.visit.ok).length, withoutSite: withoutSite.size };
     } finally { watchActive = false; }
   }
@@ -1039,6 +1071,7 @@ async function startServer() {
       if (!persistenceHealthy) throw new Error('Firestore state persistence failed');
       if (!healthy) throw new Error('One or more monitored repositories are unavailable');
       await releaseGithubSyncLease({ successful: true });
+      await notifyChanges();
       return res.json({ completedAt: new Date().toISOString(), ...result });
     } catch (error) {
       appendAudit('Cloud Scheduler', 'GITHUB_SYNC_FAILED', 'Fleet', error instanceof Error ? error.message.slice(0, 300) : 'unknown error');
