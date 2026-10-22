@@ -12,7 +12,6 @@ interface DashboardProps {
 }
 
 const shortName = (p: PlatformRecord) => p.nameAr.replace(/\s*\([^)]*\)/g, '');
-const cardId = (p: PlatformRecord) => 'program-' + p.id.replace(/[^\w-]/g, '_');
 
 async function copyToClipboard(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through to the legacy path */ }
@@ -40,65 +39,61 @@ function Glyph({ tone, size = 24 }: { tone: RowTone; size?: number }) {
   );
 }
 
-/**
- * The orbit: every program is a satellite whose colour and shape are its real status.
- * Redundant with the cards below (so it is hidden from assistive tech); hovering or tapping a satellite names it and jumps to its card.
- */
-function Orbit({ rows, working, total, activeId, onActive }: {
-  rows: ProgramRow[]; working: number; total: number; activeId: string | null; onActive: (id: string | null, jump?: boolean) => void;
+/** Ring geometry as a percentage of the orbit box (viewBox 360): outer r=152, inner r=96. */
+const RING = { out: 42.2, inn: 26.7 } as const;
+
+function Orbit({ rows, working, total, selectedId, onSelect }: {
+  rows: ProgramRow[]; working: number; total: number; selectedId: string | null; onSelect: (id: string | null) => void;
 }) {
+  // Problems come first, so they sit on the inner ring, nearest the core.
   const inner = rows.length > 4 ? Math.round(rows.length * 0.36) : 0;
-  const active = rows.find(r => r.platform.id === activeId);
+  const rings = [
+    { key: 'inn', items: rows.slice(0, inner), phase: 24 },
+    { key: 'out', items: rows.slice(inner), phase: 0 },
+  ].filter(ring => ring.items.length);
+  const frac = total ? working / total : 0;
+  const arc = 2 * Math.PI * 74;
   return (
-    <div className="orbit" role="img" aria-label={`${working} من ${total} برامج تعمل`}>
-      <svg className="orbit-art" viewBox="0 0 320 320" aria-hidden="true">
+    <div className={'orbit' + (selectedId ? ' has-sel' : '')} role="group" aria-label="برامجك" onClick={event => { if (event.target === event.currentTarget) onSelect(null); }}>
+      <svg className="orbit-art" viewBox="0 0 360 360" aria-hidden="true">
         <defs>
           <radialGradient id="orb-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#7c8bff" stopOpacity=".42" /><stop offset=".55" stopColor="#6a3fe0" stopOpacity=".14" /><stop offset="1" stopColor="#6a3fe0" stopOpacity="0" />
+            <stop offset="0" stopColor="#69ffcd" stopOpacity=".26" /><stop offset=".6" stopColor="#33bfa6" stopOpacity=".08" /><stop offset="1" stopColor="#33bfa6" stopOpacity="0" />
           </radialGradient>
           <linearGradient id="orb-core" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#2a2f86" /><stop offset="1" stopColor="#120f45" />
+            <stop offset="0" stopColor="#2b6a69" /><stop offset=".55" stopColor="#133d49" /><stop offset="1" stopColor="#142c40" />
           </linearGradient>
         </defs>
-        <circle cx="160" cy="160" r="158" fill="url(#orb-glow)" />
-        <g className="spin-slow"><circle cx="160" cy="160" r="146" className="orbit-line" strokeDasharray="1 9" strokeLinecap="round" /></g>
-        <g className="spin-rev"><circle cx="160" cy="160" r="92" className="orbit-line" strokeDasharray="2 7" strokeLinecap="round" /></g>
-        <circle cx="160" cy="160" r="146" className="orbit-line orbit-line-soft" />
-        <circle cx="160" cy="160" r="92" className="orbit-line orbit-line-soft" />
-        <g className="comet"><circle cx="160" cy="14" r="3.2" fill="#fff" /><circle cx="160" cy="14" r="8" fill="#9fb0ff" opacity=".25" /></g>
-        <circle cx="160" cy="160" r="58" fill="url(#orb-core)" className="orbit-core-disc" />
+        <circle cx="180" cy="180" r="178" fill="url(#orb-glow)" className="orbit-breathe" />
+        <circle cx="180" cy="180" r="96" className="orbit-line orbit-line-fill" />
+        <circle cx="180" cy="180" r="62" fill="url(#orb-core)" className="orbit-core-disc" />
+        <circle cx="180" cy="180" r="74" className="orbit-arc-track" />
+        <circle cx="180" cy="180" r="74" className="orbit-arc" strokeDasharray={`${arc * frac} ${arc}`} transform="rotate(-90 180 180)" />
       </svg>
-      <div className="orbit-center" aria-hidden="true">
-        {active ? (
-          <>
-            <span className={'orbit-name orbit-name-' + active.tone}>{shortName(active.platform)}</span>
-            <small>{active.text}</small>
-          </>
-        ) : (
-          <>
-            <b>{total ? working : '—'}</b>
-            <small>{total ? `تعمل من ${total}` : 'لا برامج'}</small>
-          </>
-        )}
+      <div className="orbit-core" aria-hidden="true">
+        <i>ORBIT ONE</i>
+        <b>{total ? working : '—'}</b>
+        <small>{total ? `تعمل من ${total}` : 'لا برامج'}</small>
       </div>
-      <div className="orbit-nodes" aria-hidden="true">
-        {rows.map((r, i) => {
-          const isInner = i < inner;
-          const count = isInner ? inner : rows.length - inner;
-          const k = isInner ? i : i - inner;
-          const angle = ((-90 + (360 / count) * k + (isInner ? 20 : 0)) * Math.PI) / 180;
-          const radius = isInner ? 28.75 : 45.6;
-          return (
-            <button key={r.platform.id} type="button" tabIndex={-1}
-              className={'node node-' + r.tone + (activeId === r.platform.id ? ' is-active' : '')}
-              style={{ left: `${50 + radius * Math.cos(angle)}%`, top: `${50 + radius * Math.sin(angle)}%`, '--d': `${(i % 5) * -0.7}s` } as React.CSSProperties}
-              onMouseEnter={() => onActive(r.platform.id)} onMouseLeave={() => onActive(null)}
-              onClick={() => onActive(r.platform.id, true)}>
-              <span className="node-in"><Glyph tone={r.tone} size={16} /></span>
-            </button>
-          );
-        })}
-      </div>
+      {rings.map(({ key, items, phase }) => (
+        <div key={key} className={'ring ring-' + key}>
+          {items.map((row, k) => {
+            const angle = ((-90 + (360 / items.length) * k + phase) * Math.PI) / 180;
+            const p = row.platform;
+            return (
+              <button key={p.id} type="button" className={'sat sat-' + row.tone + (Math.sin(angle) < -0.25 ? ' sat-up' : '') + (selectedId === p.id ? ' is-selected' : '')}
+                style={{ left: `${50 + 50 * Math.cos(angle)}%`, top: `${50 + 50 * Math.sin(angle)}%`, '--k': k } as React.CSSProperties}
+                aria-pressed={selectedId === p.id} aria-label={`${shortName(p)}: ${row.text}`}
+                onClick={() => onSelect(selectedId === p.id ? null : p.id)}>
+                <span className="sat-in">
+                  <span className="sat-dot"><Glyph tone={row.tone} size={16} /></span>
+                  <span className="sat-label">{shortName(p)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -106,17 +101,15 @@ function Orbit({ rows, working, total, activeId, onActive }: {
 export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRemove }: DashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [manualText, setManualText] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState('');
   const [link, setLink] = useState('');
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [flashId, setFlashId] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const flashTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => { window.clearTimeout(timer.current); window.clearTimeout(flashTimer.current); }, []);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async (scope: 'all' | string) => {
     const text = buildCopyText(rows, scope);
@@ -136,29 +129,36 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
     finally { setBusy(false); }
   };
 
-  const onActive = (id: string | null, jump = false) => {
-    setActiveId(id);
-    const row = rows.find(r => r.platform.id === id);
-    if (!jump || !row) return;
-    document.getElementById(cardId(row.platform))?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
-    setFlashId(id);
-    window.clearTimeout(flashTimer.current);
-    flashTimer.current = window.setTimeout(() => setFlashId(null), 1600);
-  };
-
   const mine = platforms.filter(p => p.isCustomAdded && p.lifecycleState !== 'unlinked' && p.lifecycleState !== 'archived');
   const verifiable = rows.filter(r => r.tone !== 'local');
   const working = verifiable.filter(r => r.tone === 'ok').length;
+  const selected = rows.find(r => r.platform.id === selectedId);
 
   return (
     <main className="page">
-      <section className={'summary hero hero-' + summary.tone} aria-live="polite">
+      <section className={'summary hero hero-' + summary.tone}>
         <div className="hero-stars" aria-hidden="true" />
-        <Orbit rows={rows} working={working} total={verifiable.length} activeId={activeId} onActive={onActive} />
         <div className="hero-text">
+          {selected ? (
+            <div className={'detail detail-' + selected.tone} role="status" key={selected.platform.id}>
+              <span className="detail-badge" aria-hidden="true"><Glyph tone={selected.tone} /></span>
+              <div className="detail-info">
+                <strong>{shortName(selected.platform)}</strong>
+                <span>{selected.text}</span>
+              </div>
+              {selected.needsCopy && (
+                <button type="button" className={'btn btn-copy' + (copied === selected.platform.id ? ' is-copied' : '')} aria-label={'انسخ مشكلة: ' + shortName(selected.platform)} onClick={() => void copy(selected.platform.id)}>
+                  {copied === selected.platform.id ? 'تم النسخ' : 'انسخ'}
+                </button>
+              )}
+              <button type="button" className="detail-close" aria-label="إغلاق" onClick={() => setSelectedId(null)}>×</button>
+            </div>
+          ) : (
+            <p className="hero-hint">اضغط أي قمر لترى اسمه ومشكلته</p>
+          )}
           <h1>{summary.headline}</h1>
           {summary.reason && <p className="reason">{'السبب: ' + summary.reason}</p>}
-          <p className="hero-muted"><span className="pulse" aria-hidden="true" />{lastCheckLabel(platforms)}</p>
+          <p className="hero-muted" aria-live="polite"><span className="pulse" aria-hidden="true" />{lastCheckLabel(platforms)}</p>
           {summary.buttonLabel && (
             <button type="button" className={'btn btn-primary' + (copied === 'all' ? ' is-copied' : '')} onClick={() => void copy('all')}>
               {copied === 'all' ? 'تم النسخ' : summary.buttonLabel}
@@ -166,6 +166,7 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
           )}
           {tokenMissing && <p className="notice">لم يُضبط توكن GitHub على الخادم، لذلك لا تُقرأ المستودعات الخاصة.</p>}
         </div>
+        <Orbit rows={rows} working={working} total={verifiable.length} selectedId={selectedId} onSelect={setSelectedId} />
       </section>
 
       {manualText !== null && (
@@ -176,34 +177,7 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
         </section>
       )}
 
-      <ul className="rows">
-        {rows.map(({ platform: p, tone, text, needsCopy }, index) => (
-          <li key={p.id} id={cardId(p)} className={'program-row pcard pcard-' + tone + (flashId === p.id ? ' is-flash' : '') + (activeId === p.id ? ' is-active' : '')}
-            style={{ '--i': index } as React.CSSProperties}
-            onMouseEnter={() => setActiveId(p.id)} onMouseLeave={() => setActiveId(null)}>
-            <span className="badge" aria-hidden="true"><Glyph tone={tone} /></span>
-            <div className="pcard-info">
-              <strong>{shortName(p)}</strong>
-              <span className="pcard-text" title={text}>{text}</span>
-            </div>
-            {needsCopy && (
-              <button type="button" className={'btn btn-copy' + (copied === p.id ? ' is-copied' : '')} aria-label={'انسخ مشكلة: ' + shortName(p)} onClick={() => void copy(p.id)}>
-                {copied === p.id ? 'تم النسخ' : 'انسخ'}
-              </button>
-            )}
-          </li>
-        ))}
-        {!addOpen && (
-          <li className="pcard pcard-add" style={{ '--i': rows.length } as React.CSSProperties}>
-            <button type="button" className="add-tile" onClick={() => setAddOpen(true)}>
-              <span aria-hidden="true">＋</span>
-              إضافة برنامج
-            </button>
-          </li>
-        )}
-      </ul>
-
-      {addOpen && (
+      {addOpen ? (
         <form className="card add" onSubmit={submit} aria-label="إضافة برنامج جديد">
           <label>اسم البرنامج
             <input type="text" value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
@@ -230,6 +204,8 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
             </div>
           )}
         </form>
+      ) : (
+        <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
       )}
 
       <footer className="foot">أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</footer>

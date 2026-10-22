@@ -27,7 +27,7 @@ try {
   await page.waitForSelector('#orbit-passkey-input', { state: 'visible', timeout: 20000 });
   await page.locator('#orbit-passkey-input').fill(key);
   await page.getByRole('button', { name: 'دخول', exact: true }).click();
-  await page.waitForFunction(() => document.querySelectorAll('.program-row').length >= 8, { timeout: 20000 });
+  await page.waitForFunction(() => document.querySelectorAll('.sat').length >= 8, { timeout: 20000 });
 
   const signedIn = await page.request.get(base + '/api/auth/session');
   assert.equal((await signedIn.json()).authenticated, true, 'Login must set a server session');
@@ -60,18 +60,19 @@ try {
   await page.getByText('تم النسخ', { exact: true }).first().waitFor();
   const clipboard = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
   if (clipboard) assert.match(clipboard, /تقرير أوربت/, 'Copied text must be the ORBIT report');
-  const rowCopy = page.locator('.program-row .btn-copy').first();
+  // The orbit is the whole interface: tap a satellite to see its name and its problem, then copy it.
+  assert.ok(await page.locator('.sat').count() >= 8, 'Every program must appear as a satellite');
+  await page.locator('.orbit').hover({ position: { x: 4, y: 4 } }); // hovering pauses the rotation
+  const sat = page.locator('.sat').first();
+  await sat.click();
+  await page.locator('.detail').waitFor();
+  assert.ok((await page.locator('.detail strong').innerText()).length > 0, 'Detail must name the program');
+  const rowCopy = page.locator('.detail .btn-copy');
   await rowCopy.waitFor();
   await rowCopy.click();
-  await page.getByText('تم النسخ', { exact: true }).first().waitFor();
-
-  // The orbit: each program is a satellite. Hovering names it; tapping jumps to its card.
-  assert.ok(await page.locator('.node').count() >= 8, 'Every program must appear as a satellite');
-  const node = page.locator('.node').first();
-  await node.hover();
-  assert.ok((await page.locator('.orbit-name').innerText()).length > 0, 'Hovering a satellite must name the program');
-  await node.click();
-  await page.locator('.pcard.is-flash').waitFor({ timeout: 3000 });
+  await page.locator('.detail').getByText('تم النسخ', { exact: true }).waitFor();
+  await page.locator('.detail-close').click();
+  await page.locator('.detail').waitFor({ state: 'detached' });
 
   await page.getByRole('button', { name: 'إضافة برنامج' }).click();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).waitFor();

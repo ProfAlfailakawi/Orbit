@@ -24,14 +24,15 @@ const pairs: Array<[string, string]> = [
   ['muted', 'bad-bg'], ['muted', 'warn-bg'], ['muted', 'ok-bg'],
   ['bad-ink', 'card'], ['warn-ink', 'card'],
   ['hero-ink', 'hero-1'], ['hero-ink', 'hero-2'], ['hero-muted', 'hero-1'], ['hero-muted', 'hero-2'], ['hero-btn-ink', 'hero-btn'],
-  ['hero-1', 'hero-ok'], ['hero-bad', 'hero-1'], ['hero-warn', 'hero-1'], ['hero-ok', 'hero-1'],
+  ['hero-1', 'hero-ok'], ['hero-bad', 'hero-1'], ['hero-warn', 'hero-1'], ['hero-ok', 'hero-1'], ['hero-local', 'hero-1'],
+  ['hero-bad', 'hero-2'], ['hero-warn', 'hero-2'], ['hero-ok', 'hero-2'], ['hero-accent', 'hero-1'], ['hero-accent', 'hero-2'],
   ['bad-ink', 'bad-bg'], ['warn-ink', 'warn-bg'], ['ok-ink', 'card'], ['ok-ink', 'ok-bg'],
   ['ink', 'bad-bg'], ['ink', 'warn-bg'], ['ink', 'ok-bg'], ['bad-ink', 'card'],
 ];
 
 // Shapes and strokes (status badges, ring) need 3:1. A literal hex may stand in for a token.
 const shapes: Array<[string, string]> = [
-  ['on-bad', 'bad-edge'], ['on-warn', 'warn-edge'], ['ok-ink', 'ok-bg'],
+  ['ok-ink', 'ok-bg'],
   ['bad-edge', 'card'], ['warn-edge', 'card'], ['ok-edge', 'card'],
   ['bad-edge', 'bad-bg'], ['warn-edge', 'warn-bg'], ['ok-edge', 'ok-bg'],
   ['hero-1', 'hero-bad'], ['hero-1', 'hero-warn'], ['hero-1', 'hero-local'], ['hero-local', 'hero-1'], ['hero-local', 'hero-2'],
