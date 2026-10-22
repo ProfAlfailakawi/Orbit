@@ -214,3 +214,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   .one-dial * { animation: none !important; }
 }
+
+/* Visual polish: calmer link-issue list, fewer redundant labels (presentation only). */
+.orbit-one .one-link-issues { padding: 0; background: color-mix(in srgb, #fff8e9 70%, transparent); overflow: hidden; }
+.orbit-one .one-link-issues details > summary { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; list-style: none; color: #7a5a16; }
+.orbit-one .one-link-issues details > summary::-webkit-details-marker { display: none; }
+.orbit-one .one-link-issues details > summary:focus-visible { outline: 3px solid #65a7fd; outline-offset: -3px; }
+.orbit-one .one-link-issues .one-link-count { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: #f3dfb2; color: #6b5320; font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; }
+.orbit-one .one-link-issues .one-link-chevron { margin-inline-start: auto; transition: transform .2s ease; }
+.orbit-one .one-link-issues details[open] .one-link-chevron { transform: rotate(-90deg); }
+.orbit-one .one-link-issues ul { margin: 0; padding: 4px 16px 10px; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 6px 20px; font-size: 12px; line-height: 1.7; }
+.orbit-one .one-link-issues > .one-button { margin: 0 16px 12px; }
+.orbit-dark .orbit-one .one-link-issues { background: rgba(233,194,122,.08); border-color: rgba(233,194,122,.25); }
+.orbit-dark .orbit-one .one-link-issues details > summary { color: #e9c27a; }
+.orbit-dark .orbit-one .one-link-issues .one-link-count { background: rgba(233,194,122,.2); color: #f3dfb2; }
+/* Floating chips repeat the footer and the score row; the dial legend already explains the art. */
+.orbit-one .one-orbit-art .one-float-chip { display: none; }
+/* Generic "actionable summary" kicker repeats on every workspace tab. */
+.orbit-workspace-section-head .orbit-kicker { display: none; }
+@media (max-width: 760px) {
+  .orbit-one .one-score-card small { display: none; }
+  .orbit-one .one-score-card { min-height: 116px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-one .one-link-issues .one-link-chevron { transition: none; }
+}
