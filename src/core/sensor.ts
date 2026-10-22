@@ -7,7 +7,7 @@ import { sanitizeTelemetryPayload } from './engine.ts';
 import type { PlatformRecord } from './types.ts';
 
 export interface SensorReport {
-  kind: 'error' | 'rejection' | 'resource' | 'request' | 'console';
+  kind: 'error' | 'rejection' | 'resource' | 'request';
   message: string; page: string; session: string;
   /** Where it threw (first frames, no query strings) and what the visitor did just before. Only for errors. */
   stack: string[]; steps: string[];
@@ -15,13 +15,41 @@ export interface SensorReport {
   own: boolean;
 }
 
-const KINDS = new Set(['error', 'rejection', 'resource', 'request', 'console']);
+// «console» was dropped on purpose: console.error often prints whole objects (user ids, emails). Old copies that still send it are ignored.
+const KINDS = new Set(['error', 'rejection', 'resource', 'request']);
 export const SENSOR_MAX_BODY = 16_000;
 const MAX_BODY = SENSOR_MAX_BODY;
 /** Noise every site has: not worth a phone alert. */
 const BENIGN = /ResizeObserver loop|^script error\.?$|(?:chrome|moz|safari)-extension:|Non-Error promise rejection/i;
 
 const strip = (value: string) => sanitizeTelemetryPayload(value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/https?:\/\/[^\s)'"]+/g, u => u.split(/[?#]/)[0])).sanitized.trim();
+
+/** A path segment that looks like an identifier: digits, uuid, long token, letters mixed with digits, an email or an encoded value. */
+const isIdSegment = (segment: string) =>
+  /^\d{2,}$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) || /^[A-Za-z0-9_-]{20,}$/.test(segment) || (/^[A-Za-z0-9_-]{12,}$/.test(segment) && !/^[a-z-]+$/.test(segment)) ||
+  (/\d/.test(segment) && /[A-Za-z]/.test(segment) && segment.length >= 6) || segment.includes('@') || segment.includes('%');
+
+/**
+ * Error messages can quote what a visitor typed or uploaded: emails, long numbers and long tokens are masked, and a quoted value is kept
+ * only when it is a plain identifier («reading 'total'»). The browser script does this too; repeating it here covers older copies.
+ */
+export function scrubText(text: string): string {
+  return text
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]')
+    .replace(/\+?\d[\d\s().-]{6,}\d/g, '[num]')
+    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, '[token]')
+    .replace(/(["'`])((?:(?!\1).){1,200}?)\1/g, (m, q: string, v: string) => (/^[A-Za-z_$][\w$]{0,30}$/.test(v) ? m : `${q}...${q}`));
+}
+
+const FILE_NAME = /\.(m?js|css|html?|map|tsx?|jsx|json|svg|png|webp|woff2?)$/i;
+export function redactPathIds(text: string): string {
+  return text.replace(/\/[^\s/\u2190?#]+/g, seg => {
+    const name = seg.slice(1);
+    const core = name.split(/[:)]/)[0]; // «index-abc123.js:10:5)» → the file name, keeping the position after it
+    const suffix = name.slice(core.length);
+    return isIdSegment(core) && !(FILE_NAME.test(core) && !/[@%]/.test(core)) ? '/:id' + suffix : seg;
+  });
+}
 
 const lines = (value: unknown, count: number, width: number): string[] =>
   Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string').slice(0, count).map(x => strip(x).slice(0, width)).filter(Boolean) : [];
@@ -38,14 +66,15 @@ export function parseSensorBody(raw: unknown): SensorReport[] {
   for (const item of list.slice(0, 5)) {
     const r = item as { k?: unknown; m?: unknown; p?: unknown; t?: unknown; b?: unknown; o?: unknown } | null;
     if (!r || typeof r.k !== 'string' || !KINDS.has(r.k) || typeof r.m !== 'string') continue;
-    const message = strip(r.m).slice(0, 160);
+    const cleaned = strip(r.m).slice(0, 160);
+    const message = scrubText(redactPathIds(cleaned));
     if (!message || BENIGN.test(message)) continue;
     let page = '/';
-    if (typeof r.p === 'string') { try { page = new URL(r.p, 'https://x.invalid').pathname.slice(0, 80); } catch { /* keep "/" */ } }
+    if (typeof r.p === 'string') { try { page = redactPathIds(new URL(r.p, 'https://x.invalid').pathname).slice(0, 80); } catch { /* keep "/" */ } }
     const isError = r.k === 'error' || r.k === 'rejection';
     out.push({
       kind: r.k as SensorReport['kind'], message, page, session,
-      stack: isError ? lines(r.t, 4, 110) : [], steps: isError ? lines(r.b, 12, 70) : [],
+      stack: isError ? lines(r.t, 4, 110).map(x => scrubText(redactPathIds(x))) : [], steps: isError ? lines(r.b, 12, 70).map(x => scrubText(redactPathIds(x))) : [],
       own: isError && r.o === 1,
     });
   }
@@ -59,7 +88,6 @@ export function originOf(url: string | null | undefined): string | null {
 
 const KIND_LABEL: Record<SensorReport['kind'], string> = {
   error: 'خطأ برمجي ظهر لزوّار الموقع', rejection: 'عملية داخل الموقع فشلت عند الزوّار', resource: 'ملف لا يُحمَّل عند الزوّار', request: 'طلب من الموقع يفشل عند الزوّار',
-  console: 'رسالة خطأ يطلقها الموقع في المتصفح',
 };
 export interface SensorFinding { text: string; page: string; visitors: number; stack: string[]; steps: string[] }
 export const SENSOR_WINDOW_MS = 24 * 3_600_000;
