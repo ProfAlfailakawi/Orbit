@@ -130,7 +130,7 @@ export function getLinkIssue(p: PlatformRecord): string | null {
     return reason && !/^GitHub repository HTTP/.test(reason) ? reason : 'تعذر قراءة GitHub لهذا البرنامج';
   }
   if (p.dataIntegrity === 'Cached') return 'بيانات قديمة تحتاج مزامنة';
-  return 'لم يُفحص بعد — اضغط «مزامنة GitHub الآن»';
+  return 'لم يُفحص بعد — اضغط «تحديث»';
 }
 
 /** One copy-paste report for Claude: every program with a problem, plus the monitoring gaps, read-only. */
@@ -139,7 +139,7 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
   const withProblems = fleet.map(p => ({ p, problems: getProgramProblems(p) })).filter(x => x.problems.length);
   const open = incidents.filter(i => i.dataIntegrity === 'Live' && !['Resolved', 'False Positive', 'Expected Behavior', "Won't Fix"].includes(i.status));
   const lines = [
-    '# تقرير أوربت لكلود — ' + today,
+    '# تقرير أوربت — ' + today,
     MANDATORY_CLAUDE_GUARDRAIL,
     '',
     'المطلوب: افحص المشاكل أدناه وحدد السبب بالدليل، ثم اقترح أقل تعديل ممكن للموافقة قبل التنفيذ.',

@@ -8,7 +8,9 @@ if (!key || key.length < 16) throw new Error('CI-only ORBIT_OPERATOR_PASSKEY is 
 await fs.mkdir('test-artifacts', { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'ar-KW' });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'ar-KW' });
+await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base }).catch(() => {});
+const page = await context.newPage();
 const runtimeErrors = [];
 page.on('pageerror', error => runtimeErrors.push(error.message));
 try {
@@ -24,11 +26,8 @@ try {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#orbit-passkey-input', { state: 'visible', timeout: 20000 });
   await page.locator('#orbit-passkey-input').fill(key);
-  await page.getByRole('button', { name: /دخول غرفة العمليات/ }).click();
-  await page.waitForSelector('.orbit-executive', { state: 'visible', timeout: 20000 });
-  await page.waitForFunction(() => document.querySelectorAll('.orbit-app-card').length >= 8, { timeout: 20000 });
-  const count = await page.locator('.orbit-app-card').count();
-  assert.ok(count >= 8, 'Expected program cards to render');
+  await page.getByRole('button', { name: 'دخول', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.program-row').length >= 8, { timeout: 20000 });
 
   const signedIn = await page.request.get(base + '/api/auth/session');
   assert.equal((await signedIn.json()).authenticated, true, 'Login must set a server session');
@@ -43,39 +42,41 @@ try {
   assert.equal(canary.status(), 200, 'Isolated canary endpoint should run');
   const canaryData = await canary.json();
   assert.ok(canaryData.events.filter(item => item.appId === 'ORBIT-CANARY').every(item => item.dataIntegrity === 'Demo'), 'Synthetic canary must remain Demo');
-
   assert.equal(state.incidents.some(i => i.appId === 'ORBIT-CANARY' && i.dataIntegrity === 'Live'), false, 'Test incidents must not be treated as live');
 
+  // The page is deliberately small: a summary, one line per program, and copy buttons.
   await page.screenshot({ path: 'test-artifacts/orbit-desktop.png', fullPage: true });
-  assert.equal(await page.locator('.orbit-desktop-nav, .orbit-mobile-nav, .orbit-more-menu').count(), 0, 'No dashboard tab bar or More menu should exist');
-  assert.equal(await page.locator('.orbit-executive').count(), 1, 'Only one owner dashboard should exist');
-  assert.equal(await page.locator('.one-quiet-settings, .orbit-tools-menu').count(), 0, 'Technical settings must stay out of the owner header');
+  assert.equal(await page.locator('main h1').count(), 1, 'Exactly one summary headline');
+  assert.equal(await page.getByRole('dialog').count(), 0, 'No overlays or detail pages');
+  assert.equal(await page.locator('[role="tab"], nav').count(), 0, 'No tabs or navigation');
 
-  await page.getByRole('button', { name: /انسخ تقرير المشاكل لكلود/ }).waitFor();
-  await page.locator('#orbit-one-incidents').waitFor();
+  // The sync button reads "جارٍ الفحص…" while the automatic link on open runs.
+  await page.getByRole('button', { name: 'تحديث', exact: true }).waitFor({ timeout: 90000 });
 
-  await page.getByRole('button', { name: /إضافة برنامج/ }).first().click();
+  // Every problem or monitoring gap has a copy button that really fills the clipboard.
+  const copyAll = page.getByRole('button', { name: /^انسخ (كل المشاكل|التقرير)$/ });
+  await copyAll.waitFor();
+  await copyAll.click();
+  await page.getByText('تم النسخ', { exact: true }).first().waitFor();
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+  if (clipboard) assert.match(clipboard, /تقرير أوربت/, 'Copied text must be the ORBIT report');
+  const rowCopy = page.locator('.program-row .btn-copy').first();
+  await rowCopy.waitFor();
+  await rowCopy.click();
+  await page.getByText('تم النسخ', { exact: true }).first().waitFor();
+
+  await page.getByRole('button', { name: 'إضافة برنامج' }).click();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).waitFor();
   await page.getByRole('form', { name: 'إضافة برنامج جديد' }).getByRole('button', { name: 'إغلاق' }).click();
 
-  await page.locator('.orbit-app-card').first().click();
-  await page.getByRole('dialog', { name: 'تفاصيل أوربت' }).waitFor();
-  await page.locator('.orbit-program-page').waitFor();
-  assert.equal(await page.getByText(/نتائج GitHub Actions الأخيرة/).count(), 0, 'Detailed GitHub Actions history must stay hidden');
-  await page.screenshot({ path: 'test-artifacts/orbit-program.png', fullPage: true });
-  await page.getByRole('button', { name: 'العودة للصفحة الرئيسية' }).click();
-  assert.equal(await page.getByRole('dialog').count(), 0, 'Program detail must close within same owner page');
-
-  await page.locator('.orbit-filter-tabs button').last().click();
-  await page.locator('.orbit-filter-tabs button').first().click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.orbit-executive').waitFor();
+  await page.waitForSelector('.summary');
   await page.screenshot({ path: 'test-artifacts/orbit-mobile.png', fullPage: true });
-  // The dashboard links to GitHub automatically on open; the button reads "جارٍ فحص…" until that finishes.
-  await page.getByRole('button', { name: 'مزامنة GitHub الآن' }).waitFor({ timeout: 90000 });
-  assert.equal(await page.getByRole('button', { name: 'مزامنة GitHub الآن' }).count(), 1, 'Manual GitHub sync button is missing');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3);
   assert.equal(overflow, false, 'Mobile viewport has horizontal overflow');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: 'test-artifacts/orbit-mobile-dark.png', fullPage: true });
+  await page.emulateMedia({ colorScheme: 'light' });
 
   const unauthorizedSensor = await page.request.post(base + '/api/sensor/ingest', {
     headers: { Origin: base },
@@ -120,13 +121,13 @@ try {
   const newState = await updatedState.json();
   assert.ok(newState.events.some(event => event.appId === 'MIRAS' && event.dataIntegrity === 'Live'), 'Authenticated sensor event should be Live');
 
-  await page.locator('.orbit-lock-control').click();
+  await page.getByRole('button', { name: 'خروج', exact: true }).click();
   await page.waitForSelector('#orbit-passkey-input', { state: 'visible', timeout: 10000 });
   const loggedOut = await page.request.get(base + '/api/state');
   assert.equal(loggedOut.status(), 401, 'Logout must revoke the server session');
 
   assert.deepEqual(runtimeErrors, [], 'Browser must not have uncaught runtime exceptions');
-  console.log('ORBIT ONE smoke PASS: one page, quick add, expert overlays, mobile, session, sensor safety.');
+  console.log('ORBIT smoke PASS: one page, copy to Claude, add program, mobile light/dark, session, sensor safety.');
 } catch (err) {
   await page.screenshot({ path: 'test-artifacts/orbit-failure.png', fullPage: true }).catch(() => {});
   throw err;

@@ -1,15 +1,15 @@
 {
   "id": "/",
-  "name": "ORBIT | أوربت — غرفة القيادة الذكية",
-  "short_name": "ORBIT",
-  "description": "مركز متابعة البرامج والتشخيص والمهام الهندسية الآمنة",
+  "name": "أوربت",
+  "short_name": "أوربت",
+  "description": "مراقبة برامجك في صفحة واحدة، وأي مشكلة تنسخها لكلود.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "dir": "rtl",
   "lang": "ar",
-  "background_color": "#f5f7fb",
-  "theme_color": "#f5f7fb",
+  "background_color": "#f5f6f8",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/pwa-192x192.png",
