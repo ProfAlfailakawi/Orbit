@@ -222,6 +222,9 @@ export interface PlatformRecord {
   siteProblems?: string[];
   siteCheckedAt?: string;
   /** Last real-browser visit (daily robot visitor). */
+  /** Errors that several real visitors hit, reported by the program's own browser sensor. */
+  sensorProblems?: string[];
+  sensorCheckedAt?: string;
   browserVisit?: { at: string; ok: boolean; problems: string[] };
   branchHeads?: Array<{ name: string; sha: string }>;
   createdAt: string;

@@ -3,6 +3,7 @@ import type { BlackBoxFrame, CrossAppPattern, IncidentCaseFile, PlatformRecord }
 import { MANDATORY_CLAUDE_GUARDRAIL, sanitizeTelemetryPayload } from './engine.ts';
 import { displayName } from './displayName.ts';
 import { freshBrowserProblems } from './browserVisit.ts';
+import { freshSensorProblems } from './sensor.ts';
 
 export type TruthEvidence = { uiReportedSuccess?: unknown; serverRecordConfirmed?: unknown; httpStatus?: unknown };
 export function evaluateTruthEvidence(input: TruthEvidence | null | undefined) {
@@ -120,7 +121,7 @@ export function getProgramProblems(p: PlatformRecord): string[] {
   if (f?.userJourneyHealthy === false) out.push('تجربة المستخدم الأساسية تحتاج مراجعة');
   // What the site visitor found on the public page (a broken app file, an error page), while the finding is fresh.
   if (p.siteProblems?.length && p.siteCheckedAt && Date.now() - Date.parse(p.siteCheckedAt) < 36 * 3_600_000) out.push(...p.siteProblems);
-  out.push(...freshBrowserProblems(p));
+  out.push(...freshBrowserProblems(p), ...freshSensorProblems(p));
   const failed = (p.recentRuns || []).find(r => r.dataIntegrity === 'Live' && r.status === 'failure');
   if (failed && f?.ciPassed === false) out.push('آخر عملية فاشلة: ' + sanitizeTelemetryPayload(failed.workflowName + ' — ' + failed.commitMessage).sanitized.slice(0, 160));
   return [...new Set(out)];
