@@ -67,3 +67,25 @@ test('the reader maps permission and network failures to plain reasons', async (
   const noToken = createCloudLogReader(async () => null, fetch);
   assert.match((await noToken.read(src, 'z') as { error: string }).error, /هوية/);
 });
+
+test('a revision that could not start is a warning with its revision name, never a red problem', () => {
+  const entries = [
+    ...Array.from({ length: 7 }, (_, i) => ({ timestamp: `2026-10-22T22:3${i}:00Z`, textPayload: 'The request failed because the instance could not start successfully.', resource: { labels: { revision_name: 'service-00975-x7f' } } })),
+    ...Array.from({ length: 4 }, (_, i) => ({ timestamp: `2026-10-22T22:4${i}:00Z`, httpRequest: { status: 500 }, resource: { labels: { revision_name: 'service-00539-yik' } } })),
+  ];
+  const errors = summarizeLogEntries(entries);
+  assert.ok(errors.some(e => e.revision === 'service-00975-x7f' && e.count === 7));
+  assert.ok(errors.some(e => e.revision === 'service-00539-yik' && e.count === 4), 'the same message on another revision is counted apart');
+  const p = applyServerErrors(program(), errors, null, new Date(NOW).toISOString());
+  const problems = serverProblems(p, NOW);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /HTTP 500.*service-00539-yik/, 'visitor-facing 5xx on the serving revision stays red and names it');
+  assert.ok(!problems.some(x => /could not start/.test(x)), 'a start failure is never red');
+  const warns = serverWarnings(p, NOW);
+  assert.ok(warns.some(x => /فشلت في الإقلاع.*7.*service-00975-x7f.*فلا أثر على الزوار/.test(x)));
+});
+
+test('a revision name that is not a plain identifier is ignored', () => {
+  const [e] = summarizeLogEntries([{ textPayload: 'boom', resource: { labels: { revision_name: 'bad name; DROP' } } }]);
+  assert.equal(e.revision, undefined);
+});

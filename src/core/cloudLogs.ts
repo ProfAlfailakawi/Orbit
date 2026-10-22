@@ -44,7 +44,7 @@ export function buildLogFilter(service: string, sinceIso: string): string {
 }
 
 export interface LogEntry {
-  timestamp?: string; textPayload?: string; httpRequest?: { status?: number };
+  timestamp?: string; textPayload?: string; httpRequest?: { status?: number }; resource?: { labels?: { revision_name?: string } };
   jsonPayload?: { message?: unknown; error?: unknown; msg?: unknown };
 }
 
@@ -71,10 +71,11 @@ export function summarizeLogEntries(entries: LogEntry[]): ServerError[] {
     const raw = messageOf(e);
     if (!raw || BENIGN.test(raw)) continue;
     const cleaned = scrubText(redactPathIds(sanitizeTelemetryPayload(raw.replace(/https?:\/\/[^\s)'"]+/g, u => u.split(/[?#]/)[0])).sanitized)).slice(0, 160);
-    const key = cleaned.replace(/\d{2,}/g, 'N');
+    const revision = typeof e.resource?.labels?.revision_name === 'string' && /^[a-z][a-z0-9-]{0,62}$/.test(e.resource.labels.revision_name) ? e.resource.labels.revision_name : undefined;
+    const key = cleaned.replace(/\d{2,}/g, 'N') + '|' + (revision || '');
     const at = typeof e.timestamp === 'string' ? e.timestamp : '';
     const g = groups.get(key);
-    if (g) { g.count += 1; if (at > g.lastAt) g.lastAt = at; } else groups.set(key, { text: cleaned, count: 1, lastAt: at });
+    if (g) { g.count += 1; if (at > g.lastAt) g.lastAt = at; } else groups.set(key, { text: cleaned, count: 1, lastAt: at, ...(revision ? { revision } : {}) });
   }
   return [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 4);
 }
@@ -84,16 +85,25 @@ export function applyServerErrors(p: PlatformRecord, errors: ServerError[] | nul
   return { ...p, serverErrors: errors, serverLogsCheckedAt: nowIso, serverLogsIssue: undefined };
 }
 
+/**
+ * A revision that «could not start» is usually a deployment that failed its start-up check. When the service's traffic is pinned to
+ * an older revision, visitors never reach it, so it is a warning to look at, never a red problem, whatever its count.
+ */
+const START_FAILURE = /could not start|failed to start and listen|container failed to start/i;
+const where = (e: ServerError) => (e.revision ? ` [النسخة ${e.revision}]` : '');
+
 const fresh = (p: PlatformRecord, now: number) => Boolean(p.serverLogsCheckedAt) && now - Date.parse(p.serverLogsCheckedAt!) < FRESH_MS;
 const times = (n: number) => (n === 1 ? 'مرة واحدة' : n === 2 ? 'مرتين' : `${n} مرة`);
 
 export function serverProblems(p: PlatformRecord, now = Date.now()): string[] {
-  return fresh(p, now) ? (p.serverErrors || []).filter(e => e.count >= LOG_PROBLEM_COUNT).map(e => `خطأ في سجلات الخادم: ${e.text} (${times(e.count)} في آخر نصف ساعة)`) : [];
+  return fresh(p, now) ? (p.serverErrors || []).filter(e => e.count >= LOG_PROBLEM_COUNT && !START_FAILURE.test(e.text)).map(e => `خطأ في سجلات الخادم: ${e.text} (${times(e.count)} في آخر نصف ساعة)${where(e)}`) : [];
 }
 
 export function serverWarnings(p: PlatformRecord, now = Date.now()): string[] {
   if (!fresh(p, now)) return [];
-  const few = (p.serverErrors || []).filter(e => e.count < LOG_PROBLEM_COUNT).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)})`);
+  const errors = p.serverErrors || [];
+  const starts = errors.filter(e => START_FAILURE.test(e.text)).map(e => `نسخة جديدة من الخادم فشلت في الإقلاع (${times(e.count)})${where(e)}، وإن كانت الحركة موجّهة إلى نسخة أخرى فلا أثر على الزوار`);
+  const few = [...starts, ...errors.filter(e => e.count < LOG_PROBLEM_COUNT && !START_FAILURE.test(e.text)).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)})${where(e)}`)];
   return p.serverLogsIssue ? [`لا يمكن قراءة سجلات الخادم: ${p.serverLogsIssue}`, ...few] : few;
 }
 
