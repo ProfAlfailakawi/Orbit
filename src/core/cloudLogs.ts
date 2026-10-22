@@ -62,10 +62,12 @@ function messageOf(e: LogEntry): string {
 }
 
 /**
- * Group the entries by message (digits collapsed so «after 3021ms» and «after 3150ms» are one error), keep the commonest four.
- * Messages are cleaned the same way as the browser sensor's: log lines can quote what a visitor sent.
+ * Group the entries by message and revision (digits collapsed so «after 3021ms» and «after 3150ms» are one error).
+ * `serving` is the list of revisions that receive traffic, when known: a group from any other revision is marked `serving: false`.
+ * Groups that can concern visitors are kept first (four at most), then a couple of the rest, so a noisy failing revision
+ * can never crowd a visitor-facing error out of the list. Messages are cleaned like the browser sensor's: log lines can quote what a visitor sent.
  */
-export function summarizeLogEntries(entries: LogEntry[]): ServerError[] {
+export function summarizeLogEntries(entries: LogEntry[], serving?: string[] | null): ServerError[] {
   const groups = new Map<string, ServerError>();
   for (const e of entries) {
     const raw = messageOf(e);
@@ -75,9 +77,11 @@ export function summarizeLogEntries(entries: LogEntry[]): ServerError[] {
     const key = cleaned.replace(/\d{2,}/g, 'N') + '|' + (revision || '');
     const at = typeof e.timestamp === 'string' ? e.timestamp : '';
     const g = groups.get(key);
-    if (g) { g.count += 1; if (at > g.lastAt) g.lastAt = at; } else groups.set(key, { text: cleaned, count: 1, lastAt: at, ...(revision ? { revision } : {}) });
+    if (g) { g.count += 1; if (at > g.lastAt) g.lastAt = at; }
+    else groups.set(key, { text: cleaned, count: 1, lastAt: at, ...(revision ? { revision } : {}), ...(serving && revision && !serving.includes(revision) ? { serving: false } : {}) });
   }
-  return [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 4);
+  const all = [...groups.values()].sort((a, b) => b.count - a.count);
+  return [...all.filter(g => g.serving !== false).slice(0, 4), ...all.filter(g => g.serving === false).slice(0, 2)];
 }
 
 export function applyServerErrors(p: PlatformRecord, errors: ServerError[] | null, issue: string | null, nowIso: string): PlatformRecord {
@@ -85,29 +89,30 @@ export function applyServerErrors(p: PlatformRecord, errors: ServerError[] | nul
   return { ...p, serverErrors: errors, serverLogsCheckedAt: nowIso, serverLogsIssue: undefined };
 }
 
-/**
- * A revision that «could not start» is usually a deployment that failed its start-up check. When the service's traffic is pinned to
- * an older revision, visitors never reach it, so it is a warning to look at, never a red problem, whatever its count.
- */
-const START_FAILURE = /could not start|failed to start and listen|container failed to start/i;
+/** A revision's start-up failure: when that revision gets no traffic, visitors never reach it, so it is a warning, never a red problem. */
 const where = (e: ServerError) => (e.revision ? ` [النسخة ${e.revision}]` : '');
+const idle = (e: ServerError) => e.serving === false;
 
 const fresh = (p: PlatformRecord, now: number) => Boolean(p.serverLogsCheckedAt) && now - Date.parse(p.serverLogsCheckedAt!) < FRESH_MS;
 const times = (n: number) => (n === 1 ? 'مرة واحدة' : n === 2 ? 'مرتين' : `${n} مرة`);
 
 export function serverProblems(p: PlatformRecord, now = Date.now()): string[] {
-  return fresh(p, now) ? (p.serverErrors || []).filter(e => e.count >= LOG_PROBLEM_COUNT && !START_FAILURE.test(e.text)).map(e => `خطأ في سجلات الخادم: ${e.text} (${times(e.count)} في آخر نصف ساعة)${where(e)}`) : [];
+  return fresh(p, now) ? (p.serverErrors || []).filter(e => e.count >= LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ في سجلات الخادم: ${e.text} (${times(e.count)} في آخر نصف ساعة)${where(e)}`) : [];
 }
 
 export function serverWarnings(p: PlatformRecord, now = Date.now()): string[] {
   if (!fresh(p, now)) return [];
   const errors = p.serverErrors || [];
-  const starts = errors.filter(e => START_FAILURE.test(e.text)).map(e => `نسخة جديدة من الخادم فشلت في الإقلاع (${times(e.count)})${where(e)}، وإن كانت الحركة موجّهة إلى نسخة أخرى فلا أثر على الزوار`);
-  const few = [...starts, ...errors.filter(e => e.count < LOG_PROBLEM_COUNT && !START_FAILURE.test(e.text)).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)})${where(e)}`)];
+  const quiet = errors.filter(idle).map(e => `نسخة لا تخدم الزوار سجّلت خطأ: ${e.text} (${times(e.count)})${where(e)}، لا أثر على الزوار ما دامت الحركة على نسخة أخرى`);
+  const few = [...quiet, ...errors.filter(e => e.count < LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)})${where(e)}`)];
   return p.serverLogsIssue ? [`لا يمكن قراءة سجلات الخادم: ${p.serverLogsIssue}`, ...few] : few;
 }
 
-export interface LogReader { read(source: LogSource, sinceIso: string): Promise<{ entries: LogEntry[] } | { error: string }> }
+export interface LogReader {
+  read(source: LogSource, sinceIso: string): Promise<{ entries: LogEntry[] } | { error: string }>;
+  /** Revisions that currently receive traffic (needs the Cloud Run Viewer role); null when that cannot be established. */
+  servingRevisions(source: LogSource): Promise<string[] | null>;
+}
 
 /** Cloud Logging over its REST API, authenticated as ORBIT's own runtime service account. */
 export function createCloudLogReader(getToken: () => Promise<string | null | undefined>, fetchImpl: typeof fetch = fetch): LogReader {
@@ -128,6 +133,22 @@ export function createCloudLogReader(getToken: () => Promise<string | null | und
         const data = await response.json() as { entries?: LogEntry[] };
         return { entries: Array.isArray(data.entries) ? data.entries : [] };
       } catch { return { error: 'تعذر الاتصال بخدمة السجلات' }; }
+    },
+    async servingRevisions(source) {
+      let token: string | null | undefined;
+      try { token = await getToken(); } catch { token = null; }
+      if (!token) return null;
+      try {
+        const response = await fetchImpl(`https://run.googleapis.com/v2/projects/${source.project}/locations/-/services?pageSize=100`, {
+          headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json() as { services?: Array<{ name?: string; trafficStatuses?: Array<{ revision?: string; percent?: number }> }> };
+        const service = (data.services || []).find(x => typeof x.name === 'string' && x.name.endsWith(`/services/${source.service}`));
+        if (!service?.trafficStatuses) return null;
+        const serving = service.trafficStatuses.filter(t => (t.percent ?? 0) > 0 && typeof t.revision === 'string').map(t => t.revision as string);
+        return serving.length ? serving : null;
+      } catch { return null; }
     },
   };
 }

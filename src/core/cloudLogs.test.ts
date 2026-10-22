@@ -68,24 +68,48 @@ test('the reader maps permission and network failures to plain reasons', async (
   assert.match((await noToken.read(src, 'z') as { error: string }).error, /هوية/);
 });
 
-test('a revision that could not start is a warning with its revision name, never a red problem', () => {
-  const entries = [
-    ...Array.from({ length: 7 }, (_, i) => ({ timestamp: `2026-10-22T22:3${i}:00Z`, textPayload: 'The request failed because the instance could not start successfully.', resource: { labels: { revision_name: 'service-00975-x7f' } } })),
-    ...Array.from({ length: 4 }, (_, i) => ({ timestamp: `2026-10-22T22:4${i}:00Z`, httpRequest: { status: 500 }, resource: { labels: { revision_name: 'service-00539-yik' } } })),
-  ];
-  const errors = summarizeLogEntries(entries);
-  assert.ok(errors.some(e => e.revision === 'service-00975-x7f' && e.count === 7));
-  assert.ok(errors.some(e => e.revision === 'service-00539-yik' && e.count === 4), 'the same message on another revision is counted apart');
+const START = 'The request failed because the instance could not start successfully.';
+const startEntries = (revision: string, n: number) => Array.from({ length: n }, (_, i) => ({ timestamp: `2026-10-22T22:${10 + i}:00Z`, textPayload: START, resource: { labels: { revision_name: revision } } }));
+const fiveHundreds = (revision: string, n: number) => Array.from({ length: n }, (_, i) => ({ timestamp: `2026-10-22T22:4${i}:00Z`, httpRequest: { status: 500 }, resource: { labels: { revision_name: revision } } }));
+
+test('without traffic information a start failure stays a red problem: it may be a real outage', () => {
+  const p = applyServerErrors(program(), summarizeLogEntries(startEntries('service-00975-x7f', 7)), null, new Date(NOW).toISOString());
+  assert.match(serverProblems(p, NOW)[0], /could not start.*service-00975-x7f/);
+});
+
+test('a start failure on a revision that gets no traffic is a warning that names it; the serving revision keeps its red 5xx', () => {
+  const errors = summarizeLogEntries([...startEntries('service-00975-x7f', 7), ...fiveHundreds('service-00539-yik', 4)], ['service-00539-yik']);
   const p = applyServerErrors(program(), errors, null, new Date(NOW).toISOString());
   const problems = serverProblems(p, NOW);
   assert.equal(problems.length, 1);
-  assert.match(problems[0], /HTTP 500.*service-00539-yik/, 'visitor-facing 5xx on the serving revision stays red and names it');
-  assert.ok(!problems.some(x => /could not start/.test(x)), 'a start failure is never red');
-  const warns = serverWarnings(p, NOW);
-  assert.ok(warns.some(x => /فشلت في الإقلاع.*7.*service-00975-x7f.*فلا أثر على الزوار/.test(x)));
+  assert.match(problems[0], /HTTP 500.*service-00539-yik/);
+  assert.ok(serverWarnings(p, NOW).some(x => /لا تخدم الزوار.*service-00975-x7f.*لا أثر على الزوار/.test(x)));
+});
+
+test('a serving revision that cannot start is red even though the message matches', () => {
+  const errors = summarizeLogEntries(startEntries('service-00539-yik', 5), ['service-00539-yik']);
+  const p = applyServerErrors(program(), errors, null, new Date(NOW).toISOString());
+  assert.equal(serverProblems(p, NOW).length, 1);
+});
+
+test('many failing idle revisions cannot crowd a visitor-facing error out of the list', () => {
+  const idle = ['service-00971-a', 'service-00972-b', 'service-00973-c', 'service-00974-d', 'service-00975-e'].flatMap(r => startEntries(r, 9));
+  const errors = summarizeLogEntries([...idle, ...fiveHundreds('service-00539-yik', 3)], ['service-00539-yik']);
+  assert.ok(errors.some(e => e.revision === 'service-00539-yik' && e.count === 3 && e.serving !== false));
+  assert.equal(errors.filter(e => e.serving === false).length, 2, 'only a couple of idle groups are kept');
 });
 
 test('a revision name that is not a plain identifier is ignored', () => {
   const [e] = summarizeLogEntries([{ textPayload: 'boom', resource: { labels: { revision_name: 'bad name; DROP' } } }]);
   assert.equal(e.revision, undefined);
+});
+
+test('the traffic split tells which revisions serve visitors; anything unclear gives null', async () => {
+  const src = { codeName: 'A', project: 'my-project-1', service: 'service' };
+  const reader = (status: number, body: unknown) => createCloudLogReader(async () => 'tok', (async () => ({ status, ok: status < 300, json: async () => body })) as unknown as typeof fetch);
+  const body = { services: [{ name: 'projects/my-project-1/locations/europe-west3/services/other', trafficStatuses: [{ revision: 'other-1', percent: 100 }] }, { name: 'projects/my-project-1/locations/europe-west3/services/service', trafficStatuses: [{ revision: 'service-00539-yik', percent: 100 }, { revision: 'service-00976-qcl', percent: 0 }] }] };
+  assert.deepEqual(await reader(200, body).servingRevisions(src), ['service-00539-yik']);
+  assert.equal(await reader(403, {}).servingRevisions(src), null);
+  assert.equal(await reader(200, { services: [] }).servingRevisions(src), null);
+  assert.equal(await createCloudLogReader(async () => null, fetch).servingRevisions(src), null);
 });
