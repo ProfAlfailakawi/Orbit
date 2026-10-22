@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { PlatformRecord } from '../core/types';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
 
+export type Logos = Record<string, { src: string }>;
+
 interface DashboardProps {
   rows: ProgramRow[];
+  logos: Logos;
   summary: Summary;
   platforms: PlatformRecord[];
   tokenMissing: boolean;
@@ -39,11 +42,27 @@ function Glyph({ tone, size = 24 }: { tone: RowTone; size?: number }) {
   );
 }
 
+const hash = (text: string) => [...text].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+/** The program's logo; when there is none (or it fails to load) a deterministic monogram, so every satellite looks finished. */
+function Avatar({ platform, src }: { platform: PlatformRecord; src?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (src && !failed) {
+    return <span className="avatar"><img src={src} alt="" draggable={false} onError={() => setFailed(true)} /></span>;
+  }
+  const hue = hash(platform.codeName) % 360;
+  const letter = ([...shortName(platform)].find(ch => /[\p{L}\p{N}]/u.test(ch)) || '•').toUpperCase();
+  return (
+    <span className="avatar avatar-mono" style={{ background: `linear-gradient(135deg, hsl(${hue} 62% 36%), hsl(${(hue + 42) % 360} 62% 24%))` }}>{letter}</span>
+  );
+}
+
 /** Ring geometry as a percentage of the orbit box (viewBox 360): outer r=152, inner r=96. */
 const RING = { out: 42.2, inn: 26.7 } as const;
 
-function Orbit({ rows, working, total, selectedId, onSelect }: {
-  rows: ProgramRow[]; working: number; total: number; selectedId: string | null; onSelect: (id: string | null) => void;
+function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
+  rows: ProgramRow[]; logos: Logos; working: number; total: number; selectedId: string | null; onSelect: (id: string | null) => void;
 }) {
   // Problems come first, so they sit on the inner ring, nearest the core.
   const inner = rows.length > 4 ? Math.round(rows.length * 0.36) : 0;
@@ -86,7 +105,10 @@ function Orbit({ rows, working, total, selectedId, onSelect }: {
                 aria-pressed={selectedId === p.id} aria-label={`${shortName(p)}: ${row.text}`}
                 onClick={() => onSelect(selectedId === p.id ? null : p.id)}>
                 <span className="sat-in">
-                  <span className="sat-dot"><Glyph tone={row.tone} size={16} /></span>
+                  <span className="sat-dot">
+                    <Avatar platform={p} src={logos[p.id]?.src} />
+                    <span className="sat-flag"><Glyph tone={row.tone} size={11} /></span>
+                  </span>
                   <span className="sat-label">{shortName(p)}</span>
                 </span>
               </button>
@@ -98,7 +120,7 @@ function Orbit({ rows, working, total, selectedId, onSelect }: {
   );
 }
 
-export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRemove }: DashboardProps) {
+export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd, onRemove }: DashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [manualText, setManualText] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,7 +163,10 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
         <div className="hero-text">
           {selected ? (
             <div className={'detail detail-' + selected.tone} role="status" key={selected.platform.id}>
-              <span className="detail-badge" aria-hidden="true"><Glyph tone={selected.tone} /></span>
+              <span className="detail-badge" aria-hidden="true">
+                <Avatar platform={selected.platform} src={logos[selected.platform.id]?.src} />
+                <span className="sat-flag"><Glyph tone={selected.tone} size={11} /></span>
+              </span>
               <div className="detail-info">
                 <strong>{shortName(selected.platform)}</strong>
                 <span>{selected.text}</span>
@@ -166,7 +191,7 @@ export function Dashboard({ rows, summary, platforms, tokenMissing, onAdd, onRem
           )}
           {tokenMissing && <p className="notice">لم يُضبط توكن GitHub على الخادم، لذلك لا تُقرأ المستودعات الخاصة.</p>}
         </div>
-        <Orbit rows={rows} working={working} total={verifiable.length} selectedId={selectedId} onSelect={setSelectedId} />
+        <Orbit rows={rows} logos={logos} working={working} total={verifiable.length} selectedId={selectedId} onSelect={setSelectedId} />
       </section>
 
       {manualText !== null && (

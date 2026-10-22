@@ -62,6 +62,12 @@ try {
   if (clipboard) assert.match(clipboard, /تقرير أوربت/, 'Copied text must be the ORBIT report');
   // The orbit is the whole interface: tap a satellite to see its name and its problem, then copy it.
   assert.ok(await page.locator('.sat').count() >= 8, 'Every program must appear as a satellite');
+  assert.equal(await page.locator('.sat .avatar').count(), await page.locator('.sat').count(), 'Every satellite shows a logo or a monogram');
+  const logos = await page.request.get(base + '/api/logos');
+  assert.equal(logos.status(), 200, 'Logos endpoint must serve the signed-in operator');
+  assert.equal(typeof (await logos.json()).logos, 'object');
+  const refreshed = await page.request.post(base + '/api/logos/refresh', { headers: { Origin: base }, data: { id: 'no-such-program' } });
+  assert.equal(refreshed.status(), 200, 'Refreshing an unknown program is a harmless no-op');
   await page.locator('.orbit').hover({ position: { x: 4, y: 4 } }); // hovering pauses the rotation
   const sat = page.locator('.sat').first();
   await sat.click();

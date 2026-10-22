@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { createLogoService } from './src/core/logoService.ts';
 import { buildPrivacySafeTimeline, buildSharedDependencyAdvisory, evaluateTruthEvidence } from './src/core/guardian.ts';
 import { GoogleGenAI } from '@google/genai';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -291,8 +292,14 @@ loadStateFromDisk();
 // Idempotency & Rate-limiting store
 const processedIdempotencyKeys = new Set<string>();
 
+const LOGO_SNAPSHOT_PATH = path.join(__dirname, '.orbit-logos.json');
+
 async function startServer() {
   const app = express();
+  const logoService = createLogoService({
+    firestore, snapshotPath: LOGO_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
+  });
+  await logoService.load();
   const asyncRoute = (handler: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>) =>
     (req: express.Request, res: express.Response, next: express.NextFunction) => { void handler(req, res, next).catch(next); };
   app.disable('x-powered-by');
@@ -645,6 +652,18 @@ async function startServer() {
       hasGithubTokenConfigured: Boolean(process.env.GITHUB_READ_ONLY_TOKEN),
     });
   });
+
+  // Program logos: found from each program's own site or repository, stored apart from the main state.
+  app.get('/api/logos', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ logos: logoService.list() });
+  });
+  app.post('/api/logos/refresh', asyncRoute(async (req, res) => {
+    const id = typeof req.body?.id === 'string' ? req.body.id.slice(0, 120) : undefined;
+    const result = await logoService.refresh({ id, force: Boolean(id && req.body?.force) });
+    res.set('Cache-Control', 'no-store');
+    res.json({ ...result, logos: logoService.list() });
+  }));
 
   // 3. Read-Only GitHub Sync Probe (Respects Rate Limits & Never Writes to Any Repo)
   async function syncGithubFleet(appId?: string) {
