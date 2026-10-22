@@ -1,3 +1,4 @@
+import { applyBrowserVisit, parseBrowserReports } from './src/core/browserVisit.ts';
 import 'dotenv/config';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -1056,6 +1057,34 @@ async function startServer() {
     const rejection = await schedulerRejection(req);
     if (rejection) return res.status(rejection.status).json({ error: rejection.error });
     return res.json({ completedAt: new Date().toISOString(), ...(await runWatch()) });
+  }));
+
+  // Daily real-browser visitor (GitHub Actions + Playwright): fetches the addresses to open, posts what it saw.
+  app.post('/internal/scheduler/visit-targets', asyncRoute(async (req, res) => {
+    const rejection = await schedulerRejection(req);
+    if (rejection) return res.status(rejection.status).json({ error: rejection.error });
+    await siteService.refresh({});
+    const targets = platforms
+      .filter(p => p.lifecycleState === 'active' && p.runtimeMode !== 'local-only' && p.runtimeMode !== 'github-local')
+      .map(p => ({ id: p.id, url: siteService.url(p) }))
+      .filter((t): t is { id: string; url: string } => Boolean(t.url));
+    return res.json({ targets });
+  }));
+
+  app.post('/internal/scheduler/visit-results', asyncRoute(async (req, res) => {
+    const rejection = await schedulerRejection(req);
+    if (rejection) return res.status(rejection.status).json({ error: rejection.error });
+    const reports = parseBrowserReports(req.body);
+    const now = new Date().toISOString();
+    const byId = new Map(reports.map(r => [r.id, r]));
+    platforms = platforms.map(p => {
+      const r = byId.get(p.id);
+      return r ? applyBrowserVisit(p, r, siteService.url(p), now) : p;
+    });
+    broadcastRealtimeUpdate('BROWSER_VISIT');
+    await persistenceQueue;
+    await notifyChanges();
+    return res.json({ completedAt: now, accepted: reports.length, problems: reports.filter(r => !r.ok).length });
   }));
 
   app.post('/internal/scheduler/github-sync', asyncRoute(async (req, res) => {
