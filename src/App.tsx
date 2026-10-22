@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, sharedLinkReason, summarize } from './core/fleetStatus';
-import { Dashboard } from './components/Dashboard';
+import { Dashboard, type Logos } from './components/Dashboard';
 import { Mark } from './components/Mark';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
@@ -34,7 +34,9 @@ export default function App() {
   const [githubTokenConfigured, setGithubTokenConfigured] = useState<boolean | undefined>(undefined);
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [logos, setLogos] = useState<Logos>({});
   const autoSyncedRef = useRef(false);
+  const logosAskedRef = useRef(false);
   const bannerTimer = useRef<number | undefined>(undefined);
 
   const showBanner = (message: string) => {
@@ -111,6 +113,31 @@ export default function App() {
     }
   };
 
+  const loadLogos = async () => {
+    try {
+      const res = await apiFetch('/api/logos');
+      if (res.ok) setLogos((await res.json()).logos || {});
+    } catch { /* monograms stand in */ }
+  };
+
+  // Asks the server to find logos for programs that have none (or an old one), then shows whatever it has.
+  const refreshLogos = async (id?: string) => {
+    try {
+      // The server handles a few programs per request; ask again until none are waiting.
+      for (let round = 0; round < 5; round += 1) {
+        const res = await apiFetch('/api/logos/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(id ? { id, force: true } : {}),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setLogos(data.logos || {});
+        if (id || !data.remaining) return;
+      }
+    } catch { /* monograms stand in */ }
+  };
+
   const handleSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -142,6 +169,10 @@ export default function App() {
     if (isLocked) return;
     void (async () => {
       const data = await fetchServerState();
+      if (data && !logosAskedRef.current) {
+        logosAskedRef.current = true;
+        void loadLogos().then(() => refreshLogos());
+      }
       if (!data || autoSyncedRef.current) return;
       autoSyncedRef.current = true;
       // Link on open: refresh once if any GitHub-backed program was never verified or its evidence is over 6 hours old.
@@ -190,6 +221,8 @@ export default function App() {
     void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => {
       clearOrbitSessionToken();
       autoSyncedRef.current = false;
+      logosAskedRef.current = false;
+      setLogos({});
       setIsLocked(true);
     });
   };
@@ -224,6 +257,8 @@ export default function App() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'تعذر إضافة البرنامج.');
     if (data.platforms) setPlatforms(data.platforms);
+    // The new program gets its own logo right away, from its site or repository.
+    if (data.platform?.id) void refreshLogos(data.platform.id);
     return 'تمت الإضافة. اضغط «تحديث» لربطه.';
   };
 
@@ -270,6 +305,7 @@ export default function App() {
       {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
       <Dashboard
         rows={rows}
+        logos={logos}
         summary={summary}
         platforms={platforms}
         tokenMissing={githubTokenConfigured === false}

@@ -92,27 +92,33 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .ring { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%; pointer-events: none; animation: spin var(--dur) linear infinite; }
 .ring-out { width: 84.4%; margin: -42.2% 0 0 -42.2%; border: 1px dashed rgba(153, 234, 217, .32); --dur: 170s; }
 .ring-inn { width: 53.4%; margin: -26.7% 0 0 -26.7%; border: 1px solid rgba(116, 230, 204, .3); box-shadow: 0 0 44px rgba(88, 242, 197, .08), inset 0 0 30px rgba(88, 242, 197, .04); --dur: 110s; animation-direction: reverse; }
-.sat { position: absolute; width: 48px; height: 48px; margin: -24px 0 0 -24px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; color: var(--hero-1); z-index: 1; pointer-events: auto; }
+.sat { position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; color: var(--hero-1); z-index: 1; pointer-events: auto; }
 .sat:focus-visible { outline: 3px solid var(--hero-accent); outline-offset: 0; border-radius: 50%; }
-.sat-in { position: relative; display: grid; place-items: center; width: 30px; height: 30px; animation: spin var(--dur) linear infinite; }
+.sat-in { position: relative; display: grid; place-items: center; width: 42px; height: 42px; animation: spin var(--dur) linear infinite; }
 .ring-out .sat-in { animation-direction: reverse; }
-.sat-dot { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px rgba(255, 255, 255, .06), 0 0 20px var(--g); transition: transform .2s ease, box-shadow .2s ease; animation: bob 5.5s ease-in-out infinite; animation-delay: calc(var(--k, 0) * -.9s); }
+.sat-dot { position: relative; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--c), 0 0 0 7px rgba(255, 255, 255, .06), 0 8px 22px -6px var(--g), 0 0 22px var(--g); transition: transform .2s ease, box-shadow .2s ease; animation: bob 5.5s ease-in-out infinite; animation-delay: calc(var(--k, 0) * -.9s); }
 .sat-bad { --c: var(--hero-bad); --g: rgba(255, 122, 104, .75); }
 .sat-warn { --c: var(--hero-warn); --g: rgba(247, 178, 60, .6); }
 .sat-ok { --c: var(--hero-ok); --g: rgba(107, 232, 190, .5); }
 .sat-local { --c: var(--hero-local); --g: transparent; }
-.sat:hover .sat-dot, .sat.is-selected .sat-dot { transform: scale(1.3); box-shadow: 0 0 0 5px rgba(255, 255, 255, .16), 0 0 26px var(--g); }
-.sat-bad .sat-dot::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--hero-bad); opacity: 0; animation: ping 2.4s ease-out infinite; pointer-events: none; }
+.sat:hover .sat-dot, .sat.is-selected .sat-dot { transform: scale(1.2); box-shadow: 0 0 0 3px var(--c), 0 0 0 8px rgba(255, 255, 255, .18), 0 0 30px var(--g); }
+.avatar { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: #fff; }
+.avatar img { width: 100%; height: 100%; object-fit: contain; padding: 9%; display: block; user-select: none; -webkit-user-drag: none; }
+.avatar-mono { color: #fff; font-family: 'Orbit Display', 'Orbit Sans', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1; text-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+.sat-flag { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--c); color: var(--hero-1); border: 2px solid #0b1a30; }
+.sat-flag svg { display: block; }
+.sat-flag circle[r=".6"], .detail-badge circle[r=".6"] { fill: currentColor; stroke: none; }
+.sat-bad .sat-dot::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--hero-bad); opacity: 0; animation: ping 2.4s ease-out infinite; pointer-events: none; }
 .sat-label { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; color: var(--hero-ink); background: rgba(9, 20, 40, .86); border: 1px solid var(--c); pointer-events: none; }
 .sat-up .sat-label { top: auto; bottom: calc(100% + 6px); }
-.sat-ok .sat-label, .sat-local .sat-label { display: none; }
+.sat-label { display: none; }
 .sat:hover .sat-label, .sat:focus-visible .sat-label, .sat.is-selected .sat-label { display: block; }
 .orbit:hover .ring, .orbit:hover .sat-in, .orbit:focus-within .ring, .orbit:focus-within .sat-in, .orbit.has-sel .ring, .orbit.has-sel .sat-in { animation-play-state: paused; }
 
 .detail { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; width: 100%; min-height: 66px; padding: 10px 12px; border-radius: 22px; text-align: start; background: rgba(255, 255, 255, .08); border: 1px solid rgba(157, 236, 228, .3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 14px 30px -16px rgba(0, 0, 0, .6); animation: rise .3s cubic-bezier(.2, .7, .2, 1) backwards; }
 .detail-bad { --c: var(--hero-bad); } .detail-warn { --c: var(--hero-warn); } .detail-ok { --c: var(--hero-ok); } .detail-local { --c: var(--hero-local); }
-.detail-badge { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: var(--c); color: var(--hero-1); }
-.detail-badge svg circle[r=".6"] { fill: currentColor; stroke: none; }
+.detail-badge { position: relative; width: 48px; height: 48px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--c), 0 6px 18px -6px var(--c); }
+.detail-badge .avatar-mono { font-size: 1.35rem; }
 .detail-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
 .detail-info strong { color: #fff; font-size: 1.1rem; }
 .detail-info span { color: var(--c); font-size: .9rem; font-weight: 600; overflow-wrap: anywhere; }

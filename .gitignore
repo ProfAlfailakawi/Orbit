@@ -8,3 +8,4 @@ coverage/
 !.env.example
 .orbit-data.json
 test-artifacts/
+.orbit-logos.json
