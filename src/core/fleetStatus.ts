@@ -1,7 +1,7 @@
 /** What the owner sees per program: one short status line and whether there is something to copy to Claude. */
 import type { IncidentCaseFile, PlatformRecord, RadarEvent } from './types.ts';
 import { generateClaudeMissionPrompt } from './engine.ts';
-import { buildFleetReportForClaude, buildRepairIntelligenceAddendum, getLinkIssue, getProgramProblems } from './guardian.ts';
+import { buildFleetReportForClaude, buildRepairIntelligenceAddendum, getLinkIssue, getProgramProblems, getProgramWarnings } from './guardian.ts';
 
 export type RowTone = 'bad' | 'warn' | 'ok' | 'local';
 export interface ProgramRow {
@@ -10,6 +10,8 @@ export interface ProgramRow {
   text: string;
   needsCopy: boolean;
   incidents: IncidentCaseFile[];
+  /** True when nothing is broken yet but a drift or expiry is coming: worth telling the owner, not a failure. */
+  early?: boolean;
 }
 
 const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3, Informational: 4 };
@@ -53,6 +55,8 @@ export function buildRows(platforms: PlatformRecord[], incidents: IncidentCaseFi
     if (p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local') {
       return { platform: p, tone: 'local', text: 'برنامج محلي', needsCopy: false, incidents: own };
     }
+    const early = getProgramWarnings(p);
+    if (early.length) return { platform: p, tone: 'warn', text: early[0], needsCopy: true, incidents: own, early: true };
     const link = getLinkIssue(p);
     if (link) return { platform: p, tone: 'warn', text: link === shared ? 'غير مربوط' : link, needsCopy: true, incidents: own };
     const siteChecked = p.productionUrlVerified && p.fourState?.siteReachable === true;
@@ -76,6 +80,8 @@ export function summarize(rows: ProgramRow[], reason: string | null = null): Sum
   const bad = rows.filter(r => r.tone === 'bad').length;
   const warn = rows.filter(r => r.tone === 'warn').length;
   if (bad) return { bad, warn, tone: 'bad', headline: (bad === 1 ? 'يوجد برنامج فيه مشكلة' : 'يوجد ' + programsPhrase(bad) + ' فيها مشاكل'), buttonLabel: 'انسخ كل المشاكل', reason };
+  const early = rows.filter(r => r.early).length;
+  if (warn && early === warn) return { bad, warn, tone: 'warn', headline: 'لا شيء معطل، لكن في ' + programsPhrase(early) + ' تحذير مبكر', buttonLabel: 'انسخ التقرير', reason };
   if (warn) return { bad, warn, tone: 'warn', headline: 'لا توجد مشاكل مؤكدة، لكن الرصد ناقص في ' + programsPhrase(warn), buttonLabel: 'انسخ التقرير', reason };
   return { bad, warn, tone: 'ok', headline: rows.length ? 'كل البرامج تعمل' : 'لا توجد برامج بعد', buttonLabel: null, reason: null };
 }
@@ -109,4 +115,23 @@ export function buildCopyText(rows: ProgramRow[], scope: 'all' | string): string
     return p ? mission(i, p, fleet) : '';
   }).filter(Boolean);
   return [report, ...missions].join('\n\n');
+}
+
+/**
+ * The automatic watch records a site visit every 15 minutes. If the newest one is old, the watch itself has stopped
+ * (a paused schedule, an expired token) and no alert can be trusted to arrive, so the owner is told on opening the page.
+ */
+export function watchHealth(platforms: PlatformRecord[], now = Date.now()): { stale: boolean; minutes: number } | null {
+  const times = platforms.filter(isInFleet).map(p => Date.parse(p.siteCheckedAt || '')).filter(Number.isFinite);
+  if (!times.length) return null;
+  const minutes = Math.max(0, Math.round((now - Math.max(...times)) / 60_000));
+  return { stale: minutes > 90, minutes };
+}
+
+export function minutesPhrase(minutes: number): string {
+  if (minutes < 60) return minutes + ' دقيقة';
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours === 1 ? 'ساعة' : hours === 2 ? 'ساعتين' : hours <= 10 ? hours + ' ساعات' : hours + ' ساعة';
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'يوم' : days === 2 ? 'يومين' : days <= 10 ? days + ' أيام' : days + ' يومًا';
 }

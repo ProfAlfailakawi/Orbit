@@ -4,6 +4,7 @@ import { displayName } from '../core/displayName';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
 
 export type Logos = Record<string, { src: string }>;
+export interface Explanation { mode: 'rules' | 'gemini'; urgency: string; meaning: string; action: string; text?: string }
 
 interface DashboardProps {
   rows: ProgramRow[];
@@ -13,6 +14,7 @@ interface DashboardProps {
   tokenMissing: boolean;
   onAdd: (name: string, link: string) => Promise<string>;
   onRemove: (id: string) => Promise<void>;
+  onExplain: (id: string) => Promise<Explanation>;
 }
 
 const shortName = displayName;
@@ -74,7 +76,7 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
   const frac = total ? working / total : 0;
   const arc = 2 * Math.PI * 74;
   return (
-    <div className={'orbit' + (selectedId ? ' has-sel' : '')} role="group" aria-label="برامجك" onClick={event => { if (event.target === event.currentTarget) onSelect(null); }}>
+    <div className={'orbit' + (selectedId ? ' has-sel' : '') + (total && working === total ? ' is-calm' : '')} role="group" aria-label="برامجك" onClick={event => { if (event.target === event.currentTarget) onSelect(null); }}>
       <svg className="orbit-art" viewBox="0 0 360 360" aria-hidden="true">
         <defs>
           <radialGradient id="orb-glow" cx="50%" cy="50%" r="50%">
@@ -100,7 +102,7 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
           <>
             <i>ORBIT ONE</i>
             <b>{total ? working : '—'}</b>
-            <small>{total ? `تعمل من ${total}` : 'لا برامج'}</small>
+            <small>{total ? (working === total ? 'كلها تعمل، كل شيء بخير' : `تعمل من ${total}`) : 'لا برامج'}</small>
           </>
         )}
       </div>
@@ -133,7 +135,7 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
   );
 }
 
-export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd, onRemove }: DashboardProps) {
+export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd, onRemove, onExplain }: DashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [manualText, setManualText] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -143,6 +145,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [explained, setExplained] = useState<{ id: string; state: 'loading' | 'failed' | Explanation } | null>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -154,6 +157,11 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setCopied(null), 2500);
     } else setManualText(text);
+  };
+
+  const explain = async (id: string) => {
+    setExplained({ id, state: 'loading' });
+    try { setExplained({ id, state: await onExplain(id) }); } catch { setExplained({ id, state: 'failed' }); }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -173,6 +181,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
     <main className="page">
       <section className={'summary hero hero-' + summary.tone}>
         <div className="hero-stars" aria-hidden="true" />
+        <div className="hero-aura" aria-hidden="true" />
         <div className="hero-text">
           {selected ? (
             <div className={'detail detail-' + selected.tone} role="status" key={selected.platform.id}>
@@ -185,21 +194,38 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
                 <span>{selected.text}</span>
               </div>
               {selected.needsCopy && (
-                <button type="button" className={'btn btn-copy' + (copied === selected.platform.id ? ' is-copied' : '')} aria-label={'انسخ مشكلة: ' + shortName(selected.platform)} onClick={() => void copy(selected.platform.id)}>
-                  {copied === selected.platform.id ? 'تم النسخ' : 'انسخ'}
-                </button>
+                <span className="detail-actions">
+                  <button type="button" className="btn btn-explain" aria-label={'اشرح مشكلة: ' + shortName(selected.platform)} disabled={explained?.id === selected.platform.id && explained.state === 'loading'} onClick={() => void explain(selected.platform.id)}>اشرح</button>
+                  <button type="button" className={'btn btn-copy' + (copied === selected.platform.id ? ' is-copied' : '')} aria-label={'انسخ مشكلة: ' + shortName(selected.platform)} onClick={() => void copy(selected.platform.id)}>
+                    {copied === selected.platform.id ? 'نُسخ' : 'انسخ'}
+                  </button>
+                </span>
               )}
               <button type="button" className="detail-close" aria-label="إغلاق" onClick={() => setSelectedId(null)}>×</button>
             </div>
           ) : (
             <p className="hero-hint">اضغط أي قمر لترى اسمه ومشكلته</p>
           )}
+          {selected && explained?.id === selected.platform.id && (
+            <div className="explain" role="status" aria-live="polite">
+              {explained.state === 'loading' && <p className="explain-wait">جارٍ الشرح…</p>}
+              {explained.state === 'failed' && <p>تعذر الشرح الآن، حاول بعد قليل.</p>}
+              {typeof explained.state === 'object' && (
+                <>
+                  <span className={'explain-chip explain-' + (explained.state.urgency === 'عاجلة' ? 'hot' : explained.state.urgency === 'مهمة' ? 'mid' : 'low')}>{explained.state.urgency}</span>
+                  {explained.state.text
+                    ? <p className="explain-text">{explained.state.text}</p>
+                    : <><p>{explained.state.meaning}</p><p className="explain-act">الخطوة: {explained.state.action}</p></>}
+                </>
+              )}
+            </div>
+          )}
           <h1>{summary.headline}</h1>
           {summary.reason && <p className="reason">{'السبب: ' + summary.reason}</p>}
           <p className="hero-muted" aria-live="polite"><span className="pulse" aria-hidden="true" />{lastCheckLabel(platforms)}</p>
           {summary.buttonLabel && (
-            <button type="button" className={'btn btn-primary' + (copied === 'all' ? ' is-copied' : '')} onClick={() => void copy('all')}>
-              {copied === 'all' ? 'تم النسخ' : summary.buttonLabel}
+            <button type="button" className={'btn btn-primary' + (copied === 'all' ? ' is-copied' : summary.tone === 'bad' ? ' btn-attn' : '')} onClick={() => void copy('all')}>
+              {copied === 'all' ? 'نُسخ — الصقه في كلود' : summary.buttonLabel}
             </button>
           )}
           {tokenMissing && <p className="notice">لم يُضبط توكن GitHub على الخادم، لذلك لا تُقرأ المستودعات الخاصة.</p>}

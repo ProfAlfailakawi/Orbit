@@ -15,6 +15,8 @@ export interface VisitResult {
   problems: string[];
   evidence: string;
   ms: number;
+  /** Size of the home page HTML: a sudden jump usually means a different deploy. */
+  htmlBytes?: number;
 }
 
 const ERROR_PAGE = /(application error|502 bad gateway|503 service (temporarily )?unavailable|service unavailable|error 404 \(not found\)|site not found|the page you requested|this site can[’']?t be reached|cloudflare[^<]{0,40}error \d{3}|something went wrong on the server|internal server error)/i;
@@ -87,5 +89,5 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   const evidence = problems.length
     ? problems.join('؛ ')
     : status >= 400 ? `الصفحة محمية (HTTP ${status}) وتستجيب.` : `الصفحة الرئيسية HTTP ${status} (${page.ms}ms)${checked ? `؛ ${checked} ملفات تطبيق سليمة` : ''}.`;
-  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started };
+  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started, htmlBytes: page.bytes.length };
 }

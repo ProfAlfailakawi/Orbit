@@ -6,8 +6,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
-import { buildRows, sharedLinkReason, summarize } from './core/fleetStatus';
-import { Dashboard, type Logos } from './components/Dashboard';
+import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
+import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
 import { Mark } from './components/Mark';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 
@@ -321,6 +321,13 @@ export default function App() {
 
   const rows = useMemo(() => buildRows(platforms, incidents, events), [platforms, incidents, events]);
   const summary = useMemo(() => summarize(rows, sharedLinkReason(platforms)), [rows, platforms]);
+  const watch = useMemo(() => watchHealth(platforms), [platforms]);
+
+  const handleExplain = async (id: string): Promise<Explanation> => {
+    const response = await apiFetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (!response.ok) throw new Error('تعذر الشرح الآن');
+    return response.json();
+  };
 
   if (isLocked) {
     return (
@@ -353,6 +360,7 @@ export default function App() {
         </div>
       </header>
       {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
+      {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
       {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
       <Dashboard
         rows={rows}
@@ -362,6 +370,7 @@ export default function App() {
         tokenMissing={githubTokenConfigured === false}
         onAdd={handleAdd}
         onRemove={handleRemove}
+        onExplain={handleExplain}
       />
     </div>
   );

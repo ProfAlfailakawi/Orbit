@@ -1,6 +1,7 @@
 /** Applying a site visit to a program record. Pure, so the server routes stay thin and this is unit-tested. */
 import type { PlatformRecord } from './types.ts';
 import type { VisitResult } from './visitor.ts';
+import { addVital } from './vitals.ts';
 
 const confirmedChecks = (fourState: PlatformRecord['fourState']) => Object.values(fourState).filter(v => v !== null).length;
 
@@ -21,6 +22,9 @@ export function applyVisit(p: PlatformRecord, url: string, visit: VisitResult, n
     healthStatus: healthOf(p, fourState, visit.problems),
     siteProblems: visit.problems,
     siteCheckedAt: nowIso,
+    ...(visit.ok ? { siteLastOkAt: nowIso } : {}),
+    // Only a page that answered says anything about speed and size.
+    ...(visit.ok && visit.htmlBytes ? { vitals: addVital(p.vitals, { at: nowIso, ms: visit.ms, bytes: visit.htmlBytes }) } : {}),
   };
 }
 
@@ -28,7 +32,7 @@ export function applyVisit(p: PlatformRecord, url: string, visit: VisitResult, n
 export function clearSite(p: PlatformRecord): PlatformRecord {
   if (!p.productionUrl && p.fourState.siteReachable === null && !p.siteProblems?.length && !p.productionUrlVerified) return p;
   const fourState = { ...p.fourState, siteReachable: null };
-  return { ...p, productionUrl: null, productionUrlVerified: false, fourState, monitoringCoveragePct: Math.round(confirmedChecks(fourState) * 100 / 4), siteProblems: [], siteCheckedAt: undefined };
+  return { ...p, productionUrl: null, productionUrlVerified: false, fourState, monitoringCoveragePct: Math.round(confirmedChecks(fourState) * 100 / 4), siteProblems: [], siteCheckedAt: undefined, vitals: undefined, certExpiresAt: undefined, certProblem: undefined, certCheckedAt: undefined };
 }
 
 /** Run `fn` over items with bounded concurrency and an overall deadline; items not started by then are skipped. */
