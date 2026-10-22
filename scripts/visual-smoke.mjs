@@ -36,6 +36,9 @@ try {
   const state = await response.json();
   assert.ok(Array.isArray(state.platforms), 'Fleet state missing');
   assert.ok(state.acceptanceCriteria.every(item => item.status !== 'Pass'), 'Unverified acceptance must not be declared passed');
+  const unauthWatch = await page.request.post(base + '/internal/scheduler/watch');
+  assert.equal(unauthWatch.status(), 503, 'Watch endpoint must fail closed when scheduler identity is not configured');
+  assert.equal((await page.request.get(base + '/api/sites')).status(), 200, 'Sites endpoint must serve the signed-in operator');
   const unauthScheduler = await page.request.post(base + '/internal/scheduler/github-sync');
   assert.equal(unauthScheduler.status(), 503, 'Scheduler endpoint must fail closed when scheduler identity is not configured');
   const canary = await page.request.post(base + '/api/canary/run', { headers: { Origin: base } });

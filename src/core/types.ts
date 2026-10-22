@@ -218,6 +218,11 @@ export interface PlatformRecord {
   featuresDna: FeatureDnaRecord[];
   recentRuns: GitHubActionRunSummary[];
   recentCommits: CommitRecord[];
+  /** Problems the automatic site visit found on the public page (e.g. a broken app file), plain Arabic. */
+  siteProblems?: string[];
+  siteCheckedAt?: string;
+  /** Last real-browser visit (daily robot visitor). */
+  browserVisit?: { at: string; ok: boolean; problems: string[] };
   branchHeads?: Array<{ name: string; sha: string }>;
   createdAt: string;
   isCustomAdded?: boolean;
