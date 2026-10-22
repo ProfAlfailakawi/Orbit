@@ -53,7 +53,7 @@ test('copy text covers one program or all, and always carries the safety guardra
   const failing = working('BAD'); failing.fourState = { ...failing.fourState, ciPassed: false };
   const rows = buildRows([failing, app('NEW')], [], []);
   const one = buildCopyText(rows, failing.id);
-  assert.match(one, /BAD/); assert.doesNotMatch(one, /\(NEW\)/);
+  assert.match(one, /BAD/); assert.doesNotMatch(one, /NEW/);
   const all = buildCopyText(rows, 'all');
   assert.match(all, /BAD/); assert.match(all, /NEW/); assert.match(all, /لا تدمج أو تنشر/);
 });

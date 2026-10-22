@@ -178,3 +178,76 @@ export async function discoverSiteLogo(siteUrl: string, deps: LogoDeps): Promise
   }
   return pickFirstUsable(candidates, deps);
 }
+
+// ── Logos found inside a program's own repository ─────────────────────────────
+
+export interface RepoFile { path: string; size: number }
+
+const IMAGE_FILE = /\.(svg|png|webp|jpe?g|ico)$/i;
+const SKIP_PATH = /(^|\/)(node_modules|docs?|tests?|__tests__|screenshots?|plans|monteur|brand-source|\.github|dist|build|coverage|quran-sources)(\/|$)/i;
+const SKIP_NAME = /(maskable|monochrome|mono\b|-mono|splash|(^|[-_])og([-_.]|$)|social|banner|hero|screenshot|favicon-(16|32)|whatsapp|safari-pinned|mstile|sprite|placeholder|avatar)/i;
+
+/** Heuristic ranking of icon-like files, used when a repository has no (usable) web-app manifest. */
+export function rankRepoIcons(files: RepoFile[]): string[] {
+  const scored: Array<{ path: string; score: number }> = [];
+  for (const file of files) {
+    if (!IMAGE_FILE.test(file.path) || file.size < 100 || file.size > MAX_LOGO_BYTES || SKIP_PATH.test(file.path)) continue;
+    const name = file.path.split('/').pop()!.toLowerCase();
+    if (SKIP_NAME.test(name)) continue;
+    let score = 0;
+    if (/^(app-icon[\w-]*|icon|favicon|[a-z]+-icon)\.svg$/.test(name)) score = 300;
+    else if (/icon-(192|256)([-.]|$)/.test(name) && name.endsWith('.png')) score = 290;
+    else if (/^apple-touch-icon/.test(name)) score = 270;
+    else if (/^logo\.svg$/.test(name)) score = 260;
+    else if (/^logo\.png$|logo[-_\w]*\.(png|svg)$/.test(name)) score = 250;
+    else if (/^icon\.png$/.test(name)) score = 200;
+    else if (/^favicon\.png$/.test(name)) score = 100;
+    else if (/^favicon\.ico$/.test(name)) score = 60;
+    if (!score) continue;
+    const version = name.match(/-v(\d+)/);
+    score += (file.path.startsWith('public/') ? 15 : file.path.includes('/') ? -5 : 5) + (version ? Number(version[1]) / 10 : 0);
+    scored.push({ path: file.path, score });
+  }
+  return scored.sort((a, b) => b.score - a.score).map(item => item.path);
+}
+
+/** Manifest files worth reading: `public/` first, then the repository root. Case-sensitive, so data manifests are ignored. */
+export function findManifestPaths(files: RepoFile[]): string[] {
+  const found = files.map(f => f.path).filter(p => /^(public\/)?(manifest\.json|manifest\.webmanifest|site\.webmanifest)$/.test(p));
+  return found.sort((a, b) => Number(b.startsWith('public/')) - Number(a.startsWith('public/'))).slice(0, 2);
+}
+
+/**
+ * The icons the program's owner declared for the installed app, mapped back to files that exist in the repository.
+ * Plain icons near 192px come first; maskable-only icons (extra safe-zone margin) and oversized files are skipped.
+ */
+export function manifestIconRepoPaths(manifestPath: string, manifest: unknown, sizes: Map<string, number>): string[] {
+  const icons = (manifest as { icons?: unknown })?.icons;
+  if (!Array.isArray(icons)) return [];
+  const dir = manifestPath.includes('/') ? manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1) : '';
+  const out: Array<{ path: string; score: number }> = [];
+  for (const icon of icons.slice(0, 24) as Array<{ src?: unknown; sizes?: unknown; purpose?: unknown; type?: unknown }>) {
+    if (typeof icon?.src !== 'string') continue;
+    const clean = icon.src.split('?')[0].split('#')[0];
+    if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(clean)) continue;
+    const relative = clean.replace(/^\/+/, '');
+    const attempts = clean.startsWith('/') ? ['public/' + relative, relative, dir + relative] : [dir + relative, 'public/' + relative, relative];
+    const path = attempts.find(candidate => sizes.has(candidate));
+    if (!path) continue;
+    const size = sizes.get(path)!;
+    if (size < 100 || size > MAX_LOGO_BYTES) continue;
+    const purpose = String(icon.purpose || 'any');
+    if (/monochrome/i.test(purpose) || (/maskable/i.test(purpose) && !/\bany\b/i.test(purpose))) continue;
+    const svg = /\.svg$/i.test(path) || String(icon.type || '').includes('svg');
+    const side = svg ? 192 : declaredSize(String(icon.sizes || '')) || 192;
+    out.push({ path, score: 300 - Math.abs(side - 192) / 4 + (svg ? 0 : 5) });
+  }
+  return out.sort((a, b) => b.score - a.score).map(item => item.path);
+}
+
+/** Files to try, best first: the owner's declared app icons, then the general heuristic. */
+export function pickRepoLogoPaths(files: RepoFile[], manifests: Array<{ path: string; json: unknown }>, limit = 4): string[] {
+  const sizes = new Map(files.map(f => [f.path, f.size] as const));
+  const ordered = [...manifests.flatMap(m => manifestIconRepoPaths(m.path, m.json, sizes)), ...rankRepoIcons(files)];
+  return [...new Set(ordered)].slice(0, limit);
+}
