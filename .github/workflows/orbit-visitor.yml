@@ -36,6 +36,12 @@ jobs:
         env:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           SCHEDULER_SERVICE_ACCOUNT: ${{ vars.ORBIT_SCHEDULER_SERVICE_ACCOUNT }}
+          # Smart visitor (optional): runs only when GEMINI_API_KEY is set. Test accounts are a JSON secret, never in the code.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ORBIT_TEST_LOGINS: ${{ secrets.ORBIT_TEST_LOGINS }}
+          ORBIT_AI_EXPLORE: ${{ vars.ORBIT_AI_EXPLORE }}
+          ORBIT_AI_MAX_CALLS: ${{ vars.ORBIT_AI_MAX_CALLS }}
+          ORBIT_AI_ALLOW_WRITES: ${{ vars.ORBIT_AI_ALLOW_WRITES }}
         shell: bash
         run: |
           set -Eeuo pipefail

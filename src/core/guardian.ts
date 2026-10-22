@@ -6,6 +6,7 @@ import { freshBrowserProblems, freshBrowserWarnings } from './browserVisit.ts';
 import { freshSensorProblems, sensorTrailLines } from './sensor.ts';
 import { certProblems, certWarnings } from './certs.ts';
 import { driftWarnings } from './vitals.ts';
+import { domainProblems, domainWarnings } from './expiry.ts';
 import { probableCause } from './causes.ts';
 
 export type TruthEvidence = { uiReportedSuccess?: unknown; serverRecordConfirmed?: unknown; httpStatus?: unknown };
@@ -124,7 +125,7 @@ export function getProgramProblems(p: PlatformRecord): string[] {
   if (f?.userJourneyHealthy === false) out.push('تجربة المستخدم الأساسية تحتاج مراجعة');
   // What the site visitor found on the public page (a broken app file, an error page), while the finding is fresh.
   if (p.siteProblems?.length && p.siteCheckedAt && Date.now() - Date.parse(p.siteCheckedAt) < 36 * 3_600_000) out.push(...p.siteProblems);
-  out.push(...freshBrowserProblems(p), ...freshSensorProblems(p), ...certProblems(p));
+  out.push(...freshBrowserProblems(p), ...freshSensorProblems(p), ...certProblems(p), ...domainProblems(p));
   const failed = (p.recentRuns || []).find(r => r.dataIntegrity === 'Live' && r.status === 'failure');
   if (failed && f?.ciPassed === false) out.push('آخر عملية فاشلة: ' + sanitizeTelemetryPayload(failed.workflowName + ' — ' + failed.commitMessage).sanitized.slice(0, 160));
   return [...new Set(out)];
@@ -132,7 +133,7 @@ export function getProgramProblems(p: PlatformRecord): string[] {
 
 /** Early warnings: nothing is broken yet, but something is drifting or hygiene is missing. Never counted as a failure. */
 export function getProgramWarnings(p: PlatformRecord, now = Date.now()): string[] {
-  return [...new Set([...driftWarnings(p, now), ...certWarnings(p, now), ...freshBrowserWarnings(p, now)])];
+  return [...new Set([...driftWarnings(p, now), ...certWarnings(p, now), ...domainWarnings(p, now), ...freshBrowserWarnings(p, now)])];
 }
 
 /** If a problem is showing and the newest commit is later than the last time the site was healthy, name that commit. */
