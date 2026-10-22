@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node --test src/core/engine.test.ts src/core/guardian.test.ts src/core/fleetStatus.test.ts src/core/contrast.test.ts src/core/logo.test.ts src/core/siteDiscovery.test.ts src/core/visitor.test.ts src/core/watch.test.ts src/core/browserVisit.test.ts src/core/sensor.test.ts src/core/alerts.test.ts src/core/pushService.test.ts src/core/vitals.test.ts src/core/pageAudit.test.ts src/core/causes.test.ts src/core/expiry.test.ts src/core/aiExplorer.test.ts src/core/repoRenames.test.ts",
+    "test": "node --test src/core/engine.test.ts src/core/guardian.test.ts src/core/fleetStatus.test.ts src/core/contrast.test.ts src/core/logo.test.ts src/core/siteDiscovery.test.ts src/core/visitor.test.ts src/core/watch.test.ts src/core/browserVisit.test.ts src/core/sensor.test.ts src/core/alerts.test.ts src/core/pushService.test.ts src/core/vitals.test.ts src/core/pageAudit.test.ts src/core/causes.test.ts src/core/expiry.test.ts src/core/aiExplorer.test.ts src/core/repoRenames.test.ts src/core/ownerSites.test.ts",
     "check": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
