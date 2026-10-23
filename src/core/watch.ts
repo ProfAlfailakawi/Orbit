@@ -29,8 +29,8 @@ function withVisit(p: PlatformRecord, url: string, visit: VisitResult, nowIso: s
     siteProblems: visit.problems,
     siteCheckedAt: nowIso,
     ...(visit.ok ? { siteLastOkAt: nowIso } : {}),
-    // Only a page that answered says anything about speed and size.
-    ...(visit.ok && visit.htmlBytes ? { vitals: addVital(p.vitals, { at: nowIso, ms: visit.ms, bytes: visit.htmlBytes }) } : {}),
+    // Only a page that answered says anything about speed and size, and only when no request was repeated (a retry adds its pause and a second attempt).
+    ...(visit.ok && visit.htmlBytes && !visit.retried ? { vitals: addVital(p.vitals, { at: nowIso, ms: visit.ms, bytes: visit.htmlBytes }) } : {}),
   };
 }
 

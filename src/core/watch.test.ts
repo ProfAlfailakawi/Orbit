@@ -38,3 +38,10 @@ test('pool runs with bounded concurrency and stops starting new work after the d
   const late = await pool([1, 2, 3, 4], 1, 25, async n => { await new Promise(r => setTimeout(r, 20)); return n; });
   assert.ok(late.length < 4, 'deadline skips the rest');
 });
+
+test('only a visit without repeated requests adds to the speed history', () => {
+  const clean = applyVisit(app(), 'https://a.example', visit({ htmlBytes: 5000, retried: false }), '2026-01-01T00:00:00Z');
+  assert.equal(clean.vitals?.length, 1);
+  const repeated = applyVisit(clean, 'https://a.example', visit({ htmlBytes: 5000, ms: 5500, retried: true }), '2026-01-01T00:15:00Z');
+  assert.equal(repeated.vitals?.length, 1, 'a retried visit includes the pause and a second attempt: it is not a speed sample');
+});

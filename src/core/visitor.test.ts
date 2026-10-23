@@ -94,3 +94,12 @@ test('retries are capped per visit so a really broken site is judged quickly', a
   const attempts = Object.values(calls).reduce((a, n) => a + n + 1, 0);
   assert.ok(attempts <= 1 + 2 + 2 + 2, `home once, two assets, plus at most two retries (was ${attempts})`);
 });
+
+test('a visit that had to repeat a request says so, so its time is not mistaken for the site\'s speed', async () => {
+  const ok = { [base]: [{ body: PAGE }], [base + 'assets/app.css']: [{ type: 'text/css' }], [base + 'assets/app.js']: [null, { type: 'text/javascript' }] };
+  const retried = await visitSite(base, flaky(ok).deps);
+  assert.equal(retried.ok, true);
+  assert.equal(retried.retried, true);
+  const clean = await visitSite(base, flaky({ ...ok, [base + 'assets/app.js']: [{ type: 'text/javascript' }] }).deps);
+  assert.equal(clean.retried, false);
+});
