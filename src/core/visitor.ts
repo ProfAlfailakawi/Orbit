@@ -35,8 +35,8 @@ export interface VisitResult {
   problems: string[];
   evidence: string;
   ms: number;
-  /** True when a request was repeated: the time then includes the pause and the extra attempt, so it says nothing about the site's speed. */
-  retried?: boolean;
+  /** How long the home page request itself took (its answering attempt only): the site's speed, free of asset checks, fallbacks and retry pauses. */
+  pageMs?: number;
   /** Size of the home page HTML: a sudden jump usually means a different deploy. */
   htmlBytes?: number;
 }
@@ -82,14 +82,14 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   const started = Date.now();
   const budget = { left: RETRIES_PER_VISIT };
   const page = await getOnce(deps, budget, url, { maxBytes: 1_500_000, accept: 'text/html,*/*;q=0.5' });
-  if (!page) return { reachable: false, ok: false, status: null, problems: ['الموقع لا يستجيب'], evidence: 'تعذر فتح الصفحة الرئيسية.', ms: Date.now() - started, retried: budget.left < RETRIES_PER_VISIT };
+  if (!page) return { reachable: false, ok: false, status: null, problems: ['الموقع لا يستجيب'], evidence: 'تعذر فتح الصفحة الرئيسية.', ms: Date.now() - started};
   const problems: string[] = [];
   const status = page.status;
   if (status >= 500) problems.push(`الموقع يعيد خطأ في الخادم (HTTP ${status})`);
   else if (status === 404) problems.push('الصفحة الرئيسية غير موجودة (404)');
   else if (status >= 400 && status !== 401 && status !== 403) problems.push(`الصفحة الرئيسية ترجع خطأ (HTTP ${status})`);
   const reachable = status < 500 && status !== 404;
-  if (problems.length) return { reachable, ok: false, status, problems, evidence: `الصفحة الرئيسية HTTP ${status}.`, ms: Date.now() - started, retried: budget.left < RETRIES_PER_VISIT };
+  if (problems.length) return { reachable, ok: false, status, problems, evidence: `الصفحة الرئيسية HTTP ${status}.`, ms: Date.now() - started};
 
   const html = text(page.bytes);
   if (status < 400) {
@@ -112,5 +112,5 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   const evidence = problems.length
     ? problems.join('؛ ')
     : status >= 400 ? `الصفحة محمية (HTTP ${status}) وتستجيب.` : `الصفحة الرئيسية HTTP ${status} (${page.ms}ms)${checked ? `؛ ${checked} ملفات تطبيق سليمة` : ''}.`;
-  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started, htmlBytes: page.bytes.length, retried: budget.left < RETRIES_PER_VISIT };
+  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started, htmlBytes: page.bytes.length, pageMs: page.ms };
 }

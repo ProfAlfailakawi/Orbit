@@ -39,9 +39,9 @@ test('pool runs with bounded concurrency and stops starting new work after the d
   assert.ok(late.length < 4, 'deadline skips the rest');
 });
 
-test('only a visit without repeated requests adds to the speed history', () => {
-  const clean = applyVisit(app(), 'https://a.example', visit({ htmlBytes: 5000, retried: false }), '2026-01-01T00:00:00Z');
-  assert.equal(clean.vitals?.length, 1);
-  const repeated = applyVisit(clean, 'https://a.example', visit({ htmlBytes: 5000, ms: 5500, retried: true }), '2026-01-01T00:15:00Z');
-  assert.equal(repeated.vitals?.length, 1, 'a retried visit includes the pause and a second attempt: it is not a speed sample');
+test('the speed sample is the home page request, and size is recorded for every good visit', () => {
+  const first = applyVisit(app(), 'https://a.example', visit({ htmlBytes: 5000, ms: 5500, pageMs: 300 }), '2026-01-01T00:00:00Z');
+  assert.deepEqual(first.vitals?.map(v => [v.ms, v.bytes]), [[300, 5000]], 'whole-visit time (with asset retries) is not used');
+  const older = applyVisit(app(), 'https://a.example', visit({ htmlBytes: 5000, ms: 700 }), '2026-01-01T00:00:00Z');
+  assert.equal(older.vitals?.[0].ms, 700, 'without a page time the visit time is the fallback');
 });
