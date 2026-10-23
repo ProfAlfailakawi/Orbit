@@ -166,17 +166,29 @@ export const describeFinding = (f: SensorFinding) => `${f.text} (${f.visitors ==
 
 const SENSOR_FRESH_MS = 6 * 3_600_000;
 
+/** A stored finding is a connection failure only when it is a request finding (its label) whose message starts with the failure phrase. */
+const isStoredConnectionFailure = (text: string) => text.startsWith(`${KIND_LABEL.request}: \u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 `);
+type Stored = NonNullable<PlatformRecord['sensorEvidence']>[number];
+/**
+ * Whether a stored finding is only a note. Findings saved before notes existed carry no `lastAt`: they are judged by the current rules,
+ * and a connection failure is a note because a burst cannot be proven after the fact.
+ */
+const isNote = (e: Stored) => (e.lastAt ? Boolean(e.note) : (e.note ?? (isStoredConnectionFailure(e.text) || e.visitors < SENSOR_CORROBORATION)));
+
 /**
  * Record the hub's findings on the program record. The hub lives in memory and is empty after a restart, so findings seen in the
  * last few hours that the hub no longer holds are kept rather than erased by the first quiet report. Freshness is per finding
- * (when it was last seen), so one visitor's unrelated report never keeps an old incident alive.
+ * (when it was last seen), so one visitor's unrelated report never keeps an old incident alive; an older record without a time
+ * is stamped with when the sensor last reported, so it ages from then on instead of being renewed by every later report.
  */
 export function applySensor(p: PlatformRecord, found: SensorFinding[], nowIso: string): PlatformRecord {
   const nowMs = Date.parse(nowIso);
-  const kept = (p.sensorEvidence || []).filter(old => !found.some(f => f.text === old.text) && nowMs - lastSeen(old, p) < SENSOR_FRESH_MS);
+  const kept = (p.sensorEvidence || [])
+    .filter(old => !found.some(f => f.text === old.text) && nowMs - lastSeen(old, p) < SENSOR_FRESH_MS)
+    .map(old => (old.lastAt ? old : { ...old, lastAt: p.sensorCheckedAt, note: isNote(old) }));
   const all = [...found, ...kept].slice(0, 7);
   if (!all.length && !p.sensorEvidence?.length && !p.sensorProblems?.length) return p;
-  return { ...p, sensorEvidence: all, sensorProblems: all.filter(f => !f.note).map(describeFinding), sensorCheckedAt: nowIso };
+  return { ...p, sensorEvidence: all, sensorProblems: all.filter(f => !isNote(f)).map(describeFinding), sensorCheckedAt: nowIso };
 }
 
 const lastSeen = (e: { lastAt?: string }, p: PlatformRecord) => Date.parse(e.lastAt || p.sensorCheckedAt || '');
@@ -184,7 +196,7 @@ const isFresh = (e: { lastAt?: string }, p: PlatformRecord, nowMs: number) => no
 
 /** Corroborated problems seen recently. Records saved before findings carried a time fall back to when the sensor last reported. */
 export function freshSensorProblems(p: PlatformRecord, nowMs = Date.now()): string[] {
-  if (p.sensorEvidence?.length) return p.sensorEvidence.filter(e => !e.note && isFresh(e, p, nowMs)).map(describeFinding);
+  if (p.sensorEvidence?.length) return p.sensorEvidence.filter(e => !isNote(e) && isFresh(e, p, nowMs)).map(describeFinding);
   return p.sensorProblems?.length && p.sensorCheckedAt && nowMs - Date.parse(p.sensorCheckedAt) < SENSOR_FRESH_MS ? p.sensorProblems : [];
 }
 
@@ -198,15 +210,15 @@ const trailOf = (e: { text: string; page: string; stack: string[]; steps: string
 /** The trail behind the program's fresh sensor problems, as lines for the report pasted to Claude. */
 export function sensorTrailLines(p: PlatformRecord, nowMs = Date.now()): string[] {
   if (!freshSensorProblems(p, nowMs).length) return [];
-  return (p.sensorEvidence || []).filter(e => !e.note && (e.stack.length || e.steps.length)).flatMap(trailOf);
+  return (p.sensorEvidence || []).filter(e => !isNote(e) && (e.stack.length || e.steps.length)).flatMap(trailOf);
 }
 
 /** Thin evidence (one visitor, scattered connection failures): shown in the report, never in the program's status. */
 export function sensorNoteLines(p: PlatformRecord, nowMs = Date.now()): string[] {
-  return (p.sensorEvidence || []).filter(e => e.note && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
+  return (p.sensorEvidence || []).filter(e => isNote(e) && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
 }
 
 /** The notes as plain texts, for the weekly log. */
 export function sensorNoteTexts(p: PlatformRecord, nowMs = Date.now()): string[] {
-  return (p.sensorEvidence || []).filter(e => e.note && isFresh(e, p, nowMs)).map(e => `ملاحظة من زوّار: ${e.text}`);
+  return (p.sensorEvidence || []).filter(e => isNote(e) && isFresh(e, p, nowMs)).map(e => `ملاحظة من زوّار: ${e.text}`);
 }

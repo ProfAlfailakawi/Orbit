@@ -164,3 +164,38 @@ test('what a visitor typed or uploaded does not leave through an error message, 
   assert.equal(out[0].message, 'Upload failed: "..." by [REDACTED_EMAIL]');
   assert.equal(out[0].page, '/s/:id');
 });
+
+test('findings saved before notes existed are judged by the current rules and then age normally', () => {
+  const saved = (text: string, visitors: number) => ({ text, page: '/', visitors, stack: [], steps: [] });
+  const t0 = new Date('2026-10-23T00:00:00Z');
+  const legacy = {
+    id: 'a', sensorCheckedAt: t0.toISOString(),
+    sensorEvidence: [
+      saved('طلب من الموقع يفشل عند الزوّار: فشل الاتصال /api/cloud-status', 2),
+      saved('خطأ برمجي ظهر لزوّار الموقع: Uncaught TypeError: x', 1),
+      saved('طلب من الموقع يفشل عند الزوّار: HTTP 503 /api/pay', 2),
+    ],
+  } as unknown as PlatformRecord;
+  const live = freshSensorProblems(legacy, t0.getTime() + 60_000);
+  assert.equal(live.length, 1, 'only the 503 seen by two visitors is still a problem');
+  assert.match(live[0], /HTTP 503/);
+  assert.equal(sensorNoteLines(legacy, t0.getTime() + 60_000).length, 2, 'the connection failure and the single-visitor error are notes');
+  // later reports keep arriving, but they do not renew the old entries: they were stamped with when the sensor last reported
+  let p = applySensor(legacy, [], new Date(t0.getTime() + 1_000).toISOString());
+  p = applySensor(p, [], new Date(t0.getTime() + 5 * 3_600_000).toISOString());
+  assert.equal(freshSensorProblems(p, t0.getTime() + 5.5 * 3_600_000).length, 1);
+  assert.deepEqual(freshSensorProblems(p, t0.getTime() + 7 * 3_600_000), [], 'six hours after the last time it was seen, it is gone');
+});
+
+test('a stored application error that merely quotes the failure phrase is still a problem at two visitors', () => {
+  const t0 = new Date('2026-10-23T00:00:00Z');
+  const p = {
+    id: 'a', sensorCheckedAt: t0.toISOString(),
+    sensorEvidence: [
+      { text: 'خطأ برمجي ظهر لزوّار الموقع: فشل الاتصال بالخادم عند الحفظ', page: '/', visitors: 2, stack: [], steps: [] },
+      { text: 'عملية داخل الموقع فشلت عند الزوّار: فشل الاتصال /api/x', page: '/', visitors: 2, stack: [], steps: [] },
+    ],
+  } as unknown as PlatformRecord;
+  const live = freshSensorProblems(p, t0.getTime() + 60_000);
+  assert.equal(live.length, 2, 'only a stored request finding is treated as a connection failure');
+});
