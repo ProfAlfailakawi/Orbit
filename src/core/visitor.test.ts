@@ -94,3 +94,13 @@ test('retries are capped per visit so a really broken site is judged quickly', a
   const attempts = Object.values(calls).reduce((a, n) => a + n + 1, 0);
   assert.ok(attempts <= 1 + 2 + 2 + 2, `home once, two assets, plus at most two retries (was ${attempts})`);
 });
+
+test('the speed of a visit is the home page request itself, however many asset requests were repeated or fell back', async () => {
+  const ok = { [base]: [{ body: PAGE }], [base + 'assets/app.css']: [{ type: 'text/css' }], [base + 'assets/app.js']: [null, { type: 'text/javascript' }] };
+  const result = await visitSite(base, flaky(ok).deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.pageMs, 12, 'the fake answers the home page in 12 ms; asset retries do not change it');
+  // a HEAD that is refused and answered by GET is two requests for one file: still not part of the page speed
+  const head: VisitDeps = { wait: async () => {}, get: async (url, opts) => url === base ? { status: 200, bytes: enc(PAGE), contentType: 'text/html', finalUrl: url, ms: 30 } : opts.method === 'HEAD' ? { status: 405, bytes: enc(''), contentType: '', finalUrl: url, ms: 900 } : { status: 200, bytes: enc(''), contentType: url.endsWith('.css') ? 'text/css' : 'text/javascript', finalUrl: url, ms: 900 } };
+  assert.equal((await visitSite(base, head)).pageMs, 30);
+});
