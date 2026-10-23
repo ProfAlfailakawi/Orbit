@@ -6,6 +6,26 @@
 
 export interface VisitDeps {
   get(url: string, opts: { maxBytes: number; method?: 'GET' | 'HEAD'; accept?: string }): Promise<{ status: number; bytes: Uint8Array; contentType: string; finalUrl: string; ms: number } | null>;
+  /** Pause between a failed attempt and its one retry; tests pass an instant one. */
+  wait?(ms: number): Promise<void>;
+}
+
+type Reply = Awaited<ReturnType<VisitDeps['get']>>;
+const RETRY_PAUSE_MS = 2000;
+/** One visit may spend this many retries in total, so a really broken site is judged quickly. */
+const RETRIES_PER_VISIT = 2;
+
+/**
+ * A single failed request is often the network, not the site (a slow answer, a dropped connection, an edge node mid-update).
+ * An unanswered request or a 5xx is asked once more before it counts; a 4xx is an answer and is never retried.
+ */
+async function getOnce(deps: VisitDeps, budget: { left: number }, url: string, opts: Parameters<VisitDeps['get']>[1]): Promise<Reply> {
+  const first = await deps.get(url, opts);
+  if (first && first.status < 500) return first;
+  if (budget.left <= 0) return first;
+  budget.left -= 1;
+  await (deps.wait ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))))(RETRY_PAUSE_MS);
+  return (await deps.get(url, opts)) ?? first;
 }
 
 export interface VisitResult {
@@ -58,7 +78,8 @@ const isStyle = (type: string) => /css/i.test(type);
 
 export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResult> {
   const started = Date.now();
-  const page = await deps.get(url, { maxBytes: 1_500_000, accept: 'text/html,*/*;q=0.5' });
+  const budget = { left: RETRIES_PER_VISIT };
+  const page = await getOnce(deps, budget, url, { maxBytes: 1_500_000, accept: 'text/html,*/*;q=0.5' });
   if (!page) return { reachable: false, ok: false, status: null, problems: ['الموقع لا يستجيب'], evidence: 'تعذر فتح الصفحة الرئيسية.', ms: Date.now() - started };
   const problems: string[] = [];
   const status = page.status;
@@ -78,8 +99,8 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   let checked = 0;
   if (!problems.length && status < 400) {
     for (const asset of pageAssets(html, page.finalUrl)) {
-      let res = await deps.get(asset.url, { maxBytes: 4_000_000, method: 'HEAD', accept: '*/*' });
-      if (res && (res.status === 405 || res.status === 501 || res.status === 403)) res = await deps.get(asset.url, { maxBytes: 4_000_000, accept: '*/*' });
+      let res = await getOnce(deps, budget, asset.url, { maxBytes: 4_000_000, method: 'HEAD', accept: '*/*' });
+      if (res && (res.status === 405 || res.status === 501 || res.status === 403)) res = await getOnce(deps, budget, asset.url, { maxBytes: 4_000_000, accept: '*/*' });
       checked += 1;
       if (!res || res.status >= 400) { problems.push(`ملف التطبيق ${fileName(asset.url)} لا يُحمَّل${res ? ` (HTTP ${res.status})` : ''}`); continue; }
       const wrongType = asset.kind === 'script' ? !isScript(res.contentType) && res.contentType !== '' : !isStyle(res.contentType) && res.contentType !== '';

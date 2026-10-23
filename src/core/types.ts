@@ -226,7 +226,7 @@ export interface PlatformRecord {
   sensorProblems?: string[];
   sensorCheckedAt?: string;
   /** What those visitors did just before the error (privacy-safe: tags and paths only) and where it threw. */
-  sensorEvidence?: Array<{ text: string; page: string; visitors: number; stack: string[]; steps: string[] }>;
+  sensorEvidence?: Array<{ text: string; page: string; visitors: number; stack: string[]; steps: string[]; /** When it was last seen. */ lastAt?: string; /** Too thin to call the program broken: shown in the report only. */ note?: boolean }>;
   /** `sensor`: whether the robot found the ORBIT sensor script on the program's pages (undefined = not checked). */
   browserVisit?: { at: string; ok: boolean; problems: string[]; warnings?: string[]; hash?: string; sensor?: 'installed' | 'absent' };
   /** Last time the sensor's daily self-test note (sent by the robot through the program's own page) reached ORBIT. */

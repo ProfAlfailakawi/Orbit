@@ -89,13 +89,18 @@ export function originOf(url: string | null | undefined): string | null {
 const KIND_LABEL: Record<SensorReport['kind'], string> = {
   error: 'خطأ برمجي ظهر لزوّار الموقع', rejection: 'عملية داخل الموقع فشلت عند الزوّار', resource: 'ملف لا يُحمَّل عند الزوّار', request: 'طلب من الموقع يفشل عند الزوّار',
 };
-export interface SensorFinding { text: string; page: string; visitors: number; stack: string[]; steps: string[] }
+/** `note`: seen, but too thin to call the program broken (one visitor's own-code error, a few scattered connection failures). `lastAt`: when it was last seen. */
+export interface SensorFinding { text: string; page: string; visitors: number; stack: string[]; steps: string[]; lastAt?: string; note?: boolean }
 export const SENSOR_WINDOW_MS = 24 * 3_600_000;
 export const SENSOR_CORROBORATION = 2;
+/** A connection failure on one endpoint is only an outage signal when several visitors hit it close together; scattered ones are tabs closed, phones locked, weak signal. */
+export const NETWORK_BURST_VISITORS = 3;
+export const NETWORK_BURST_MS = 3_600_000;
+const NETWORK_FAILURE = /^\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644/;
 
 /** In-memory hub: counts distinct visitors per error and exposes the corroborated ones. */
 export function createSensorHub(now: () => number = Date.now) {
-  type Entry = { sessions: Map<string, number>; text: string; page: string; stack: string[]; steps: string[]; own: boolean };
+  type Entry = { sessions: Map<string, number>; text: string; page: string; stack: string[]; steps: string[]; own: boolean; network: boolean };
   const seen = new Map<string, Map<string, Entry>>(); // program -> signature -> evidence
   const hits = new Map<string, number[]>(); // rate limit key -> timestamps
 
@@ -114,7 +119,7 @@ export function createSensorHub(now: () => number = Date.now) {
     seen.set(programId, bucket);
     for (const r of reports) {
       const signature = `${r.kind}|${r.message}`;
-      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), text: `${KIND_LABEL[r.kind]}: ${r.message}`, page: r.page, stack: [], steps: [], own: false };
+      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), text: `${KIND_LABEL[r.kind]}: ${r.message}`, page: r.page, stack: [], steps: [], own: false, network: r.kind === 'request' && NETWORK_FAILURE.test(r.message) };
       entry.sessions.set(r.session, t);
       entry.own = entry.own || r.own;
       if (r.stack.length || r.steps.length) { entry.stack = r.stack; entry.steps = r.steps; entry.page = r.page; } // the latest trail wins
@@ -127,20 +132,33 @@ export function createSensorHub(now: () => number = Date.now) {
   }
 
   /**
-   * Findings for a program: an error needs ≥2 different visitors, except an uncaught error thrown by the program's own
-   * code, which is a real defect on first sight. At most 4, most visitors first.
+   * What visitors reported for a program. A finding is a *problem* when it is corroborated: an error needs two different visitors
+   * (an uncaught error from the program's own code needs two as well; one visitor is only a note, because an extension or a stale cache
+   * can cause one), and a connection failure needs a burst of several visitors within an hour. Thinner evidence is returned as a *note*:
+   * worth showing in the report, never a reason to call the program broken. At most 4 problems and 3 notes, most visitors first.
    */
   function findings(programId: string): SensorFinding[] {
     const t = now();
-    const out: SensorFinding[] = [];
+    const problems: SensorFinding[] = [];
+    const notes: SensorFinding[] = [];
     for (const entry of seen.get(programId)?.values() || []) {
       for (const [s, at] of entry.sessions) if (t - at > SENSOR_WINDOW_MS) entry.sessions.delete(s);
-      if (entry.sessions.size >= (entry.own ? 1 : SENSOR_CORROBORATION)) out.push({ text: entry.text, page: entry.page, visitors: entry.sessions.size, stack: entry.stack, steps: entry.steps });
+      const visitors = entry.sessions.size;
+      if (!visitors) continue;
+      const lastAt = new Date(Math.max(...entry.sessions.values())).toISOString();
+      const finding = { text: entry.text, page: entry.page, visitors, stack: entry.stack, steps: entry.steps, lastAt };
+      const burst = [...entry.sessions.values()].filter(at => t - at <= NETWORK_BURST_MS).length;
+      if (entry.network) {
+        if (burst >= NETWORK_BURST_VISITORS) problems.push(finding);
+        else if (visitors >= SENSOR_CORROBORATION) notes.push({ ...finding, note: true });
+      } else if (visitors >= SENSOR_CORROBORATION) problems.push(finding);
+      else if (entry.own) notes.push({ ...finding, note: true });
     }
-    return out.sort((a, b) => b.visitors - a.visitors).slice(0, 4);
+    const byVisitors = (a: SensorFinding, b: SensorFinding) => b.visitors - a.visitors;
+    return [...problems.sort(byVisitors).slice(0, 4), ...notes.sort(byVisitors).slice(0, 3)];
   }
 
-  const problems = (programId: string) => findings(programId).map(describeFinding);
+  const problems = (programId: string) => findings(programId).filter(f => !f.note).map(describeFinding);
   return { allow, add, findings, problems };
 }
 
@@ -149,29 +167,46 @@ export const describeFinding = (f: SensorFinding) => `${f.text} (${f.visitors ==
 const SENSOR_FRESH_MS = 6 * 3_600_000;
 
 /**
- * Record the hub's findings on the program record. The hub lives in memory and is empty after a restart, so findings from the
- * last few hours that the hub no longer holds are kept rather than erased by the first quiet report.
+ * Record the hub's findings on the program record. The hub lives in memory and is empty after a restart, so findings seen in the
+ * last few hours that the hub no longer holds are kept rather than erased by the first quiet report. Freshness is per finding
+ * (when it was last seen), so one visitor's unrelated report never keeps an old incident alive.
  */
 export function applySensor(p: PlatformRecord, found: SensorFinding[], nowIso: string): PlatformRecord {
-  const kept = (p.sensorEvidence || []).filter(old => !found.some(f => f.text === old.text) && p.sensorCheckedAt && Date.parse(nowIso) - Date.parse(p.sensorCheckedAt) < SENSOR_FRESH_MS);
-  const all = [...found, ...kept].slice(0, 4);
-  if (!all.length && !p.sensorProblems?.length) return p;
-  return { ...p, sensorEvidence: all, sensorProblems: all.map(describeFinding), sensorCheckedAt: nowIso };
+  const nowMs = Date.parse(nowIso);
+  const kept = (p.sensorEvidence || []).filter(old => !found.some(f => f.text === old.text) && nowMs - lastSeen(old, p) < SENSOR_FRESH_MS);
+  const all = [...found, ...kept].slice(0, 7);
+  if (!all.length && !p.sensorEvidence?.length && !p.sensorProblems?.length) return p;
+  return { ...p, sensorEvidence: all, sensorProblems: all.filter(f => !f.note).map(describeFinding), sensorCheckedAt: nowIso };
 }
 
+const lastSeen = (e: { lastAt?: string }, p: PlatformRecord) => Date.parse(e.lastAt || p.sensorCheckedAt || '');
+const isFresh = (e: { lastAt?: string }, p: PlatformRecord, nowMs: number) => nowMs - lastSeen(e, p) < SENSOR_FRESH_MS;
+
+/** Corroborated problems seen recently. Records saved before findings carried a time fall back to when the sensor last reported. */
 export function freshSensorProblems(p: PlatformRecord, nowMs = Date.now()): string[] {
+  if (p.sensorEvidence?.length) return p.sensorEvidence.filter(e => !e.note && isFresh(e, p, nowMs)).map(describeFinding);
   return p.sensorProblems?.length && p.sensorCheckedAt && nowMs - Date.parse(p.sensorCheckedAt) < SENSOR_FRESH_MS ? p.sensorProblems : [];
 }
 
-/** The trail behind the program's fresh sensor findings, as lines for the report pasted to Claude. */
+const trailOf = (e: { text: string; page: string; stack: string[]; steps: string[] }) => {
+  const out = [`  - ${e.text} — الصفحة ${e.page}`];
+  if (e.steps.length) out.push(`    ما فعله الزائر قبل الخطأ: ${e.steps.join(' ← ')}`);
+  if (e.stack.length) out.push(`    موضع الخطأ: ${e.stack.join(' | ')}`);
+  return out;
+};
+
+/** The trail behind the program's fresh sensor problems, as lines for the report pasted to Claude. */
 export function sensorTrailLines(p: PlatformRecord, nowMs = Date.now()): string[] {
   if (!freshSensorProblems(p, nowMs).length) return [];
-  const out: string[] = [];
-  for (const e of p.sensorEvidence || []) {
-    if (!e.stack.length && !e.steps.length) continue;
-    out.push(`  - ${e.text} — الصفحة ${e.page}`);
-    if (e.steps.length) out.push(`    ما فعله الزائر قبل الخطأ: ${e.steps.join(' ← ')}`);
-    if (e.stack.length) out.push(`    موضع الخطأ: ${e.stack.join(' | ')}`);
-  }
-  return out;
+  return (p.sensorEvidence || []).filter(e => !e.note && (e.stack.length || e.steps.length)).flatMap(trailOf);
+}
+
+/** Thin evidence (one visitor, scattered connection failures): shown in the report, never in the program's status. */
+export function sensorNoteLines(p: PlatformRecord, nowMs = Date.now()): string[] {
+  return (p.sensorEvidence || []).filter(e => e.note && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
+}
+
+/** The notes as plain texts, for the weekly log. */
+export function sensorNoteTexts(p: PlatformRecord, nowMs = Date.now()): string[] {
+  return (p.sensorEvidence || []).filter(e => e.note && isFresh(e, p, nowMs)).map(e => `ملاحظة من زوّار: ${e.text}`);
 }

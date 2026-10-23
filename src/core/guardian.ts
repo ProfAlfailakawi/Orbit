@@ -3,7 +3,7 @@ import type { BlackBoxFrame, CrossAppPattern, IncidentCaseFile, PlatformRecord }
 import { MANDATORY_CLAUDE_GUARDRAIL, sanitizeTelemetryPayload } from './engine.ts';
 import { displayName } from './displayName.ts';
 import { freshBrowserProblems, freshBrowserWarnings } from './browserVisit.ts';
-import { freshSensorProblems, sensorTrailLines } from './sensor.ts';
+import { freshSensorProblems, sensorNoteLines, sensorTrailLines } from './sensor.ts';
 import { certProblems, certWarnings } from './certs.ts';
 import { driftWarnings, releaseSlowdown } from './vitals.ts';
 import { serverProblems, serverWarnings } from './cloudLogs.ts';
@@ -189,6 +189,11 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
   if (early.length) {
     lines.push('', '## تحذيرات مبكرة (لا شيء معطل بعد)');
     for (const { p, warnings } of early) { lines.push('### ' + displayName(p)); warnings.forEach(x => lines.push('- ' + x)); }
+  }
+  const noted = fleet.map(p => ({ p, lines: sensorNoteLines(p) })).filter(x => x.lines.length);
+  if (noted.length) {
+    lines.push('', '## ملاحظات من زوّار حقيقيين (لا تعني أن الموقع معطل: دليل قليل، قد يكون إضافة متصفح أو ذاكرة قديمة أو ضعف شبكة)');
+    for (const { p, lines: l } of noted) { lines.push('### ' + displayName(p)); lines.push(...l); }
   }
   const linkIssues = fleet.map(p => ({ p, issue: getLinkIssue(p) })).filter(x => x.issue);
   if (linkIssues.length) {
