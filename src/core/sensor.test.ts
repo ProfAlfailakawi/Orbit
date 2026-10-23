@@ -186,3 +186,16 @@ test('findings saved before notes existed are judged by the current rules and th
   assert.equal(freshSensorProblems(p, t0.getTime() + 5.5 * 3_600_000).length, 1);
   assert.deepEqual(freshSensorProblems(p, t0.getTime() + 7 * 3_600_000), [], 'six hours after the last time it was seen, it is gone');
 });
+
+test('a stored application error that merely quotes the failure phrase is still a problem at two visitors', () => {
+  const t0 = new Date('2026-10-23T00:00:00Z');
+  const p = {
+    id: 'a', sensorCheckedAt: t0.toISOString(),
+    sensorEvidence: [
+      { text: 'خطأ برمجي ظهر لزوّار الموقع: فشل الاتصال بالخادم عند الحفظ', page: '/', visitors: 2, stack: [], steps: [] },
+      { text: 'عملية داخل الموقع فشلت عند الزوّار: فشل الاتصال /api/x', page: '/', visitors: 2, stack: [], steps: [] },
+    ],
+  } as unknown as PlatformRecord;
+  const live = freshSensorProblems(p, t0.getTime() + 60_000);
+  assert.equal(live.length, 2, 'only a stored request finding is treated as a connection failure');
+});

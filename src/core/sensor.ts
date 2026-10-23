@@ -166,13 +166,14 @@ export const describeFinding = (f: SensorFinding) => `${f.text} (${f.visitors ==
 
 const SENSOR_FRESH_MS = 6 * 3_600_000;
 
-const NETWORK_TEXT = /: \u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 /;
+/** A stored finding is a connection failure only when it is a request finding (its label) whose message starts with the failure phrase. */
+const isStoredConnectionFailure = (text: string) => text.startsWith(`${KIND_LABEL.request}: \u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 `);
 type Stored = NonNullable<PlatformRecord['sensorEvidence']>[number];
 /**
  * Whether a stored finding is only a note. Findings saved before notes existed carry no `lastAt`: they are judged by the current rules,
  * and a connection failure is a note because a burst cannot be proven after the fact.
  */
-const isNote = (e: Stored) => (e.lastAt ? Boolean(e.note) : (e.note ?? (NETWORK_TEXT.test(e.text) || e.visitors < SENSOR_CORROBORATION)));
+const isNote = (e: Stored) => (e.lastAt ? Boolean(e.note) : (e.note ?? (isStoredConnectionFailure(e.text) || e.visitors < SENSOR_CORROBORATION)));
 
 /**
  * Record the hub's findings on the program record. The hub lives in memory and is empty after a restart, so findings seen in the
