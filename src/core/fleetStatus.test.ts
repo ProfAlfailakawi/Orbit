@@ -87,7 +87,7 @@ test('a certificate that ends in two days is a real problem', () => {
 
 test('the copied report names the trail, the probable cause and the suspect commit', () => {
   const now = Date.now();
-  const sick = applySensor(working('PAY'), [{ text: 'خطأ برمجي ظهر لزوّار الموقع: x is null', page: '/pay', visitors: 1, stack: ['at pay (/app.js:3:9)'], steps: ['نقر button#pay في /pay'] }], new Date(now).toISOString());
+  const sick = applySensor(working('PAY'), [{ text: 'خطأ برمجي ظهر لزوّار الموقع: x is null', page: '/pay', visitors: 2, stack: ['at pay (/app.js:3:9)'], steps: ['نقر button#pay في /pay'] }], new Date(now).toISOString());
   sick.siteLastOkAt = new Date(now - 6 * 3_600_000).toISOString();
   sick.recentCommits = [{ sha: 'abcdef1234567', author: 'a', message: 'refactor pay', timestamp: new Date(now - 3_600_000).toISOString(), branch: 'main', changedFiles: ['src/pay.ts'], riskLevel: 'Low', dataIntegrity: 'Live' }];
   const rows = buildRows([sick], [], []);
