@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, scrubText, sensorTrailLines } from './sensor.ts';
+import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, scrubText, sensorNoteLines, sensorNoteTexts, sensorTrailLines } from './sensor.ts';
 import type { PlatformRecord } from './types.ts';
 
 const body = (s: string, r: unknown[]) => JSON.stringify({ s, r });
@@ -45,15 +45,52 @@ test('an error needs two different visitors before it counts', () => {
   assert.deepEqual(hub.problems('p'), []);
 });
 
-test('an uncaught error from the program\'s own code counts on first sight and carries its trail', () => {
+test('an uncaught error from the program\'s own code seen by one visitor is a note with its trail, not a problem', () => {
   const hub = createSensorHub(() => 5);
   hub.add('p', parseSensorBody(body('visitor_one', [{ k: 'error', m: 'Cannot read properties of null', p: '/pay', t: ['at pay (/app.js:3:9)'], b: ['نقر button#pay في /pay'], o: 1 }])));
   const [f] = hub.findings('p');
   assert.equal(f.visitors, 1);
+  assert.equal(f.note, true);
   assert.deepEqual(f.steps, ['نقر button#pay في /pay']);
-  assert.match(hub.problems('p')[0], /زائر واحد/);
+  assert.deepEqual(hub.problems('p'), [], 'one visitor can be an extension or a stale cache');
+  hub.add('p', parseSensorBody(body('visitor_two', [{ k: 'error', m: 'Cannot read properties of null', p: '/pay', o: 1 }])));
+  assert.equal(hub.problems('p').length, 1, 'a second visitor makes it a problem');
   hub.add('q', parseSensorBody(body('visitor_one', [{ k: 'error', m: 'third party broke', p: '/', o: 0 }])));
   assert.deepEqual(hub.findings('q'), [], 'a failure outside the program\'s own code still needs two visitors');
+});
+
+test('connection failures are an outage signal only as a burst of several visitors within an hour', () => {
+  let t = 10_000_000; const hub = createSensorHub(() => t);
+  const fail = (s: string) => parseSensorBody(body(s, [{ k: 'request', m: 'فشل الاتصال /api/cloud-status', p: '/' }]));
+  hub.add('p', fail('visitor_one')); t += 3 * 3_600_000; hub.add('p', fail('visitor_two'));
+  assert.deepEqual(hub.problems('p'), [], 'two visitors hours apart is weak signal, not an outage');
+  assert.equal(hub.findings('p')[0].note, true, 'but it is kept as a note');
+  t += 60_000; hub.add('p', fail('visitor_three')); hub.add('p', fail('visitor_four'));
+  assert.equal(hub.problems('p').length, 1, 'three visitors within the hour is a burst');
+  // a server error status stays a problem at two visitors
+  const hub2 = createSensorHub(() => 5);
+  for (const v of ['visitor_one', 'visitor_two']) hub2.add('p', parseSensorBody(body(v, [{ k: 'request', m: 'HTTP 503 /api/pay', p: '/' }])));
+  assert.equal(hub2.problems('p').length, 1);
+});
+
+test('notes never reach the program problems; they appear in the report lines', () => {
+  const p = applySensor({ id: 'a' } as PlatformRecord, [finding('خطأ برمجي: x', { visitors: 1, note: true, lastAt: new Date().toISOString() })], new Date().toISOString());
+  assert.deepEqual(freshSensorProblems(p), []);
+  assert.deepEqual(sensorTrailLines(p), []);
+  assert.match(sensorNoteLines(p).join('\n'), /خطأ برمجي: x \(زائر واحد\)/);
+  assert.match(sensorNoteTexts(p)[0], /^ملاحظة من زوّار/);
+});
+
+test('an old incident is not kept alive by another visitor reporting something else', () => {
+  const t0 = new Date('2026-01-01T10:00:00Z');
+  const incident = finding('طلب يفشل', { lastAt: t0.toISOString() });
+  let p = applySensor({ id: 'a' } as PlatformRecord, [incident], t0.toISOString());
+  // 7 hours later a different, new finding arrives; the hub still holds the old one (24h window) and passes it again
+  const later = new Date(t0.getTime() + 7 * 3_600_000);
+  p = applySensor(p, [incident, finding('جديد', { lastAt: later.toISOString() })], later.toISOString());
+  const live = freshSensorProblems(p, later.getTime());
+  assert.equal(live.length, 1);
+  assert.match(live[0], /جديد/);
 });
 
 test('rate limit', () => {

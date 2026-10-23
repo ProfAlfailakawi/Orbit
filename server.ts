@@ -1,4 +1,4 @@
-import { applySensor, createSensorHub, originOf, parseSensorBody } from './src/core/sensor.ts';
+import { applySensor, createSensorHub, originOf, parseSensorBody, sensorNoteTexts } from './src/core/sensor.ts';
 import { applyBrowserVisit, parseBrowserReports } from './src/core/browserVisit.ts';
 import { hasCiVerdict } from './src/core/ciStatus.ts';
 import 'dotenv/config';
@@ -343,7 +343,7 @@ async function startServer() {
       let logged = false;
       platforms = platforms.map(p => {
         if (p.lifecycleState === 'unlinked' || p.lifecycleState === 'archived') return p;
-        const next = logProblems(p, [...getProgramProblems(p), ...getProgramWarnings(p)], stamp);
+        const next = logProblems(p, [...getProgramProblems(p), ...getProgramWarnings(p), ...sensorNoteTexts(p)], stamp);
         logged = logged || next !== p;
         return next;
       });
