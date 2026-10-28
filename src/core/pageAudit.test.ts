@@ -22,7 +22,8 @@ test('visible placeholder and broken-value text are problems', () => {
 test('phone-only and slow-link-only problems carry the device in their text', () => {
   assert.deepEqual(auditSnapshot(page({ overflowX: true }), 'desktop').problems, []);
   assert.match(auditSnapshot(page({ overflowX: true }), 'phone').problems[0], /^\[جوال\] الصفحة أعرض من شاشة الجوال/);
-  assert.match(auditSnapshot(page({ loadMs: 14_000 }), 'phone-slow').problems[0], /^\[جوال بطيء\] .*14 ثانية/);
+  assert.deepEqual(auditSnapshot(page({ loadMs: 14_000 }), 'phone-slow').problems, []);
+  assert.match(auditSnapshot(page({ loadMs: 14_000 }), 'phone-slow').warnings[0], /^\[جوال بطيء\] .*14 ثانية/);
   assert.deepEqual(auditSnapshot(page({ loadMs: 14_000 }), 'phone').problems, []);
   assert.match(auditSnapshot(page({ loadMs: 9000 }), 'desktop').problems[0], /9 ثانية/);
 });
@@ -32,6 +33,14 @@ test('images, browser errors and RTL mistakes', () => {
   assert.match(auditSnapshot(page({ consoleErrors: ['TypeError: x', 'b'] })).problems[0], /TypeError: x \(\+1\)/);
   assert.match(auditSnapshot(page({ direction: 'ltr' })).problems[0], /من اليسار لليمين/);
   assert.deepEqual(auditSnapshot(page({ direction: 'ltr', text: 'Welcome to a plain English site' })).problems, []);
+});
+
+test('a report-only CSP violation blocks nothing, so it is a warning; an enforced one is a problem', () => {
+  const reportOnly = auditSnapshot(page({ consoleErrors: ["Framing 'https://x.firebaseapp.com/' violates the following report-only Content Security Policy directive"] }));
+  assert.deepEqual(reportOnly.problems, []);
+  assert.match(reportOnly.warnings[0], /report-only/);
+  const enforced = auditSnapshot(page({ consoleErrors: ["Executing inline script violates the following Content Security Policy directive 'script-src 'self''"] }));
+  assert.match(enforced.problems[0], /أخطاء في المتصفح/);
 });
 
 test('softer findings are warnings, not problems', () => {

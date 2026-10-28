@@ -32,6 +32,9 @@ const BROKEN_TOKEN = /(^|[\s:|•(])(undefined|NaN|\[object Object\])($|[\s.,:|�
 const ARABIC = /[؀-ۿ]/g;
 const LONG_ENGLISH = /\b[A-Za-z]{2,}(?:[ \t]+[A-Za-z'’]+){5,}/;
 
+/** Chrome logs report-only CSP violations as errors, but nothing was blocked: the page still works. */
+const REPORT_ONLY = /report-only|\[Report Only\]/i;
+
 const short = (text: string, n = 90) => text.replace(/\s+/g, ' ').trim().slice(0, n);
 
 export function auditSnapshot(s: PageSnapshot, device: Device = 'desktop'): Audit {
@@ -45,15 +48,19 @@ export function auditSnapshot(s: PageSnapshot, device: Device = 'desktop'): Audi
   const broken = text.match(BROKEN_TOKEN);
   if (broken) problems.push(`${tag}ظهر نص برمجي «${broken[2]}» للزائر بدل قيمة حقيقية`);
   if (s.brokenImages > 0) problems.push(`${tag}${s.brokenImages} من ${s.images} صور لا تُحمَّل`);
-  if (s.consoleErrors.length) problems.push(`${tag}أخطاء في المتصفح: ${short(s.consoleErrors[0], 110)}${s.consoleErrors.length > 1 ? ` (+${s.consoleErrors.length - 1})` : ''}`);
+  const errors = s.consoleErrors.filter(e => !REPORT_ONLY.test(e));
+  const reportOnly = s.consoleErrors.filter(e => REPORT_ONLY.test(e));
+  if (errors.length) problems.push(`${tag}أخطاء في المتصفح: ${short(errors[0], 110)}${errors.length > 1 ? ` (+${errors.length - 1})` : ''}`);
+  if (reportOnly.length) warnings.push(`${tag}سياسة CSP تجريبية (report-only) كانت ستحجب شيئًا لو فُعّلت، والصفحة تعمل الآن: ${short(reportOnly[0], 110)}`);
   if (device !== 'desktop' && s.overflowX) problems.push(`${tag}الصفحة أعرض من شاشة الجوال، فيضطر الزائر للتمرير جانبيًا`);
-  if (device === 'phone-slow' && s.loadMs > 10_000) problems.push(`${tag}الصفحة تحتاج ${Math.round(s.loadMs / 1000)} ثانية للتحميل على اتصال ضعيف`);
-  else if (device === 'desktop' && s.loadMs > 8000) problems.push(`الصفحة بطيئة: ${Math.round(s.loadMs / 1000)} ثانية للتحميل`);
+  if (device === 'desktop' && s.loadMs > 8000) problems.push(`الصفحة بطيئة: ${Math.round(s.loadMs / 1000)} ثانية للتحميل`);
 
   const arabicLetters = (text.match(ARABIC) || []).length;
   const arabicPage = arabicLetters > 40 || /^ar/i.test(s.lang);
   if (arabicPage && arabicLetters > 40 && LONG_ENGLISH.test(text)) warnings.push(`${tag}جملة إنجليزية طويلة داخل صفحة عربية (ترجمة ناقصة؟)`);
   if (arabicLetters > 40 && arabicLetters / Math.max(text.length, 1) > 0.3 && s.direction === 'ltr') problems.push(`${tag}الصفحة عربية لكن اتجاهها من اليسار لليمين، فيظهر النص مقلوبًا`);
+  // A throttled link is a simulation, so a long load there is an early warning, not a breakage.
+  if (device === 'phone-slow' && s.loadMs > 10_000) warnings.push(`${tag}الصفحة تحتاج ${Math.round(s.loadMs / 1000)} ثانية للتحميل على اتصال ضعيف`);
   if (!s.lang) warnings.push(`${tag}لغة الصفحة (lang) غير محددة، وهذا يربك قارئات الشاشة ومحركات البحث`);
   if (s.unnamedControls > 0) warnings.push(`${tag}${s.unnamedControls} أزرار أو حقول بلا اسم يقرؤه قارئ الشاشة`);
   if (device !== 'desktop' && s.smallTargets >= 3) warnings.push(`${tag}${s.smallTargets} عناصر ضغط أصغر من أن تُلمس بسهولة على الجوال`);
