@@ -43,3 +43,18 @@ test('only fresh failing visits count', () => {
   assert.deepEqual(freshBrowserProblems(rec({ browserVisit: { at: at(40), ok: false, problems: ['p'] } }), now), []);
   assert.deepEqual(freshBrowserProblems(rec({ browserVisit: { at: at(1), ok: true, problems: [] } }), now), []);
 });
+
+test('stored findings follow today\'s rules without waiting for the next visit', () => {
+  const now = Date.now();
+  const p = rec({ browserVisit: { at: new Date(now - 3_600_000).toISOString(), ok: false, warnings: ['w'], problems: [
+    '[جوال بطيء] الصفحة تحتاج 10 ثانية للتحميل على اتصال ضعيف',
+    "[جوال] أخطاء في المتصفح: Framing 'https://x.firebaseapp.com/' violates the following report-only Content Security Polic",
+    "[جوال] أخطاء في المتصفح: Loading the script 'https://apis.google.com/js/api.js violates the following Content (+2)",
+  ] } });
+  assert.deepEqual(freshBrowserProblems(p, now), ["[جوال] أخطاء في المتصفح: Loading the script 'https://apis.google.com/js/api.js violates the following Content (+2)"]);
+  const warnings = freshBrowserWarnings(p, now);
+  assert.equal(warnings.length, 3);
+  assert.match(warnings[0], /10 ثانية/);
+  assert.match(warnings[1], /سياسة CSP تجريبية/);
+  assert.equal(warnings[2], 'w');
+});

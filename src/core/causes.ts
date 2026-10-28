@@ -40,7 +40,7 @@ export function probableCause(problems: string[]): string | null {
   const errors = problems.filter(p => /خطأ برمجي|خطأ في الصفحة|أخطاء في المتصفح|عملية داخل الموقع فشلت/.test(p)).length;
   const requests = problems.filter(p => /طلب من الموقع يفشل|HTTP 5\d\d/.test(p)).length;
   if (errors >= 1 && requests >= 1) return 'الواجهة الخلفية أو الـ API تعيد أخطاء، والأخطاء البرمجية في الصفحة على الأرجح نتيجة لذلك';
-  if (problems.some(p => /أخطاء في المتصفح.*Content Security Policy/i.test(p))) return 'سياسة CSP في الموقع تحجب سكربتًا يحتاجه (ليس خطأ في كود الصفحة): عدّل التوجيه المذكور في الخطأ';
+  if (problems.some(p => /أخطاء في المتصفح.*Content Security Policy/i.test(p))) return 'سياسة CSP في الموقع تحجب سكربتًا يحتاجه (ليس خطأ في كود الصفحة): أضف المصدر المحجوب إلى التوجيه المذكور، أو انقل السكربت المضمّن إلى ملف';
   if (problems.some(p => /لا يستجيب|تعذر فتح الموقع/.test(p)) && problems.length > 1) return 'الموقع نفسه متوقف، وبقية الأعراض ناتجة عنه على الأرجح';
   return null;
 }

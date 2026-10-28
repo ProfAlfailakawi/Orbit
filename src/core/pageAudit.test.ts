@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditHeaders, auditSnapshot, averageHash, crawlTargets, hashDistance, scanForSecrets, type PageSnapshot } from './pageAudit.ts';
+import { storedProblemNowWarning, auditHeaders, auditSnapshot, averageHash, crawlTargets, hashDistance, scanForSecrets, type PageSnapshot } from './pageAudit.ts';
 
 const page = (over: Partial<PageSnapshot> = {}): PageSnapshot => ({
   lang: 'ar', direction: 'rtl', text: 'مرحبًا بك في الموقع، هذه صفحة سليمة فيها نص عربي كثير يكفي لاعتبارها صفحة عربية حقيقية للزائر.',
@@ -83,4 +83,12 @@ test('visual hash: same picture is distance 0, inverted picture is far', () => {
   assert.equal(hashDistance(a, averageHash(dark)), 64);
   assert.equal(hashDistance(a, 'zz'), 0, 'garbage compares as unchanged rather than raising an alarm');
   assert.throws(() => averageHash([1, 2]));
+});
+
+test('a problem stored by an earlier visit is judged by today\'s rules', () => {
+  assert.match(storedProblemNowWarning('[جوال بطيء] الصفحة تحتاج 11 ثانية للتحميل على اتصال ضعيف') || '', /11 ثانية/);
+  assert.match(storedProblemNowWarning("[جوال] أخطاء في المتصفح: Framing 'https://x.firebaseapp.com/' violates the following report-only Content Security Polic") || '', /^\[جوال\] سياسة CSP تجريبية/);
+  assert.equal(storedProblemNowWarning("أخطاء في المتصفح: Framing 'x' violates the following report-only Content Security Polic (+2)"), null, 'the errors it did not quote may be real');
+  assert.equal(storedProblemNowWarning("صفحة /deck.html: أخطاء في المتصفح: Executing inline script violates the following Content Security Policy directive 'script-src 'self''"), null);
+  assert.equal(storedProblemNowWarning('الصفحة بطيئة: 9 ثانية للتحميل'), null, 'a slow desktop load stays a problem');
 });

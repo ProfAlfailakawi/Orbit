@@ -92,6 +92,9 @@
       } catch (x) {}
     });
     // Failed requests: a network failure or a 5xx anywhere, and a missing (404) file or endpoint on the program's own site.
+    // Not failures: a request the page cancelled itself (AbortError; a timeout is still reported) and Firestore's long-lived
+    // .../Listen/channel and .../Write/channel, which the Firebase SDK drops and reopens on its own.
+    function stream(u) { return /\/(?:Listen|Write)\/channel$/.test(path(u)); }
     function judge(u, status) {
       var bad = status >= 500 || (status === 404 && same(u));
       if (bad) { note('request', 'HTTP ' + status + ' ' + path(u)); }
@@ -102,7 +105,7 @@
       window.fetch = function () {
         var a = arguments, u = a[0] && a[0].url ? a[0].url : a[0];
         var p = f.apply(this, a);
-        try { p.then(function (r) { if (r) judge(u, r.status); }, function () { note('request', '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 ' + path(u)); step('\u0637\u0644\u0628 ' + path(u) + ' \u2190 \u0641\u0634\u0644'); }); } catch (x) {}
+        try { p.then(function (r) { if (r) judge(u, r.status); }, function (e) { if ((e && e.name === 'AbortError') || stream(u)) return; note('request', '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 ' + path(u)); step('\u0637\u0644\u0628 ' + path(u) + ' \u2190 \u0641\u0634\u0644'); }); } catch (x) {}
         return p;
       };
     }
@@ -112,7 +115,9 @@
         var open = X.prototype.open;
         X.prototype.open = function (m, u) {
           try {
-            this.addEventListener('loadend', function () { try { if (this.status === 0) { note('request', '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 ' + path(u)); step('\u0637\u0644\u0628 ' + path(u) + ' \u2190 \u0641\u0634\u0644'); } else judge(u, this.status); } catch (x) {} });
+            var aborted = false;
+            this.addEventListener('abort', function () { aborted = true; });
+            this.addEventListener('loadend', function () { try { if (this.status === 0) { if (aborted || stream(u)) return; note('request', '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 ' + path(u)); step('\u0637\u0644\u0628 ' + path(u) + ' \u2190 \u0641\u0634\u0644'); } else judge(u, this.status); } catch (x) {} });
           } catch (x) {}
           return open.apply(this, arguments);
         };

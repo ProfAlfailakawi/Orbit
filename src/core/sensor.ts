@@ -68,7 +68,7 @@ export function parseSensorBody(raw: unknown): SensorReport[] {
     if (!r || typeof r.k !== 'string' || !KINDS.has(r.k) || typeof r.m !== 'string') continue;
     const cleaned = strip(r.m).slice(0, 160);
     const message = scrubText(redactPathIds(cleaned));
-    if (!message || BENIGN.test(message)) continue;
+    if (!message || BENIGN.test(message) || (r.k === 'request' && STREAM_CHANNEL_DROP.test(message))) continue;
     let page = '/';
     if (typeof r.p === 'string') { try { page = redactPathIds(new URL(r.p, 'https://x.invalid').pathname).slice(0, 80); } catch { /* keep "/" */ } }
     const isError = r.k === 'error' || r.k === 'rejection';
@@ -97,6 +97,11 @@ export const SENSOR_CORROBORATION = 2;
 export const NETWORK_BURST_VISITORS = 3;
 export const NETWORK_BURST_MS = 3_600_000;
 const NETWORK_FAILURE = /^\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644/;
+/**
+ * Firestore keeps …/Listen/channel and …/Write/channel open and the Firebase SDK closes and reopens them on its own (an idle tab,
+ * a locked phone, a network change), so a dropped one is not a failure. Older sensor copies still send them; they are dropped here.
+ */
+const STREAM_CHANNEL_DROP = /^\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \S*\/(?:Listen|Write)\/channel\b/;
 
 /** In-memory hub: counts distinct visitors per error and exposes the corroborated ones. */
 export function createSensorHub(now: () => number = Date.now) {
@@ -169,6 +174,9 @@ const SENSOR_FRESH_MS = 6 * 3_600_000;
 /** A stored finding is a connection failure only when it is a request finding (its label) whose message starts with the failure phrase. */
 const isStoredConnectionFailure = (text: string) => text.startsWith(`${KIND_LABEL.request}: \u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 `);
 type Stored = NonNullable<PlatformRecord['sensorEvidence']>[number];
+/** A stored Firestore channel drop, saved before such drops were ignored: judged by the current rules, it is not a finding at all. */
+const isStoredChannelDrop = (text: string) => text.startsWith(`${KIND_LABEL.request}: `) && STREAM_CHANNEL_DROP.test(text.slice(KIND_LABEL.request.length + 2));
+const evidenceOf = (p: PlatformRecord) => (p.sensorEvidence || []).filter(e => !isStoredChannelDrop(e.text));
 /**
  * Whether a stored finding is only a note. Findings saved before notes existed carry no `lastAt`: they are judged by the current rules,
  * and a connection failure is a note because a burst cannot be proven after the fact.
@@ -183,7 +191,7 @@ const isNote = (e: Stored) => (e.lastAt ? Boolean(e.note) : (e.note ?? (isStored
  */
 export function applySensor(p: PlatformRecord, found: SensorFinding[], nowIso: string): PlatformRecord {
   const nowMs = Date.parse(nowIso);
-  const kept = (p.sensorEvidence || [])
+  const kept = evidenceOf(p)
     .filter(old => !found.some(f => f.text === old.text) && nowMs - lastSeen(old, p) < SENSOR_FRESH_MS)
     .map(old => (old.lastAt ? old : { ...old, lastAt: p.sensorCheckedAt, note: isNote(old) }));
   const all = [...found, ...kept].slice(0, 7);
@@ -196,8 +204,8 @@ const isFresh = (e: { lastAt?: string }, p: PlatformRecord, nowMs: number) => no
 
 /** Corroborated problems seen recently. Records saved before findings carried a time fall back to when the sensor last reported. */
 export function freshSensorProblems(p: PlatformRecord, nowMs = Date.now()): string[] {
-  if (p.sensorEvidence?.length) return p.sensorEvidence.filter(e => !isNote(e) && isFresh(e, p, nowMs)).map(describeFinding);
-  return p.sensorProblems?.length && p.sensorCheckedAt && nowMs - Date.parse(p.sensorCheckedAt) < SENSOR_FRESH_MS ? p.sensorProblems : [];
+  if (p.sensorEvidence?.length) return evidenceOf(p).filter(e => !isNote(e) && isFresh(e, p, nowMs)).map(describeFinding);
+  return p.sensorProblems?.length && p.sensorCheckedAt && nowMs - Date.parse(p.sensorCheckedAt) < SENSOR_FRESH_MS ? p.sensorProblems.filter(t => !isStoredChannelDrop(t)) : [];
 }
 
 const trailOf = (e: { text: string; page: string; stack: string[]; steps: string[] }) => {
@@ -210,15 +218,15 @@ const trailOf = (e: { text: string; page: string; stack: string[]; steps: string
 /** The trail behind the program's fresh sensor problems, as lines for the report pasted to Claude. */
 export function sensorTrailLines(p: PlatformRecord, nowMs = Date.now()): string[] {
   if (!freshSensorProblems(p, nowMs).length) return [];
-  return (p.sensorEvidence || []).filter(e => !isNote(e) && (e.stack.length || e.steps.length)).flatMap(trailOf);
+  return evidenceOf(p).filter(e => !isNote(e) && (e.stack.length || e.steps.length)).flatMap(trailOf);
 }
 
 /** Thin evidence (one visitor, scattered connection failures): shown in the report, never in the program's status. */
 export function sensorNoteLines(p: PlatformRecord, nowMs = Date.now()): string[] {
-  return (p.sensorEvidence || []).filter(e => isNote(e) && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
+  return evidenceOf(p).filter(e => isNote(e) && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
 }
 
 /** The notes as plain texts, for the weekly log. */
 export function sensorNoteTexts(p: PlatformRecord, nowMs = Date.now()): string[] {
-  return (p.sensorEvidence || []).filter(e => isNote(e) && isFresh(e, p, nowMs)).map(e => `ملاحظة من زوّار: ${e.text}`);
+  return evidenceOf(p).filter(e => isNote(e) && isFresh(e, p, nowMs)).map(e => `ملاحظة من زوّار: ${e.text}`);
 }

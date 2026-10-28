@@ -34,6 +34,8 @@ const LONG_ENGLISH = /\b[A-Za-z]{2,}(?:[ \t]+[A-Za-z'’]+){5,}/;
 
 /** Chrome logs report-only CSP violations as errors, but nothing was blocked: the page still works. */
 const REPORT_ONLY = /report-only|\[Report Only\]/i;
+const REPORT_ONLY_WARNING = 'سياسة CSP تجريبية (report-only) كانت ستحجب شيئًا لو فُعّلت، والصفحة تعمل الآن: ';
+const SLOW_LINK = /الصفحة تحتاج \d+ ثانية للتحميل على اتصال ضعيف/;
 
 const short = (text: string, n = 90) => text.replace(/\s+/g, ' ').trim().slice(0, n);
 
@@ -51,7 +53,7 @@ export function auditSnapshot(s: PageSnapshot, device: Device = 'desktop'): Audi
   const errors = s.consoleErrors.filter(e => !REPORT_ONLY.test(e));
   const reportOnly = s.consoleErrors.filter(e => REPORT_ONLY.test(e));
   if (errors.length) problems.push(`${tag}أخطاء في المتصفح: ${short(errors[0], 110)}${errors.length > 1 ? ` (+${errors.length - 1})` : ''}`);
-  if (reportOnly.length) warnings.push(`${tag}سياسة CSP تجريبية (report-only) كانت ستحجب شيئًا لو فُعّلت، والصفحة تعمل الآن: ${short(reportOnly[0], 110)}`);
+  if (reportOnly.length) warnings.push(`${tag}${REPORT_ONLY_WARNING}${short(reportOnly[0], 110)}`);
   if (device !== 'desktop' && s.overflowX) problems.push(`${tag}الصفحة أعرض من شاشة الجوال، فيضطر الزائر للتمرير جانبيًا`);
   if (device === 'desktop' && s.loadMs > 8000) problems.push(`الصفحة بطيئة: ${Math.round(s.loadMs / 1000)} ثانية للتحميل`);
 
@@ -65,6 +67,17 @@ export function auditSnapshot(s: PageSnapshot, device: Device = 'desktop'): Audi
   if (s.unnamedControls > 0) warnings.push(`${tag}${s.unnamedControls} أزرار أو حقول بلا اسم يقرؤه قارئ الشاشة`);
   if (device !== 'desktop' && s.smallTargets >= 3) warnings.push(`${tag}${s.smallTargets} عناصر ضغط أصغر من أن تُلمس بسهولة على الجوال`);
   return { problems, warnings };
+}
+
+/**
+ * A problem stored by an earlier visit, judged by today's rules: the warning it would be now, or null when it is still a problem.
+ * Lets a rule change take effect at once instead of waiting for the next daily visit. A stored browser-error line that also counted
+ * other errors («(+2)») stays a problem: the ones it did not quote may be real.
+ */
+export function storedProblemNowWarning(problem: string): string | null {
+  if (SLOW_LINK.test(problem)) return problem;
+  if (problem.includes('أخطاء في المتصفح: ') && REPORT_ONLY.test(problem) && !/\(\+\d+\)$/.test(problem)) return problem.replace('أخطاء في المتصفح: ', REPORT_ONLY_WARNING);
+  return null;
 }
 
 /** Missing hardening headers on the home page: hygiene, so only ever a warning. */
