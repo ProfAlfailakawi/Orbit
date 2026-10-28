@@ -1,6 +1,6 @@
 /** Results of the daily real-browser visit. Pure: validation of what the robot posts, and applying it to a program record. */
 import type { PlatformRecord } from './types.ts';
-import { VISUAL_CHANGE_BITS, hashDistance } from './pageAudit.ts';
+import { VISUAL_CHANGE_BITS, hashDistance, storedProblemNowWarning } from './pageAudit.ts';
 
 export interface BrowserVisitReport { id: string; url: string; ok: boolean; problems: string[]; warnings: string[]; hash?: string; sensor?: 'installed' | 'absent' }
 
@@ -37,15 +37,17 @@ export function applyBrowserVisit(p: PlatformRecord, report: BrowserVisitReport,
   return { ...p, browserVisit: { at: nowIso, ok: report.ok, problems: report.problems, warnings, hash: report.hash ?? before, ...(report.sensor ? { sensor: report.sensor } : {}) } };
 }
 
-/** Findings from the last browser visit while still fresh (a daily visit stays valid for 36 hours). */
+/** Findings from the last browser visit while still fresh (a daily visit stays valid for 36 hours), judged by today's rules. */
 export function freshBrowserProblems(p: PlatformRecord, now = Date.now()): string[] {
   const v = p.browserVisit;
   if (!v || v.ok || now - Date.parse(v.at) > 36 * 3_600_000) return [];
-  return v.problems;
+  return v.problems.filter(x => storedProblemNowWarning(x) === null);
 }
 
-/** Softer findings from the last browser visit (accessibility, hygiene, a changed look), while still fresh. */
+/** Softer findings from the last browser visit (accessibility, hygiene, a changed look, stored problems that are warnings now), while still fresh. */
 export function freshBrowserWarnings(p: PlatformRecord, now = Date.now()): string[] {
   const v = p.browserVisit;
-  return v?.warnings?.length && now - Date.parse(v.at) <= 36 * 3_600_000 ? v.warnings : [];
+  if (!v || now - Date.parse(v.at) > 36 * 3_600_000) return [];
+  const softened = v.ok ? [] : v.problems.map(storedProblemNowWarning).filter((x): x is string => x !== null);
+  return [...softened, ...(v.warnings || [])];
 }

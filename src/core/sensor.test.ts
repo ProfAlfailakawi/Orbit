@@ -199,3 +199,25 @@ test('a stored application error that merely quotes the failure phrase is still 
   const live = freshSensorProblems(p, t0.getTime() + 60_000);
   assert.equal(live.length, 2, 'only a stored request finding is treated as a connection failure');
 });
+
+test('a dropped Firestore channel is the SDK reconnecting, not a failure, from new reports and from ones stored before', () => {
+  const parsed = parseSensorBody(body('visitor_one', [
+    { k: 'request', m: 'فشل الاتصال /:id/Listen/channel', p: '/' },
+    { k: 'request', m: 'فشل الاتصال /:id/Write/channel', p: '/' },
+    { k: 'request', m: 'فشل الاتصال /api/invoice/confirm', p: '/' },
+    { k: 'request', m: 'HTTP 503 /:id/Listen/channel', p: '/' },
+  ]));
+  assert.deepEqual(parsed.map(r => r.message), ['فشل الاتصال /api/invoice/confirm', 'HTTP 503 /:id/Listen/channel'], 'a server error on the channel still counts');
+  const t0 = new Date('2026-10-28T00:00:00Z');
+  const stored = {
+    id: 'a', sensorCheckedAt: t0.toISOString(),
+    sensorEvidence: [
+      { text: 'طلب من الموقع يفشل عند الزوّار: فشل الاتصال /:id/Listen/channel', page: '/', visitors: 2, stack: [], steps: [], lastAt: t0.toISOString(), note: true },
+      { text: 'طلب من الموقع يفشل عند الزوّار: فشل الاتصال /api/invoice/confirm', page: '/', visitors: 2, stack: [], steps: [], lastAt: t0.toISOString(), note: true },
+    ],
+  } as unknown as PlatformRecord;
+  const notes = sensorNoteLines(stored, t0.getTime() + 60_000).join('\n');
+  assert.doesNotMatch(notes, /Listen\/channel/);
+  assert.match(notes, /invoice\/confirm/);
+  assert.equal(applySensor(stored, [], new Date(t0.getTime() + 60_000).toISOString()).sensorEvidence?.length, 1);
+});

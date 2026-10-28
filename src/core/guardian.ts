@@ -200,7 +200,9 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
     lines.push('', '## مشاكل الربط (برامج لا يقرأ أوربت بياناتها الحية)');
     linkIssues.forEach(({ p, issue }) => lines.push('- ' + displayName(p) + ' (' + p.owner + '/' + p.repoName + '): ' + issue));
   }
-  const gaps = fleet.filter(p => !(p.fourState?.siteReachable === true && p.fourState?.userJourneyHealthy === true));
-  lines.push('', '## برامج رصدها غير مكتمل (ليست دليل سلامة)', gaps.length ? gaps.map(p => displayName(p)).join('، ') : 'لا يوجد.');
+  // Nothing marks a user journey healthy yet, so requiring it listed every program on every report; only a site not seen working is a gap.
+  const gaps = fleet.filter(p => p.fourState?.siteReachable !== true);
+  lines.push('', '## برامج رصدها غير مكتمل (لم يتأكد أوربت أن موقعها يعمل)', gaps.length ? gaps.map(p => displayName(p)).join('، ') : 'لا يوجد.',
+    'أوربت لا يختبر رحلة المستخدم الكاملة (الدخول والدفع والحفظ)، فغياب المشاكل ليس دليل سلامة كاملة.');
   return lines.join('\n');
 }
