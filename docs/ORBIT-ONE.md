@@ -12,7 +12,7 @@ Implemented server-only functions:
 - FUTURE RADAR: evidence-qualified risk checks based on real Live GitHub commits only.
 
 Optional GitHub repository secrets required for independent checks:
-ORBIT_HEALTHCHECK_URL = https://your-orbit-production-host/healthz
+ORBIT_HEALTHCHECK_URL = https://your-orbit-production-host/healthz/  (keep the trailing slash: Cloud Run reserves /healthz itself and Hosting answers it with 404)
 ORBIT_GHOST_TARGETS = JSON array containing up to 15 publicly accessible HTTPS read-only URLs.
 Until those secrets are configured, this external guard reports UNCONFIGURED. A successful GET does NOT establish that user journeys work. GitHub Actions schedule can run late; external push delivery remains unconfigured.
 
