@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PlatformRecord } from '../core/types';
+import { apiFetch } from '../core/api';
 import { displayName } from '../core/displayName';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
 
@@ -163,7 +164,9 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
   const copyWeekly = async () => {
     setWeekly('loading');
     try {
-      const response = await fetch('/api/weekly-report', { credentials: 'same-origin' });
+      // apiFetch adds the session's Bearer token: in production Firebase Hosting drops every cookie but `__session`
+      // on the way to Cloud Run, so the HTTP-only session cookie alone never reaches the API.
+      const response = await apiFetch('/api/weekly-report');
       const { text } = await response.json() as { text?: string };
       if (!response.ok || !text) throw new Error('empty');
       if (await copyToClipboard(text)) { setManualText(null); setWeekly('copied'); window.setTimeout(() => setWeekly('idle'), 2500); }
