@@ -21,6 +21,8 @@ export interface PageSnapshot {
   smallTargets: number;
   consoleErrors: string[];
   loadMs: number;
+  /** Text of elements the page marks with a non-Arabic lang (a paper title with lang="en"): intended, not a missing translation. */
+  foreign?: string[];
 }
 
 export interface Audit { problems: string[]; warnings: string[] }
@@ -59,7 +61,8 @@ export function auditSnapshot(s: PageSnapshot, device: Device = 'desktop'): Audi
 
   const arabicLetters = (text.match(ARABIC) || []).length;
   const arabicPage = arabicLetters > 40 || /^ar/i.test(s.lang);
-  if (arabicPage && arabicLetters > 40 && LONG_ENGLISH.test(text)) warnings.push(`${tag}جملة إنجليزية طويلة داخل صفحة عربية (ترجمة ناقصة؟)`);
+  const unmarked = (s.foreign || []).reduce((rest, passage) => rest.split(passage).join(' '), text);
+  if (arabicPage && arabicLetters > 40 && LONG_ENGLISH.test(unmarked)) warnings.push(`${tag}جملة إنجليزية طويلة داخل صفحة عربية (ترجمة ناقصة؟)`);
   if (arabicLetters > 40 && arabicLetters / Math.max(text.length, 1) > 0.3 && s.direction === 'ltr') problems.push(`${tag}الصفحة عربية لكن اتجاهها من اليسار لليمين، فيظهر النص مقلوبًا`);
   // A throttled link is a simulation, so a long load there is an early warning, not a breakage.
   if (device === 'phone-slow' && s.loadMs > 10_000) warnings.push(`${tag}الصفحة تحتاج ${Math.round(s.loadMs / 1000)} ثانية للتحميل على اتصال ضعيف`);

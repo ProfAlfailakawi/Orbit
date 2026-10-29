@@ -85,6 +85,13 @@ test('visual hash: same picture is distance 0, inverted picture is far', () => {
   assert.throws(() => averageHash([1, 2]));
 });
 
+test('English the page marks with lang is intended; unmarked English in an Arabic page is still flagged', () => {
+  const title = 'Faculty Members Degree of Awareness of Augmented Reality Concept';
+  const arabic = page().text;
+  assert.equal(auditSnapshot(page({ text: `${arabic} ${title}` })).warnings.length, 1);
+  assert.deepEqual(auditSnapshot(page({ text: `${arabic} ${title}`, foreign: [title] })).warnings, []);
+});
+
 test('a problem stored by an earlier visit is judged by today\'s rules', () => {
   assert.match(storedProblemNowWarning('[جوال بطيء] الصفحة تحتاج 11 ثانية للتحميل على اتصال ضعيف') || '', /11 ثانية/);
   assert.match(storedProblemNowWarning("[جوال] أخطاء في المتصفح: Framing 'https://x.firebaseapp.com/' violates the following report-only Content Security Polic") || '', /^\[جوال\] سياسة CSP تجريبية/);

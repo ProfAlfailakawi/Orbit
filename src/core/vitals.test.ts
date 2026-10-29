@@ -35,7 +35,7 @@ test('history is capped and stale history is ignored', () => {
   const p = { vitals: series([...steady, 3000, 3000, 3000, 3000]) } as PlatformRecord;
   const lastAt = Date.parse(p.vitals![p.vitals!.length - 1].at);
   assert.equal(driftWarnings(p, lastAt + 3_600_000).length, 1);
-  assert.deepEqual(driftWarnings(p, lastAt + 5 * 3_600_000), []);
+  assert.deepEqual(driftWarnings(p, lastAt + 27 * 3_600_000), []);
 });
 
 test('certificate: late notice is a problem, early notice is a warning, healthy is silent', () => {

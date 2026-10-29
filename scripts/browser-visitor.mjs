@@ -53,21 +53,29 @@ const noQuery = url => { try { const u = new URL(url); return u.origin + u.pathn
 /** Facts about the page as it stands now, collected inside the browser. Judged later by auditSnapshot. */
 const collect = () => {
   const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+  // Hidden from assistive tech (aria-hidden, inert): a screen reader never meets it, so it needs no name.
+  const exposed = el => !el.closest('[aria-hidden="true"], [inert]');
   const nameOf = el => {
-    const direct = el.getAttribute('aria-label') || el.getAttribute('title') || (el.innerText || '').trim() || el.querySelector('img[alt]')?.getAttribute('alt');
+    // innerText is empty for text Chrome has not rendered yet (an off-screen content-visibility section), so fall back to the text itself;
+    // a child image or SVG named with alt / aria-label / <title> names the control, as it does for a screen reader.
+    const text = (el.innerText || '').trim() || (el.textContent || '').trim();
+    const direct = el.getAttribute('aria-label') || el.getAttribute('title') || text || el.querySelector('img[alt]')?.getAttribute('alt') ||
+      el.querySelector('[aria-label]')?.getAttribute('aria-label') || (el.querySelector('svg title')?.textContent || '').trim();
     if (direct) return direct;
     const by = el.getAttribute('aria-labelledby');
     if (by && by.split(/\s+/).some(id => (document.getElementById(id)?.innerText || '').trim())) return 'x';
     if (el.labels && el.labels.length) return 'x';
     return /^(submit|button|reset)$/.test(el.type || '') ? el.value : '';
   };
-  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button]')].filter(shown);
+  const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button]')].filter(shown).filter(exposed);
   const targets = [...document.querySelectorAll('button, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, [role=button]')].filter(shown);
   const images = [...document.images].filter(i => i.src && !i.src.startsWith('data:'));
   return {
     lang: document.documentElement.lang || '',
     direction: getComputedStyle(document.body).direction,
     text: (document.body?.innerText || '').slice(0, 20000),
+    foreign: [...document.querySelectorAll('body [lang]')].filter(el => !/^ar/i.test(el.getAttribute('lang') || ''))
+      .map(el => (el.innerText || el.textContent || '').trim()).filter(Boolean).slice(0, 200),
     overflowX: document.documentElement.scrollWidth > window.innerWidth + 2,
     images: images.length,
     brokenImages: images.filter(i => i.complete && i.naturalWidth === 0 && i.loading !== 'lazy').length,
@@ -117,7 +125,7 @@ async function openPage(browser, profile, url, { first, hashOf, probe }) {
   const secretScans = [];
   let hash;
   page.on('pageerror', e => problems.push(`${profile.tag}خطأ برمجي في الصفحة: ${short(e.message)}`));
-  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|chrome-extension|favicon/i.test(m.text())) consoleErrors.push(short(m.text())); });
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|chrome-extension|favicon/i.test(m.text())) consoleErrors.push(short(m.text().replace(/https?:\/\/[^\s'"]+/g, u => noQuery(u)))); });
   page.on('requestfailed', r => { if (r.url().startsWith(origin) && !/aborted|ERR_ABORTED/i.test(r.failure()?.errorText || '')) problems.push(`${profile.tag}فشل تحميل ${noQuery(r.url())}`); });
   page.on('response', r => {
     const type = r.request().resourceType();

@@ -9,11 +9,23 @@ import type { PlatformRecord } from './types.ts';
 export interface LogSource { codeName: string; project: string; service: string }
 export type ServerError = NonNullable<PlatformRecord['serverErrors']>[number];
 
-/** How far back each watch looks, and how long a result stays valid (the watch runs every 15 minutes). */
-export const LOG_WINDOW_MS = 30 * 60_000;
-const FRESH_MS = 60 * 60_000;
-/** The same error this many times in the window is a problem; fewer is a warning. */
+/** How far back each watch looks and how long its result stays valid: a little over a day, because the scheduled watch runs daily. */
+export const LOG_WINDOW_MS = 25 * 3_600_000;
+const FRESH_MS = 26 * 3_600_000;
+/** The same error this many times within half an hour (anywhere in the window) is a problem; fewer is a warning. */
 export const LOG_PROBLEM_COUNT = 3;
+export const LOG_BURST_MS = 30 * 60_000;
+
+/** The most occurrences that fall within any half hour: a burst, as opposed to the same error spread thinly over the day. */
+function busiestHalfHour(times: number[]): number {
+  const sorted = [...times].sort((a, b) => a - b);
+  let best = 0;
+  for (let start = 0, end = 0; end < sorted.length; end++) {
+    while (sorted[end] - sorted[start] > LOG_BURST_MS) start++;
+    best = Math.max(best, end - start + 1);
+  }
+  return best;
+}
 
 /**
  * ORBIT_LOG_SOURCES lists which Cloud Run service holds each program's logs. Two spellings, both validated:
@@ -69,6 +81,7 @@ function messageOf(e: LogEntry): string {
  */
 export function summarizeLogEntries(entries: LogEntry[], serving?: string[] | null): ServerError[] {
   const groups = new Map<string, ServerError>();
+  const seenAt = new Map<string, number[]>();
   for (const e of entries) {
     const raw = messageOf(e);
     if (!raw || BENIGN.test(raw)) continue;
@@ -76,10 +89,12 @@ export function summarizeLogEntries(entries: LogEntry[], serving?: string[] | nu
     const revision = typeof e.resource?.labels?.revision_name === 'string' && /^[a-z][a-z0-9-]{0,62}$/.test(e.resource.labels.revision_name) ? e.resource.labels.revision_name : undefined;
     const key = cleaned.replace(/\d{2,}/g, 'N') + '|' + (revision || '');
     const at = typeof e.timestamp === 'string' ? e.timestamp : '';
+    seenAt.set(key, [...(seenAt.get(key) || []), Number.isFinite(Date.parse(at)) ? Date.parse(at) : 0]);
     const g = groups.get(key);
     if (g) { g.count += 1; if (at > g.lastAt) g.lastAt = at; }
     else groups.set(key, { text: cleaned, count: 1, lastAt: at, ...(revision ? { revision } : {}), ...(serving && revision && !serving.includes(revision) ? { serving: false } : {}) });
   }
+  for (const [key, g] of groups) g.peak = busiestHalfHour(seenAt.get(key) || []);
   const all = [...groups.values()].sort((a, b) => b.count - a.count);
   return [...all.filter(g => g.serving !== false).slice(0, 4), ...all.filter(g => g.serving === false).slice(0, 2)];
 }
@@ -95,16 +110,19 @@ const idle = (e: ServerError) => e.serving === false;
 
 const fresh = (p: PlatformRecord, now: number) => Boolean(p.serverLogsCheckedAt) && now - Date.parse(p.serverLogsCheckedAt!) < FRESH_MS;
 const times = (n: number) => (n === 1 ? 'مرة واحدة' : n === 2 ? 'مرتين' : `${n} مرة`);
+/** Results stored before bursts were measured read their count as the burst: they came from a half-hour window. */
+const peakOf = (e: ServerError) => e.peak ?? e.count;
+const burstPhrase = (e: ServerError) => `${times(peakOf(e))} خلال نصف ساعة${e.count > peakOf(e) ? `، و${times(e.count)} في آخر يوم` : ''}`;
 
 export function serverProblems(p: PlatformRecord, now = Date.now()): string[] {
-  return fresh(p, now) ? (p.serverErrors || []).filter(e => e.count >= LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ في سجلات الخادم: ${e.text} (${times(e.count)} في آخر نصف ساعة)${where(e)}`) : [];
+  return fresh(p, now) ? (p.serverErrors || []).filter(e => peakOf(e) >= LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ في سجلات الخادم: ${e.text} (${burstPhrase(e)})${where(e)}`) : [];
 }
 
 export function serverWarnings(p: PlatformRecord, now = Date.now()): string[] {
   if (!fresh(p, now)) return [];
   const errors = p.serverErrors || [];
   const quiet = errors.filter(idle).map(e => `نسخة لا تخدم الزوار سجّلت خطأ: ${e.text} (${times(e.count)})${where(e)}، لا أثر على الزوار ما دامت الحركة على نسخة أخرى`);
-  const few = [...quiet, ...errors.filter(e => e.count < LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)})${where(e)}`)];
+  const few = [...quiet, ...errors.filter(e => peakOf(e) < LOG_PROBLEM_COUNT && !idle(e)).map(e => `خطأ عابر في سجلات الخادم: ${e.text} (${times(e.count)} في آخر يوم، لا يتجاوز ${times(peakOf(e))} خلال نصف ساعة)${where(e)}`)];
   return p.serverLogsIssue ? [`لا يمكن قراءة سجلات الخادم: ${p.serverLogsIssue}`, ...few] : few;
 }
 
