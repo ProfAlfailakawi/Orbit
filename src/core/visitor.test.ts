@@ -95,6 +95,20 @@ test('retries are capped per visit so a really broken site is judged quickly', a
   assert.ok(attempts <= 1 + 2 + 2 + 2, `home once, two assets, plus at most two retries (was ${attempts})`);
 });
 
+test('a slow first answer is asked once more: a cold start is not a slowdown, a slow site is slow both times', async () => {
+  const site = (times: number[]): VisitDeps => {
+    let n = 0;
+    return { wait: async () => {}, get: async (url) => url === base
+      ? { status: 200, bytes: enc(PAGE), contentType: 'text/html', finalUrl: url, ms: times[Math.min(n++, times.length - 1)] }
+      : { status: 200, bytes: enc(''), contentType: url.endsWith('.css') ? 'text/css' : 'text/javascript', finalUrl: url, ms: 5 } };
+  };
+  const cold = await visitSite(base, site([2100, 9]));
+  assert.equal(cold.ok, true);
+  assert.equal(cold.pageMs, 9, 'the server woke up on the first request');
+  assert.equal((await visitSite(base, site([2100, 2000]))).pageMs, 2000, 'really slow both times');
+  assert.equal((await visitSite(base, site([800, 5]))).pageMs, 800, 'a normal answer is not asked again');
+});
+
 test('the speed of a visit is the home page request itself, however many asset requests were repeated or fell back', async () => {
   const ok = { [base]: [{ body: PAGE }], [base + 'assets/app.css']: [{ type: 'text/css' }], [base + 'assets/app.js']: [null, { type: 'text/javascript' }] };
   const result = await visitSite(base, flaky(ok).deps);

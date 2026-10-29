@@ -114,6 +114,33 @@ test('the traffic split tells which revisions serve visitors; anything unclear g
   assert.equal(await createCloudLogReader(async () => null, fetch).servingRevisions(src), null);
 });
 
+test('without the Cloud Run Viewer role, the revision of the newest request is the serving one', async () => {
+  const src = { codeName: 'MAJAL', project: 'my-project-1', service: 'majal-app' };
+  const calls: string[] = [];
+  const reader = (logs: { status: number; body: unknown }) => createCloudLogReader(async () => 'tok', (async (url: string, init?: { body?: string }) => {
+    calls.push(String(url));
+    if (String(url).startsWith('https://run.googleapis.com')) return { status: 403, ok: false, json: async () => ({}) };
+    assert.match(String(init?.body), /log_id\(\\"run.googleapis.com\/requests\\"\)/, 'asks for request logs only');
+    return { status: logs.status, ok: logs.status < 300, json: async () => logs.body };
+  }) as unknown as typeof fetch);
+
+  assert.deepEqual(await reader({ status: 200, body: { entries: [{ resource: { labels: { revision_name: 'majal-app-00244-4l9' } } }] } }).servingRevisions(src), ['majal-app-00244-4l9']);
+  assert.ok(calls.some(u => u.startsWith('https://run.googleapis.com')) && calls.some(u => u.startsWith('https://logging.googleapis.com')));
+  // nothing usable from either source: unknown, so errors keep their normal (possibly red) verdict
+  assert.equal(await reader({ status: 403, body: {} }).servingRevisions(src), null);
+  assert.equal(await reader({ status: 200, body: { entries: [] } }).servingRevisions(src), null);
+  assert.equal(await reader({ status: 200, body: { entries: [{ resource: { labels: { revision_name: 'x" OR 1' } } }] } }).servingRevisions(src), null);
+
+  // a burst on the replaced revision is a warning, the same burst on the serving one stays red
+  const burst = (revision: string) => Array.from({ length: 5 }, (_, i) => ({ timestamp: `2026-10-29T08:3${i}:00Z`, textPayload: 'Error: Connection terminated due to connection timeout', resource: { labels: { revision_name: revision } } }));
+  const now = Date.parse('2026-10-29T12:00:00Z');
+  const record = (errors: ReturnType<typeof summarizeLogEntries>) => ({ serverErrors: errors, serverLogsCheckedAt: '2026-10-29T11:59:00Z' }) as never;
+  const old = summarizeLogEntries(burst('majal-app-00242-27w'), ['majal-app-00244-4l9']);
+  assert.deepEqual(serverProblems(record(old), now), []);
+  assert.equal(serverWarnings(record(old), now).length, 1);
+  assert.equal(serverProblems(record(summarizeLogEntries(burst('majal-app-00244-4l9'), ['majal-app-00244-4l9'])), now).length, 1);
+});
+
 test('the same error three times within half an hour is red; three times spread over the day is a warning', () => {
   const at = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
   const burst = summarizeLogEntries([0, 5, 20].map(m => ({ timestamp: at(m), textPayload: 'Error: burst' })));

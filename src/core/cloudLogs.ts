@@ -128,8 +128,37 @@ export function serverWarnings(p: PlatformRecord, now = Date.now()): string[] {
 
 export interface LogReader {
   read(source: LogSource, sinceIso: string): Promise<{ entries: LogEntry[] } | { error: string }>;
-  /** Revisions that currently receive traffic (needs the Cloud Run Viewer role); null when that cannot be established. */
+  /**
+   * Revisions that currently receive traffic: the exact split with the Cloud Run Viewer role; without it, the revision that
+   * answered the latest request (Logs Viewer is enough). Null when neither can be established.
+   */
   servingRevisions(source: LogSource): Promise<string[] | null>;
+}
+
+/**
+ * The revision that answered the newest request in the last day. Cloud Run sends every request to the serving revision, so
+ * a replaced revision stops appearing here and its old errors stop being red. With no request since a deploy this still names
+ * the old revision, which keeps its errors red: the safe side. Assumes no traffic split, which these programs never use.
+ */
+async function latestRequestRevision(source: LogSource, token: string, fetchImpl: typeof fetch): Promise<string[] | null> {
+  try {
+    const since = new Date(Date.now() - LOG_WINDOW_MS).toISOString();
+    const response = await fetchImpl('https://logging.googleapis.com/v2/entries:list', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resourceNames: [`projects/${source.project}`],
+        filter: `resource.type="cloud_run_revision" AND resource.labels.service_name="${source.service}" AND log_id("run.googleapis.com/requests") AND timestamp>="${since}"`,
+        orderBy: 'timestamp desc',
+        pageSize: 1,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { entries?: LogEntry[] };
+    const revision = data.entries?.[0]?.resource?.labels?.revision_name;
+    return typeof revision === 'string' && /^[a-z0-9-]{1,80}$/.test(revision) ? [revision] : null;
+  } catch { return null; }
 }
 
 /** Cloud Logging over its REST API, authenticated as ORBIT's own runtime service account. */
@@ -160,7 +189,7 @@ export function createCloudLogReader(getToken: () => Promise<string | null | und
         const response = await fetchImpl(`https://run.googleapis.com/v2/projects/${source.project}/locations/-/services?pageSize=100`, {
           headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000),
         });
-        if (!response.ok) return null;
+        if (!response.ok) return await latestRequestRevision(source, token, fetchImpl);
         const data = await response.json() as { services?: Array<{ name?: string; trafficStatuses?: Array<{ revision?: string; percent?: number }> }> };
         const service = (data.services || []).find(x => typeof x.name === 'string' && x.name.endsWith(`/services/${source.service}`));
         if (!service?.trafficStatuses) return null;
