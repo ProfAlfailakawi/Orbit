@@ -1,7 +1,8 @@
 name: ORBIT independent guardian (opt-in)
 on:
   schedule:
-    - cron: "13 * * * *"
+    # Once a day, like the rest of ORBIT's automatic checks (each run is billed as a full GitHub Actions minute).
+    - cron: "13 4 * * *"
   workflow_dispatch:
 permissions:
   contents: read

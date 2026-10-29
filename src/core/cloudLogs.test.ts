@@ -45,8 +45,8 @@ test('three of the same error is a problem; fewer is a warning; stale checks say
   assert.equal(serverProblems(p, NOW).length, 1);
   assert.match(serverProblems(p, NOW)[0], /boom/);
   assert.match(serverWarnings(p, NOW)[0], /once/);
-  assert.deepEqual(serverProblems(p, NOW + 2 * 3_600_000), []);
-  assert.deepEqual(serverWarnings(p, NOW + 2 * 3_600_000), []);
+  assert.deepEqual(serverProblems(p, NOW + 27 * 3_600_000), []);
+  assert.deepEqual(serverWarnings(p, NOW + 27 * 3_600_000), []);
 });
 
 test('an unreadable log source is a warning, never mistaken for "no errors"', () => {
@@ -112,4 +112,16 @@ test('the traffic split tells which revisions serve visitors; anything unclear g
   assert.equal(await reader(403, {}).servingRevisions(src), null);
   assert.equal(await reader(200, { services: [] }).servingRevisions(src), null);
   assert.equal(await createCloudLogReader(async () => null, fetch).servingRevisions(src), null);
+});
+
+test('the same error three times within half an hour is red; three times spread over the day is a warning', () => {
+  const at = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+  const burst = summarizeLogEntries([0, 5, 20].map(m => ({ timestamp: at(m), textPayload: 'Error: burst' })));
+  const spread = summarizeLogEntries([0, 300, 900].map(m => ({ timestamp: at(m), textPayload: 'Error: spread' })));
+  assert.deepEqual([burst[0].count, burst[0].peak, spread[0].count, spread[0].peak], [3, 3, 3, 1]);
+  const p = applyServerErrors(program(), [...burst, ...spread], null, new Date(NOW).toISOString());
+  assert.equal(serverProblems(p, NOW).length, 1);
+  assert.match(serverProblems(p, NOW)[0], /burst.*3 مرة خلال نصف ساعة/);
+  assert.match(serverWarnings(p, NOW).join(' '), /spread.*3 مرة في آخر يوم/);
+  assert.equal(serverProblems(p, NOW + 20 * 3_600_000).length, 1, 'a daily check stays valid until the next one');
 });

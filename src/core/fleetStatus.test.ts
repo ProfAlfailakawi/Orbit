@@ -103,7 +103,8 @@ test('the owner is told when the automatic watch itself has gone quiet', () => {
   const now = Date.parse('2026-05-01T12:00:00Z');
   const seen = (minutesAgo: number) => app('A', { siteCheckedAt: new Date(now - minutesAgo * 60_000).toISOString() });
   assert.deepEqual(watchHealth([seen(10)], now), { stale: false, minutes: 10 });
-  assert.deepEqual(watchHealth([seen(200), seen(400)], now), { stale: true, minutes: 200 });
+  assert.deepEqual(watchHealth([seen(200), seen(400)], now), { stale: false, minutes: 200 }, 'a daily watch is not late after a few hours');
+  assert.deepEqual(watchHealth([seen(27 * 60), seen(30 * 60)], now), { stale: true, minutes: 27 * 60 });
   assert.equal(watchHealth([app('B')], now), null, 'no site to watch means nothing to be stale');
   assert.deepEqual([minutesPhrase(45), minutesPhrase(200), minutesPhrase(60 * 30)], ['45 دقيقة', '3 ساعات', 'يوم']);
 });

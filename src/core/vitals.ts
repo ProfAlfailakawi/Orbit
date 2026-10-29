@@ -3,7 +3,7 @@ import type { PlatformRecord } from './types.ts';
 
 export type VitalSample = NonNullable<PlatformRecord['vitals']>[number];
 
-const MAX_SAMPLES = 96; // a day of 15-minute visits
+const MAX_SAMPLES = 96; // about three months of daily checks and manual refreshes
 const MIN_SAMPLES = 16;
 const RECENT = 4;
 
@@ -38,10 +38,10 @@ export function detectDrift(samples: VitalSample[] | undefined): string[] {
   return out;
 }
 
-/** Drift warnings that are still current (the watch records a sample every 15 minutes; a stale history says nothing). */
+/** Drift warnings that are still current (the watch records a sample daily and on every refresh; a stale history says nothing). */
 export function driftWarnings(p: PlatformRecord, now = Date.now()): string[] {
   const last = p.vitals?.[p.vitals.length - 1];
-  return last && now - Date.parse(last.at) < 3 * 3_600_000 ? detectDrift(p.vitals) : [];
+  return last && now - Date.parse(last.at) < 26 * 3_600_000 ? detectDrift(p.vitals) : [];
 }
 
 const median12 = (v: number[]) => median(v.slice(-12));

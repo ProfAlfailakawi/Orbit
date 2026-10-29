@@ -164,10 +164,11 @@ export default function App() {
     try {
       const res = await apiFetch('/api/watch/run', { method: 'POST' });
       if (res.ok) await fetchServerState();
-    } catch { /* the 15-minute watch covers it */ }
+    } catch { /* the daily watch covers it */ }
   };
 
-  const handleSync = async () => {
+  /** «تحديث»: read GitHub, then visit every site, so one press refreshes everything the daily schedule would. */
+  const handleSync = async ({ visitSites = true }: { visitSites?: boolean } = {}) => {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
@@ -185,7 +186,8 @@ export default function App() {
       showBanner(checked > 0 && linked === 0
         ? 'تعذر الربط بـGitHub. سبب كل برنامج مكتوب تحته.'
         : `تم الفحص: ${linked} من ${checked} مربوطة.`);
-      void fetchServerState();
+      if (visitSites) await runWatch();
+      else void fetchServerState();
     } catch (error) {
       // Browser network errors are English ("Failed to fetch"); show only Arabic messages.
       showBanner(error instanceof Error && /[؀-ۿ]/.test(error.message) ? error.message : 'تعذر الوصول إلى الخادم.');
@@ -211,7 +213,7 @@ export default function App() {
       const needsLink = data.platforms.some(p =>
         p.lifecycleState === 'active' && p.runtimeMode === 'github-web' &&
         (!p.connectionVerified || !(Date.now() - Date.parse(p.lastVerifiedTimestamp || '') < sixHours)));
-      if (needsLink) void handleSync();
+      if (needsLink) void handleSync({ visitSites: false }); // the sites were just visited above
     })();
     const timer = setInterval(fetchServerState, 12000);
     return () => clearInterval(timer);

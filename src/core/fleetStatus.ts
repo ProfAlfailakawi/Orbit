@@ -117,15 +117,19 @@ export function buildCopyText(rows: ProgramRow[], scope: 'all' | string): string
   return [report, ...missions].join('\n\n');
 }
 
+/** The scheduled watch runs once a day; a little over a day without any visit means the schedule itself has stopped. */
+export const WATCH_STALE_MINUTES = 26 * 60;
+
 /**
- * The automatic watch records a site visit every 15 minutes. If the newest one is old, the watch itself has stopped
- * (a paused schedule, an expired token) and no alert can be trusted to arrive, so the owner is told on opening the page.
+ * The automatic watch records a site visit once a day (and whenever the owner opens the page or presses «تحديث»). If the newest
+ * one is older than that, the watch itself has stopped (a paused schedule, an expired token) and no alert can be trusted to arrive,
+ * so the owner is told on opening the page.
  */
 export function watchHealth(platforms: PlatformRecord[], now = Date.now()): { stale: boolean; minutes: number } | null {
   const times = platforms.filter(isInFleet).map(p => Date.parse(p.siteCheckedAt || '')).filter(Number.isFinite);
   if (!times.length) return null;
   const minutes = Math.max(0, Math.round((now - Math.max(...times)) / 60_000));
-  return { stale: minutes > 90, minutes };
+  return { stale: minutes > WATCH_STALE_MINUTES, minutes };
 }
 
 export function minutesPhrase(minutes: number): string {

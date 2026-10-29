@@ -1130,7 +1130,7 @@ async function startServer() {
     try { await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) }); } catch { /* the outside service notices the silence */ }
   }
 
-  // Frequent, cheap check: find real sites, visit each one, update the record. Used by the dashboard and by the 15-minute watch.
+  // Cheap check: find real sites, visit each one, update the record. Used by the dashboard (opening it, «تحديث») and by the daily scheduled watch.
   let watchActive = false;
   async function runWatch() {
     if (watchActive) return { skipped: 'already running' as const };
