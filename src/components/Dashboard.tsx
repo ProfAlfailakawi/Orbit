@@ -276,7 +276,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
                 <div className="mine-row" key={p.id}>
                   <bdi dir="ltr">{shortName(p)}</bdi>
                   {removing === p.id
-                    ? <button type="button" className="btn btn-danger" onClick={() => { setRemoving(null); void onRemove(p.id); }}>تأكيد الإزالة</button>
+                    ? <button type="button" className="btn btn-danger" onClick={() => { setRemoving(null); setFeedback(''); onRemove(p.id).catch(error => setFeedback(error instanceof Error && /[\u0600-\u06FF]/.test(error.message) ? error.message : 'تعذرت الإزالة الآن، حاول بعد قليل.')); }}>تأكيد الإزالة</button>
                     : <button type="button" className="btn" onClick={() => setRemoving(p.id)}>إزالة</button>}
                 </div>
               ))}

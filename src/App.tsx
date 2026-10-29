@@ -320,7 +320,8 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nextLifecycle: next }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'تعذرت الإزالة الآن، حاول بعد قليل.');
     if (data.platforms) setPlatforms(data.platforms);
   };
 
