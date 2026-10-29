@@ -1,4 +1,4 @@
-import { applySensor, createSensorHub, originOf, parseSensorBody, sensorNoteTexts } from './src/core/sensor.ts';
+import { applySensor, createSensorHub, originOf, parseSensorBody, sensorClientAddress, sensorNoteTexts } from './src/core/sensor.ts';
 import { applyBrowserVisit, parseBrowserReports } from './src/core/browserVisit.ts';
 import { hasCiVerdict } from './src/core/ciStatus.ts';
 import 'dotenv/config';
@@ -663,6 +663,9 @@ async function startServer() {
 
   // Browser sensor: anonymous error notes from the programs' own pages. Open to the internet, so strictly bounded.
   const sensorHub = createSensorHub();
+  // Per-process salt: the hub keeps only salted hashes of visitor addresses, in memory, and nothing ties them back to an address after a restart.
+  const sensorSalt = crypto.randomBytes(32);
+  const sensorAddressKey = (req: express.Request) => crypto.createHmac('sha256', sensorSalt).update(sensorClientAddress(req.get('x-forwarded-for'), req.socket.remoteAddress)).digest('base64url').slice(0, 22);
   const sensorOrigins = () => new Map(platforms.map(p => [originOf(siteService.url(p)), p.id] as const).filter(([o]) => o !== null) as Array<[string, string]>);
   app.options('/api/public-sensor', (req, res) => {
     const origin = req.get('origin') || '';
@@ -682,7 +685,7 @@ async function startServer() {
       saveStateToDisk();
     }
     if (reports.length) {
-      sensorHub.add(programId, reports);
+      sensorHub.add(programId, reports, sensorAddressKey(req));
       const now = new Date().toISOString();
       const found = sensorHub.findings(programId);
       let changed = false;
