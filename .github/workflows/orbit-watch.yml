@@ -4,7 +4,7 @@ on:
   schedule:
     # Once a day at 06:30 Kuwait time (03:30 UTC), half an hour before the daily browser visitor.
     # The owner's «تحديث» button and opening the page run the same check on demand, so nothing waits a day when it matters.
-    - cron: '30 3 * * 0'
+    - cron: '30 3 1 * *'
   workflow_dispatch:
 
 permissions:
