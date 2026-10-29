@@ -103,9 +103,22 @@ const NETWORK_FAILURE = /^\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u062
  */
 const STREAM_CHANNEL_DROP = /^\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \S*\/(?:Listen|Write)\/channel\b/;
 
+/**
+ * The client address used only to tell visitors apart: the left-most X-Forwarded-For entry, else the socket address.
+ * Behind Firebase Hosting → Cloud Run the number of proxy hops is not documented, so the trusted hop cannot be picked with
+ * certainty; the left-most entry is what the visitor's browser connected from unless the sender forged the header. Forging it
+ * is possible, so this only raises the bar for faking many visitors; it is never used for rate limits or logins (those use req.ip).
+ */
+export function sensorClientAddress(forwardedFor: string | string[] | undefined, fallback: string | undefined): string {
+  const header = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  const first = header?.split(',')[0]?.trim();
+  return first || fallback || 'unknown';
+}
+
 /** In-memory hub: counts distinct visitors per error and exposes the corroborated ones. */
 export function createSensorHub(now: () => number = Date.now) {
-  type Entry = { sessions: Map<string, number>; text: string; page: string; stack: string[]; steps: string[]; own: boolean; network: boolean };
+  // A visitor is distinct only when both its session id and its address key are new: one sender cannot fake a crowd by changing either alone.
+  type Entry = { sessions: Map<string, number>; addresses: Map<string, number>; text: string; page: string; stack: string[]; steps: string[]; own: boolean; network: boolean };
   const seen = new Map<string, Map<string, Entry>>(); // program -> signature -> evidence
   const hits = new Map<string, number[]>(); // rate limit key -> timestamps
 
@@ -118,14 +131,19 @@ export function createSensorHub(now: () => number = Date.now) {
     return true;
   }
 
-  function add(programId: string, reports: SensorReport[]) {
+  /**
+   * `addressKey`: a salted hash of the sender's client address (see sensorClientAddress); the hub never sees the raw address.
+   * Without one, each session stands for its own address.
+   */
+  function add(programId: string, reports: SensorReport[], addressKey?: string) {
     const t = now();
     const bucket = seen.get(programId) || new Map<string, Entry>();
     seen.set(programId, bucket);
     for (const r of reports) {
       const signature = `${r.kind}|${r.message}`;
-      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), text: `${KIND_LABEL[r.kind]}: ${r.message}`, page: r.page, stack: [], steps: [], own: false, network: r.kind === 'request' && NETWORK_FAILURE.test(r.message) };
+      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), addresses: new Map<string, number>(), text: `${KIND_LABEL[r.kind]}: ${r.message}`, page: r.page, stack: [], steps: [], own: false, network: r.kind === 'request' && NETWORK_FAILURE.test(r.message) };
       entry.sessions.set(r.session, t);
+      entry.addresses.set(addressKey === undefined ? 's:' + r.session : 'a:' + addressKey, t);
       entry.own = entry.own || r.own;
       if (r.stack.length || r.steps.length) { entry.stack = r.stack; entry.steps = r.steps; entry.page = r.page; } // the latest trail wins
       bucket.set(signature, entry);
@@ -148,11 +166,13 @@ export function createSensorHub(now: () => number = Date.now) {
     const notes: SensorFinding[] = [];
     for (const entry of seen.get(programId)?.values() || []) {
       for (const [s, at] of entry.sessions) if (t - at > SENSOR_WINDOW_MS) entry.sessions.delete(s);
-      const visitors = entry.sessions.size;
+      for (const [a, at] of entry.addresses) if (t - at > SENSOR_WINDOW_MS) entry.addresses.delete(a);
+      const visitors = Math.min(entry.sessions.size, entry.addresses.size);
       if (!visitors) continue;
       const lastAt = new Date(Math.max(...entry.sessions.values())).toISOString();
       const finding = { text: entry.text, page: entry.page, visitors, stack: entry.stack, steps: entry.steps, lastAt };
-      const burst = [...entry.sessions.values()].filter(at => t - at <= NETWORK_BURST_MS).length;
+      const recent = (m: Map<string, number>) => [...m.values()].filter(at => t - at <= NETWORK_BURST_MS).length;
+      const burst = Math.min(recent(entry.sessions), recent(entry.addresses));
       if (entry.network) {
         if (burst >= NETWORK_BURST_VISITORS) problems.push(finding);
         else if (visitors >= SENSOR_CORROBORATION) notes.push({ ...finding, note: true });
@@ -167,7 +187,11 @@ export function createSensorHub(now: () => number = Date.now) {
   return { allow, add, findings, problems };
 }
 
-export const describeFinding = (f: SensorFinding) => `${f.text} (${f.visitors === 1 ? 'زائر واحد' : f.visitors + ' زائر'})`;
+/** Arabic count agreement: زائر واحد، زائران، 3–10 زوار، 11 زائرًا فأكثر. */
+export const visitorsLabel = (n: number) => (n === 1 ? 'زائر واحد' : n === 2 ? 'زائران' : n >= 3 && n <= 10 ? `${n} زوار` : `${n} زائرًا`);
+export const describeFinding = (f: SensorFinding) => `${f.text} (${visitorsLabel(f.visitors)})`;
+/** The visitor-count suffix describeFinding adds, in today's wording and the older «(N زائر)» one. */
+export const VISITOR_COUNT_SUFFIX = / \((?:زائر واحد|زائران|\d+ (?:زائر|زوار|زوّار|زائرًا|زائراً))\)/g;
 
 const SENSOR_FRESH_MS = 6 * 3_600_000;
 
@@ -223,7 +247,7 @@ export function sensorTrailLines(p: PlatformRecord, nowMs = Date.now()): string[
 
 /** Thin evidence (one visitor, scattered connection failures): shown in the report, never in the program's status. */
 export function sensorNoteLines(p: PlatformRecord, nowMs = Date.now()): string[] {
-  return evidenceOf(p).filter(e => isNote(e) && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${e.visitors === 1 ? 'زائر واحد' : e.visitors + ' زوّار'})`, ...trailOf(e).slice(1)]);
+  return evidenceOf(p).filter(e => isNote(e) && isFresh(e, p, nowMs)).flatMap(e => [`  - ${e.text} (${visitorsLabel(e.visitors)})`, ...trailOf(e).slice(1)]);
 }
 
 /** The notes as plain texts, for the weekly log. */

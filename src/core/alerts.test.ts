@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeAlertChanges } from './alerts.ts';
+import { alertSignature, computeAlertChanges } from './alerts.ts';
+import { applySensor, createSensorHub, parseSensorBody } from './sensor.ts';
+import { buildRows } from './fleetStatus.ts';
+import { inspectRepositoryCapabilities } from './engine.ts';
 import type { ProgramRow } from './fleetStatus.ts';
 
 const row = (id: string, tone: ProgramRow['tone'], text = 'x'): ProgramRow => ({
@@ -43,4 +46,43 @@ test('an early warning is announced once like a problem, and clearing it counts 
   assert.deepEqual(first.messages.map(m => [m.kind, m.body]), [['problem', 'الموقع يتباطأ']]);
   assert.deepEqual(computeAlertChanges([early('a', 'الموقع يتباطأ')], first.next).messages, []);
   assert.equal(computeAlertChanges([row('a', 'ok', 'يعمل')], first.next).messages[0].kind, 'recovered');
+});
+
+// One program, one unchanged visitor error seen by more and more visitors: the full path hub → record → row → alert.
+const site = () => ({
+  ...inspectRepositoryCapabilities({ owner: 'ProfAlfailakawi', repoName: 'pay', codeName: 'PAY', nameAr: 'PAY', description: 'Test', runtimeMode: 'github-web' }),
+  lifecycleState: 'active', connectionVerified: true, dataIntegrity: 'Live', productionUrl: 'https://x.example', productionUrlVerified: true,
+  fourState: { ciPassed: true, deploymentSucceeded: true, siteReachable: true, userJourneyHealthy: null },
+} as any);
+const beacon = (session: string, m = 'x is undefined') => parseSensorBody(JSON.stringify({ s: session, r: [{ k: 'error', m, p: '/' }] }));
+
+test('five visitors hitting the same unchanged error send one push, not four', () => {
+  let t = Date.now() - 10 * 60_000; const hub = createSensorHub(() => t);
+  let p = site(); let memory = computeAlertChanges(buildRows([p], [], []), undefined).next;
+  const pushes: string[] = [];
+  for (let i = 1; i <= 5; i++) {
+    t += 60_000; hub.add(p.id, beacon('visitor_' + i), 'ip-' + i);
+    p = applySensor(p, hub.findings(p.id), new Date(t).toISOString());
+    const { messages, next } = computeAlertChanges(buildRows([p], [], []), memory);
+    pushes.push(...messages.map(m => m.body)); memory = next;
+  }
+  assert.equal(pushes.length, 1);
+  assert.match(pushes[0], /x is undefined \(زائران\)/, 'the push still shows the count as it was when it was sent');
+});
+
+test('a genuinely new error, and an error that returns after recovering, still alert', () => {
+  const memory = { initialized: true, signatures: { a: '' } };
+  const first = computeAlertChanges([row('a', 'bad', 'خطأ: x (زائران)')], memory);
+  assert.equal(first.messages.length, 1);
+  assert.deepEqual(computeAlertChanges([row('a', 'bad', 'خطأ: x (7 زوار)')], first.next).messages, [], 'more visitors, same error');
+  assert.equal(computeAlertChanges([row('a', 'bad', 'خطأ: x (7 زوار) · خطأ: y (زائران)')], first.next).messages.length, 1, 'a second error is new');
+  const gone = computeAlertChanges([row('a', 'ok', 'يعمل')], first.next);
+  assert.equal(gone.messages[0].kind, 'recovered');
+  assert.equal(computeAlertChanges([row('a', 'bad', 'خطأ: x (زائران)')], gone.next).messages[0].kind, 'problem', 'it came back');
+});
+
+test('alert signatures ignore counts in every wording and the order of the parts; old memories match without a re-send', () => {
+  assert.equal(alertSignature('خطأ: x (3 زائر) · خطأ: y (زائر واحد)'), alertSignature('خطأ: y (11 زائرًا) · خطأ: x (زائران)'));
+  const old = { initialized: true, signatures: { a: 'خطأ: x (4 زائر)' } }; // saved before this change, raw text with the old wording
+  assert.deepEqual(computeAlertChanges([row('a', 'bad', 'خطأ: x (5 زوار)')], old).messages, []);
 });

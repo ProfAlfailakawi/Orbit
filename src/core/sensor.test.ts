@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, scrubText, sensorNoteLines, sensorNoteTexts, sensorTrailLines } from './sensor.ts';
+import { applySensor, createSensorHub, freshSensorProblems, originOf, parseSensorBody, redactPathIds, scrubText, sensorNoteLines, sensorClientAddress, sensorNoteTexts, sensorTrailLines, visitorsLabel } from './sensor.ts';
 import type { PlatformRecord } from './types.ts';
 
 const body = (s: string, r: unknown[]) => JSON.stringify({ s, r });
@@ -106,7 +106,7 @@ test('record helpers', () => {
   const p = { id: 'a' } as PlatformRecord; const now = new Date().toISOString();
   assert.equal(applySensor(p, [], now), p);
   const q = applySensor(p, [finding('m')], now);
-  assert.deepEqual(freshSensorProblems(q), ['m (2 زائر)']);
+  assert.deepEqual(freshSensorProblems(q), ['m (زائران)']);
   assert.deepEqual(freshSensorProblems({ ...q, sensorCheckedAt: new Date(Date.now() - 7 * 3_600_000).toISOString() }), []);
   assert.equal(originOf('https://a.app/path?x'), 'https://a.app');
   assert.equal(originOf('http://a.app'), null);
@@ -220,4 +220,33 @@ test('a dropped Firestore channel is the SDK reconnecting, not a failure, from n
   assert.doesNotMatch(notes, /Listen\/channel/);
   assert.match(notes, /invoice\/confirm/);
   assert.equal(applySensor(stored, [], new Date(t0.getTime() + 60_000).toISOString()).sensorEvidence?.length, 1);
+});
+
+test('one sender cannot fake a crowd: the same address with two session ids, or one session from two addresses, is one visitor', () => {
+  const hub = createSensorHub(() => 5);
+  const r = (s: string) => parseSensorBody(body(s, [{ k: 'error', m: 'x is undefined', p: '/' }]));
+  hub.add('p', r('visitor_one'), 'hashA'); hub.add('p', r('visitor_two'), 'hashA');
+  assert.deepEqual(hub.problems('p'), [], 'same address, two sessions');
+  hub.add('q', r('visitor_one'), 'hashA'); hub.add('q', r('visitor_one'), 'hashB');
+  assert.deepEqual(hub.problems('q'), [], 'same session, two addresses');
+  hub.add('p', r('visitor_three'), 'hashB');
+  assert.equal(hub.findings('p')[0].visitors, 2, 'a new session from a new address is a second visitor');
+});
+
+test('a connection-failure burst needs distinct addresses too', () => {
+  const hub = createSensorHub(() => 5);
+  const fail = (s: string) => parseSensorBody(body(s, [{ k: 'request', m: 'فشل الاتصال /api/x', p: '/' }]));
+  for (const s of ['visitor_one', 'visitor_two', 'visitor_three', 'visitor_four']) hub.add('p', fail(s), 'same');
+  assert.deepEqual(hub.problems('p'), []);
+});
+
+test('the address used to tell visitors apart is the left-most X-Forwarded-For entry, else the socket address', () => {
+  assert.equal(sensorClientAddress('203.0.113.7, 35.191.0.1, 169.254.1.1', '10.0.0.1'), '203.0.113.7');
+  assert.equal(sensorClientAddress(' 2001:db8::1 ', undefined), '2001:db8::1');
+  assert.equal(sensorClientAddress(undefined, '10.0.0.1'), '10.0.0.1');
+  assert.equal(sensorClientAddress('', undefined), 'unknown');
+});
+
+test('visitor counts use correct Arabic agreement', () => {
+  assert.deepEqual([1, 2, 3, 10, 11, 25].map(visitorsLabel), ['زائر واحد', 'زائران', '3 زوار', '10 زوار', '11 زائرًا', '25 زائرًا']);
 });
