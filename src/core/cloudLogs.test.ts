@@ -22,6 +22,17 @@ test('the filter asks only for this service errors since a time', () => {
   assert.match(f, /timestamp>="2026-10-22T11:30:00Z"/);
 });
 
+test('a 1st-gen Cloud Function source reads that function\'s errors and has no revisions', async () => {
+  assert.deepEqual(parseLogSources('TEBYAN=tebyan-app-2026/fn:api;x=my-project-1/fn:a"b'), [{ codeName: 'TEBYAN', project: 'tebyan-app-2026', service: 'fn:api' }]);
+  const f = buildLogFilter('fn:api', '2026-10-29T11:30:00Z');
+  assert.match(f, /^resource\.type="cloud_function" AND resource\.labels\.function_name="api" AND severity>=ERROR/);
+  assert.doesNotMatch(f, /cloud_run_revision|fn:/);
+  let called = false;
+  const reader = createCloudLogReader(async () => 'tok', (async () => { called = true; return { status: 200, ok: true, json: async () => ({}) }; }) as unknown as typeof fetch);
+  assert.equal(await reader.servingRevisions({ codeName: 'TEBYAN', project: 'tebyan-app-2026', service: 'fn:api' }), null);
+  assert.equal(called, false, 'no Cloud Run or request-log lookup for a function');
+});
+
 test('entries group by message with digits collapsed, noise dropped, secrets masked', () => {
   const entries = [
     { timestamp: '2026-10-22T11:40:00Z', textPayload: 'Error: timeout after 3021ms calling payments' },
