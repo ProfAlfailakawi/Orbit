@@ -104,3 +104,10 @@ test('the speed of a visit is the home page request itself, however many asset r
   const head: VisitDeps = { wait: async () => {}, get: async (url, opts) => url === base ? { status: 200, bytes: enc(PAGE), contentType: 'text/html', finalUrl: url, ms: 30 } : opts.method === 'HEAD' ? { status: 405, bytes: enc(''), contentType: '', finalUrl: url, ms: 900 } : { status: 200, bytes: enc(''), contentType: url.endsWith('.css') ? 'text/css' : 'text/javascript', finalUrl: url, ms: 900 } };
   assert.equal((await visitSite(base, head)).pageMs, 30);
 });
+
+test('a broken app file whose name is not valid percent-encoding is reported, not thrown (one bad page must not abort the whole watch)', async () => {
+  const page = PAGE.replace('/assets/app.js', '/assets/app%.js');
+  const result = await visitSite(base, fake({ [base]: { body: page }, 'https://app.example/assets/app.css': { type: 'text/css' }, 'https://app.example/assets/app%.js': { status: 404, type: 'text/html' } }));
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.problems, ['ملف التطبيق app%.js لا يُحمَّل (HTTP 404)']);
+});

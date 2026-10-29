@@ -74,7 +74,11 @@ export function pageAssets(html: string, pageUrl: string, limit = 6): Array<{ ur
   return out.slice(0, limit);
 }
 
-const fileName = (url: string) => decodeURIComponent(new URL(url).pathname.split('/').pop() || url).slice(0, 48);
+/** Readable file name; a name that is not valid percent-encoding stays as written (decodeURIComponent would throw and abort the whole watch). */
+const fileName = (url: string) => {
+  const raw = new URL(url).pathname.split('/').pop() || url;
+  try { return decodeURIComponent(raw).slice(0, 48); } catch { return raw.slice(0, 48); }
+};
 const isScript = (type: string) => /javascript|ecmascript|wasm/i.test(type);
 const isStyle = (type: string) => /css/i.test(type);
 

@@ -24,6 +24,7 @@ import { applyServerErrors, createCloudLogReader, LOG_WINDOW_MS, parseLogSources
 import { applyProbe, splitProbe } from './src/core/sensorChannel.ts';
 import { buildWeeklyDigest, logProblems } from './src/core/weeklyReport.ts';
 import { buildRows } from './src/core/fleetStatus.ts';
+import { createCoalescedWriter } from './src/core/persistQueue.ts';
 import { visitSite, type VisitDeps } from './src/core/visitor.ts';
 import { safeGet } from './src/core/safeFetch.ts';
 import { applyVisit, clearSite, pool } from './src/core/watch.ts';
@@ -169,23 +170,32 @@ const sseClients = new Set<express.Response>();
 const sseClientsBySession = new Map<string, number>();
 let githubSyncActive = false;
 
-function saveStateToDisk() {
-  const snapshot = {
+function stateSnapshot() {
+  return {
     platforms, events, incidents, alerts, silentFailures, changeImpacts,
     crossAppPatterns, engineeringMemory, innovations, discoveredCandidates,
     canaryHistory, auditLogs, selfHealth, costGuard,
   };
-  if (stateDocument) {
-    persistenceQueue = persistenceQueue.then(() => stateDocument.set({ ...snapshot, updatedAt: new Date().toISOString() }, { merge: true }))
-      .then(() => { persistenceHealthy = true; })
-      .catch((error: unknown) => {
-        persistenceHealthy = false;
-        console.error('Firestore state persistence failed:', error instanceof Error ? error.message : 'unknown');
-      });
+}
+
+// One full-document write per change let every anonymous sensor beacon cost a Firestore write of the whole state.
+// Changes are now folded into at most one queued write that reads the latest state, at most one per second.
+const stateWriter = stateDocument ? createCoalescedWriter({
+  write: () => stateDocument.set({ ...stateSnapshot(), updatedAt: new Date().toISOString() }, { merge: true }).then(() => undefined),
+  onResult: (ok, error) => {
+    persistenceHealthy = ok;
+    if (!ok) console.error('Firestore state persistence failed:', error instanceof Error ? error.message : 'unknown');
+  },
+  minIntervalMs: 1000,
+}) : null;
+
+function saveStateToDisk() {
+  if (stateWriter) {
+    persistenceQueue = stateWriter.schedule();
     return;
   }
   try {
-    fs.writeFileSync(DATA_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), { encoding: 'utf8', mode: 0o600 });
+    fs.writeFileSync(DATA_SNAPSHOT_PATH, JSON.stringify(stateSnapshot(), null, 2), { encoding: 'utf8', mode: 0o600 });
   } catch {
     // Non-blocking fail-open persistence
   }
@@ -193,6 +203,8 @@ function saveStateToDisk() {
 
 function broadcastRealtimeUpdate(reason: string) {
   saveStateToDisk();
+  // The dashboard polls /api/state; serialising the whole state is only worth it when a stream client listens.
+  if (!sseClients.size) return;
   const payload = JSON.stringify({
     type: 'STATE_UPDATE',
     reason,
