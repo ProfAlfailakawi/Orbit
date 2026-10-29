@@ -29,6 +29,7 @@ function busiestHalfHour(times: number[]): number {
 
 /**
  * ORBIT_LOG_SOURCES lists which Cloud Run service holds each program's logs. Two spellings, both validated:
+ * (a 1st-gen Cloud Function is written `fn:<name>`, e.g. `TEBYAN=my-project/fn:api`)
  * `ORDER=my-project/order-api;ADMIN=my-project/admin-api` (no commas or quotes, so it fits a deploy flag) or a JSON array of {codeName, project, service}.
  * Anything malformed is skipped, never trusted.
  */
@@ -45,14 +46,20 @@ export function parseLogSources(raw: string | undefined): LogSource[] {
   for (const item of items.slice(0, 20)) {
     const r = item as Partial<LogSource> | null;
     if (!r || typeof r.codeName !== 'string' || typeof r.project !== 'string' || typeof r.service !== 'string') continue;
-    if (!/^[A-Za-z][A-Za-z0-9._-]{0,40}$/.test(r.codeName) || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(r.project) || !/^[a-z][a-z0-9-]{0,62}$/.test(r.service)) continue;
+    if (!/^[A-Za-z][A-Za-z0-9._-]{0,40}$/.test(r.codeName) || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(r.project) || !/^(fn:)?[a-z][a-z0-9-]{0,62}$/.test(r.service)) continue;
     out.push({ codeName: r.codeName.toUpperCase(), project: r.project, service: r.service });
   }
   return out;
 }
 
+const FUNCTION = 'fn:';
+const isFunction = (service: string) => service.startsWith(FUNCTION);
+
 export function buildLogFilter(service: string, sinceIso: string): string {
-  return `resource.type="cloud_run_revision" AND resource.labels.service_name="${service}" AND severity>=ERROR AND timestamp>="${sinceIso}"`;
+  const resource = isFunction(service)
+    ? `resource.type="cloud_function" AND resource.labels.function_name="${service.slice(FUNCTION.length)}"`
+    : `resource.type="cloud_run_revision" AND resource.labels.service_name="${service}"`;
+  return `${resource} AND severity>=ERROR AND timestamp>="${sinceIso}"`;
 }
 
 export interface LogEntry {
@@ -182,6 +189,8 @@ export function createCloudLogReader(getToken: () => Promise<string | null | und
       } catch { return { error: 'تعذر الاتصال بخدمة السجلات' }; }
     },
     async servingRevisions(source) {
+      // A Cloud Function has no revisions to tell apart.
+      if (isFunction(source.service)) return null;
       let token: string | null | undefined;
       try { token = await getToken(); } catch { token = null; }
       if (!token) return null;
