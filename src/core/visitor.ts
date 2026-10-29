@@ -14,6 +14,12 @@ type Reply = Awaited<ReturnType<VisitDeps['get']>>;
 const RETRY_PAUSE_MS = 2000;
 /** One visit may spend this many retries in total, so a really broken site is judged quickly. */
 const RETRIES_PER_VISIT = 2;
+/**
+ * A home page slower than this may only be a server starting from zero: Cloud Run stops idle instances, and a daily check
+ * almost always meets a cold one. The page is asked once more and the faster answer is the speed, so a cold start is not
+ * read as a slowdown; a site that is really slow is slow both times.
+ */
+const COLD_START_MS = 1500;
 
 /**
  * A single failed request is often the network, not the site (a slow answer, a dropped connection, an edge node mid-update).
@@ -95,6 +101,12 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   const reachable = status < 500 && status !== 404;
   if (problems.length) return { reachable, ok: false, status, problems, evidence: `الصفحة الرئيسية HTTP ${status}.`, ms: Date.now() - started};
 
+  let pageMs = page.ms;
+  if (status < 400 && page.ms > COLD_START_MS) {
+    const again = await deps.get(url, { maxBytes: 1_500_000, accept: 'text/html,*/*;q=0.5' });
+    if (again && again.status === status) pageMs = Math.min(page.ms, again.ms);
+  }
+
   const html = text(page.bytes);
   if (status < 400) {
     if (!/html/i.test(page.contentType) && !/^\s*<!doctype html|^\s*<html/i.test(html)) problems.push('الصفحة الرئيسية لا تعيد صفحة ويب');
@@ -115,6 +127,6 @@ export async function visitSite(url: string, deps: VisitDeps): Promise<VisitResu
   }
   const evidence = problems.length
     ? problems.join('؛ ')
-    : status >= 400 ? `الصفحة محمية (HTTP ${status}) وتستجيب.` : `الصفحة الرئيسية HTTP ${status} (${page.ms}ms)${checked ? `؛ ${checked} ملفات تطبيق سليمة` : ''}.`;
-  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started, htmlBytes: page.bytes.length, pageMs: page.ms };
+    : status >= 400 ? `الصفحة محمية (HTTP ${status}) وتستجيب.` : `الصفحة الرئيسية HTTP ${status} (${pageMs}ms)${checked ? `؛ ${checked} ملفات تطبيق سليمة` : ''}.`;
+  return { reachable, ok: problems.length === 0, status, problems, evidence, ms: Date.now() - started, htmlBytes: page.bytes.length, pageMs };
 }
