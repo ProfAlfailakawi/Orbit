@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
+import { SERVER_BACK_EVENT } from './core/updatingNotice';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
 import { tokenNotice } from './core/expiry';
@@ -90,13 +91,17 @@ export default function App() {
     };
 
     const onVisible = () => { if (document.visibilityState === 'visible') void checkRelease(); };
+    // The server came back from a deploy: this tab may now be the old build.
+    const onServerBack = () => { void checkRelease(); };
     const interval = window.setInterval(() => { void checkRelease(); }, 120_000);
+    window.addEventListener(SERVER_BACK_EVENT, onServerBack);
     window.addEventListener('pageshow', onVisible);
     document.addEventListener('visibilitychange', onVisible);
     void checkRelease();
     return () => {
       stopped = true;
       window.clearInterval(interval);
+      window.removeEventListener(SERVER_BACK_EVENT, onServerBack);
       window.removeEventListener('pageshow', onVisible);
       document.removeEventListener('visibilitychange', onVisible);
     };

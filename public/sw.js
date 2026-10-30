@@ -1,5 +1,21 @@
-const CACHE_NAME = 'orbit-mission-control-v2';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.svg'];
+const CACHE_NAME = 'orbit-mission-control-v3';
+const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.svg', '/updating.html'];
+
+// «نُحدّث البرنامج» بدل صفحة Google الإنجليزية: أثناء النشر يتبدّل الخادم فتجيب
+// واجهة Google بـ 500/502/503/504 لا يكتبها خادمنا. للتنقّل وحده (لا /api ولا غير
+// GET ولا جواب ناجح) تُقدَّم الصفحة المحفوظة عند التثبيت، والرابط يبقى كما طُلب.
+// لا يُحفظ جواب 5xx في أي ذاكرة هنا.
+const UPDATING_PAGE = '/updating.html';
+const isUpdatingStatus = (status) => status === 500 || status === 502 || status === 503 || status === 504;
+const updatingResponse = async () => {
+  const page = await caches.match(UPDATING_PAGE).catch(() => undefined);
+  if (!page) return null;
+  return new Response(await page.text(), {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Retry-After': '5', 'X-Orbit-Updating': '1' },
+  });
+};
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -18,6 +34,22 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('/api/')) return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then(async (response) => {
+        if (isUpdatingStatus(response.status)) return (await updatingResponse()) || response;
+        return response;
+      }).catch(async (error) => {
+        // A dropped request while the device says it is online is the same deploy moment;
+        // truly offline keeps the cached shell as before.
+        if (self.navigator?.onLine !== false) { const page = await updatingResponse(); if (page) return page; }
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        throw error;
+      })
+    );
+    return;
+  }
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
