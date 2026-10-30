@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { HEALTH_PATH, isPlatformUpdating, nextDelay, UPDATING_MESSAGE } from './updatingNotice.ts';
 
-// «نُحدّث البرنامج» instead of Google's English 5xx page while Cloud Run swaps servers mid-deploy.
+// «أوربت يتلقّى تحديثاً» instead of Google's English 5xx page while Cloud Run swaps servers mid-deploy.
 const read = (file: string) => fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
 const PAGE = read('public/updating.html');
 const ORIGIN = 'https://orbitq8.web.app';
@@ -75,7 +75,7 @@ const deploying = (status: number | 'drop'): Net => async pathname => {
 };
 const isUpdatingPage = async (response: Response | null) =>
   Boolean(response) && response!.status === 503 && response!.headers.get('cache-control') === 'no-store'
-  && /text\/html/.test(response!.headers.get('content-type') || '') && (await response!.clone().text()).includes('نُحدّث البرنامج الآن');
+  && /text\/html/.test(response!.headers.get('content-type') || '') && (await response!.clone().text()).includes('أوربت يتلقّى تحديثاً');
 
 test('a navigation answered 500/502/503/504 gets the updating page (503, no-store)', async () => {
   for (const status of [500, 502, 503, 504]) {
@@ -138,8 +138,8 @@ test('the page is self-contained, RTL, light/dark, and in Orbit\'s own identity'
   assert.match(PAGE, /<html lang="ar" dir="rtl">/);
   assert.match(PAGE, /prefers-color-scheme:dark/);
   assert.match(PAGE, /prefers-reduced-motion/);
-  assert.match(PAGE, /<title>نُحدّث البرنامج · أوربت<\/title>/);
-  for (const text of ['نُحدّث البرنامج الآن ✨', 'لحظاتٍ ونعود', 'أعد المحاولة الآن', 'لا اتصال بالإنترنت الآن']) assert.ok(PAGE.includes(text), text);
+  assert.match(PAGE, /<title>تحديثٌ قيد الإطلاق · أوربت<\/title>/);
+  for (const text of ['أوربت يتلقّى تحديثاً', 'يعود الاتصال وحده فور اكتمال الإطلاق.', 'أعد الاتصال الآن', 'انقطعت الإشارة من جهتك']) assert.ok(PAGE.includes(text), text);
   // The mark is the one in public/icon.svg.
   for (const color of ['#090D16', '#38BDF8', '#F8FAFC', '#10B981', '#F59E0B']) assert.ok(PAGE.includes(color), color);
 });
@@ -179,10 +179,10 @@ test('the page asks /api/version every 3 s, reopens the same URL, and never loop
   const now = Date.now();
   const stuck = runPage({ health: [true], recent: [now - 1000, now - 2000, now - 3000] });
   assert.equal(await stuck.step(), 30000);
-  assert.equal(stuck.nodes.lead.textContent, 'يستغرق ذلك وقتاً أطول من المعتاد');
+  assert.equal(stuck.nodes.lead.textContent, 'الإطلاق أطول من المعتاد هذه المرة.');
 
   const offline = runPage({ health: [true], online: false });
-  assert.equal(offline.nodes.title.textContent, 'لا اتصال بالإنترنت الآن');
+  assert.equal(offline.nodes.title.textContent, 'انقطعت الإشارة من جهتك');
   await offline.step();
   assert.equal(offline.asked.length, 0);
 });
@@ -193,7 +193,7 @@ test('in the app: only a non-JSON 5xx on /api is the platform updating', () => {
   assert.equal(isPlatformUpdating(503, 'application/json; charset=utf-8'), false);
   assert.equal(isPlatformUpdating(401, 'text/html'), false);
   assert.equal(isPlatformUpdating(404, 'text/html'), false);
-  assert.equal(UPDATING_MESSAGE, 'نُحدّث البرنامج الآن ✨ لحظاتٍ ونعود.');
+  assert.equal(UPDATING_MESSAGE, 'أوربت يتلقّى تحديثاً، ويعود الاتصال وحده بعد قليل.');
   assert.deepEqual([1, 5, 6, 20].map(nextDelay), [3000, 3000, 3900, 15000]);
   const api = read('src/core/api.ts');
   assert.match(api, /isPlatformUpdating\(response\.status, response\.headers\.get\('content-type'\)\)/);
