@@ -46,19 +46,26 @@ export type AlertSeverity =
   | 'Low'
   | 'Informational';
 
-export type IncidentStatus =
-  | 'Detected'
-  | 'Triaged'
-  | 'Investigating'
-  | 'Action Proposed'
-  | 'Fix In Progress'
-  | 'Verification'
-  | 'Resolved'
-  | 'Reopened'
-  | 'False Positive'
-  | 'Expected Behavior'
-  | 'Monitoring Gap'
-  | "Won't Fix";
+export const INCIDENT_STATUSES = [
+  'Detected',
+  'Triaged',
+  'Investigating',
+  'Action Proposed',
+  'Fix In Progress',
+  'Verification',
+  'Resolved',
+  'Reopened',
+  'False Positive',
+  'Expected Behavior',
+  'Monitoring Gap',
+  "Won't Fix",
+] as const;
+
+export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
+
+export function isIncidentStatus(value: unknown): value is IncidentStatus {
+  return typeof value === 'string' && (INCIDENT_STATUSES as readonly string[]).includes(value);
+}
 
 export type ObservabilityEye =
   | 'Eye 1: Client Experience'

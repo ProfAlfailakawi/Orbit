@@ -62,9 +62,9 @@ import {
   INITIAL_SELF_HEALTH,
   INITIAL_SILENT_FAILURES,
 } from './src/core/seedData.ts';
+import { isIncidentStatus } from './src/core/types.ts';
 import type {
   CanaryTestResult,
-  IncidentStatus,
   PlatformLifecycleState,
   PlatformRecord,
   SelfHealthMetrics,
@@ -1243,20 +1243,19 @@ async function startServer() {
     const rejection = await schedulerRejection(req);
     if (rejection) return res.status(rejection.status).json({ error: rejection.error });
     const lease = await claimGithubSyncLease(false);
-    const acquired = lease;
-    if (!acquired.acquired) return res.status(202).json({ skipped: acquired.reason, ...('nextDueAt' in acquired ? { nextDueAt: acquired.nextDueAt } : {}) });
+    if (!lease.acquired) return res.status(202).json({ skipped: lease.reason, ...('nextDueAt' in lease ? { nextDueAt: lease.nextDueAt } : {}) });
     try {
       const result = await syncGithubFleet();
       await persistenceQueue;
       const healthy = result.syncedResults.length > 0 && result.syncedResults.every(item => item.integrity === 'Live');
       if (!persistenceHealthy) throw new Error('Firestore state persistence failed');
       if (!healthy) throw new Error('One or more monitored repositories are unavailable');
-      await releaseGithubSyncLease({ successful: true });
+      await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}), successful: true });
       await notifyChanges();
       return res.json({ completedAt: new Date().toISOString(), ...result });
     } catch (error) {
       appendAudit('Cloud Scheduler', 'GITHUB_SYNC_FAILED', 'Fleet', error instanceof Error ? error.message.slice(0, 300) : 'unknown error');
-      await releaseGithubSyncLease({});
+      await releaseGithubSyncLease({ ...(lease.local ? { local: true } : {}) });
       return res.status(503).json({ error: 'Scheduled GitHub check failed' });
     }
   }));
@@ -1386,11 +1385,14 @@ async function startServer() {
     costGuard.ingestedEventsCount += 2;
     costGuard.deduplicatedSavedEvents += 1;
 
+    const failedCanarySteps = result.canaryResult.steps.filter((step) => !step.passed).map((step) => step.step);
     appendAudit(
       'Synthetic Canary Runner',
-      'CANARY_VERIFICATION_PASS',
+      result.canaryResult.overallPassed ? 'CANARY_VERIFICATION_PASS' : 'CANARY_VERIFICATION_FAIL',
       result.canaryResult.runId,
-      `اجتاز اختبار الكناري جميع المراحل الـ 6 بنجاح (${result.canaryResult.generatedEventId}).`
+      result.canaryResult.overallPassed
+        ? `اجتاز اختبار الكناري جميع المراحل الـ 6 بنجاح (${result.canaryResult.generatedEventId}).`
+        : `فشل اختبار الكناري في: ${failedCanarySteps.join('، ')} (${result.canaryResult.generatedEventId}).`
     );
 
     res.json({
@@ -1415,9 +1417,14 @@ async function startServer() {
       return;
     }
 
+    if (!isIncidentStatus(nextStatus)) {
+      res.status(400).json({ error: 'حالة الحادثة المطلوبة غير معروفة.' });
+      return;
+    }
+
     const updated = transitionIncidentStatus(
       incidents[idx],
-      nextStatus as IncidentStatus,
+      nextStatus,
       'ProfAlfailakawi',
       note || `تحديث الحالة إلى ${nextStatus}`,
       Boolean(technicalVerificationPassed)
