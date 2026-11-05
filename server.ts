@@ -669,7 +669,7 @@ async function startServer() {
   const sensorOrigins = () => new Map(platforms.map(p => [originOf(siteService.url(p)), p.id] as const).filter(([o]) => o !== null) as Array<[string, string]>);
   app.options('/api/public-sensor', (req, res) => {
     const origin = req.get('origin') || '';
-    if (sensorOrigins().has(origin)) { res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', Vary: 'Origin' }); }
+    if (sensorOrigins().has(origin)) { res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' }); }
     res.status(204).end();
   });
   app.post('/api/public-sensor', express.text({ type: '*/*', limit: '17kb' }), (req, res) => {
@@ -677,7 +677,7 @@ async function startServer() {
     const programId = sensorOrigins().get(origin);
     // Unknown origins and rate-limited callers get the same quiet answer: nothing to learn from probing.
     if (!programId || !sensorHub.allow(`ip:${req.ip}`, 20, 60_000) || !sensorHub.allow(`app:${programId}`, 300, 60_000)) return res.status(204).end();
-    res.set({ 'Access-Control-Allow-Origin': origin, Vary: 'Origin' });
+    res.set({ 'Access-Control-Allow-Origin': origin, 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' });
     const { probe, rest: reports } = splitProbe(parseSensorBody(req.body));
     if (probe) { // the robot's daily self-test: proof the channel works, never a finding
       const at = new Date().toISOString();
