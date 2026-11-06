@@ -30,6 +30,7 @@ import { safeGet } from './src/core/safeFetch.ts';
 import { applyVisit, clearSite, pool } from './src/core/watch.ts';
 import { buildPrivacySafeTimeline, buildSharedDependencyAdvisory, evaluateTruthEvidence, getProgramProblems, getProgramWarnings } from './src/core/guardian.ts';
 import { GoogleGenAI } from '@google/genai';
+import { createDemoGate } from './src/server/demoSandbox.ts';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
@@ -390,6 +391,11 @@ async function startServer() {
   if (Number.isSafeInteger(configuredProxyHops) && configuredProxyHops > 0) {
     app.set('trust proxy', configuredProxyHops);
   }
+
+  // Isolated visitor demo (Google Play reviewers). Mounted before every other /api route: a request carrying
+  // a valid x-orbit-demo id is answered from synthetic fixtures inside the gate and never reaches real handlers.
+  // Kill switch: ORBIT_DEMO_ENABLED=0. See src/server/demoSandbox.ts.
+  app.use('/api', createDemoGate().gate);
 
   // Independent liveness only: no app health information, secrets or authenticated data.
   app.get('/healthz', (_req, res) => {
