@@ -421,6 +421,7 @@ export default function App() {
       {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
       {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
       <Dashboard
+        isDemo={isDemo}
         rows={rows}
         logos={logos}
         summary={summary}

@@ -9,6 +9,7 @@ export type Logos = Record<string, { src: string }>;
 export interface Explanation { mode: 'rules' | 'gemini'; urgency: string; meaning: string; action: string; text?: string }
 
 interface DashboardProps {
+  isDemo?: boolean;
   rows: ProgramRow[];
   logos: Logos;
   summary: Summary;
@@ -168,7 +169,7 @@ function Roster({ rows, logos, selectedId, onPick }: { rows: ProgramRow[]; logos
   );
 }
 
-export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd, onRemove, onExplain }: DashboardProps) {
+export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tokenMissing, onAdd, onRemove, onExplain }: DashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [manualText, setManualText] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -341,9 +342,9 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
       ) : (
         <div className="row-center">
           <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
-          <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
-            {weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
-          </button>
+          {!isDemo && <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
+              {weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
+            </button>}
         </div>
       )}
 
