@@ -11,7 +11,7 @@ import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEve
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
 import { tokenNotice } from './core/expiry';
 import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
-import { Mark } from './components/Mark';
+import { LoginArt, Mark } from './components/Mark';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
@@ -369,8 +369,21 @@ export default function App() {
   if (isLocked) {
     return (
       <div className="login-wrap" dir="rtl">
+        <div className="login-stage">
+        <aside className="login-aside" aria-label="عن أوربت">
+          <LoginArt />
+          <div className="login-copy">
+            <h2>كل برامجك في مدار واحد</h2>
+            <p>يراقب مواقعك ومستودعاتك ويقول لك بالضبط ما الذي يحتاج انتباهك.</p>
+            <ul className="login-points">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7.8 12.4 2.8 2.8 5.6-6" /></svg>يفحص برامجك باستمرار</li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v6.2" /><circle cx="12" cy="16.9" r=".6" /></svg>ينبّهك عند أي مشكلة</li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9h8M8 13h5" /></svg>يجهّز لك نصّها لتلصقه في كلود</li>
+            </ul>
+          </div>
+        </aside>
         <form className="card login" onSubmit={handleLogin}>
-          <div className="login-brand"><Mark size={44} /><h1>أوربت</h1></div>
+          <div className="login-brand"><Mark size={44} /><div><h1>أوربت</h1><p className="login-sub">مراقب برامجك</p></div></div>
           <label htmlFor="orbit-passkey-input">رمز الدخول</label>
           <input id="orbit-passkey-input" type="password" autoComplete="current-password" value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
@@ -381,6 +394,7 @@ export default function App() {
             </button>
           )}
         </form>
+        </div>
       </div>
     );
   }
@@ -401,7 +415,7 @@ export default function App() {
           <button type="button" className="btn" onClick={handleLogout}>خروج</button>
         </div>
       </header>
-      {isDemo && <p className="banner banner-warn" role="status"><strong>وضع تجريبي</strong> — بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}
+      {isDemo && <p className="banner banner-warn banner-demo" role="status"><strong>وضع تجريبي</strong> بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}
       {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
       {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
       {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
