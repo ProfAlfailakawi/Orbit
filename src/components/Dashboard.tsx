@@ -238,6 +238,14 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
           <h1>{summary.headline}</h1>
           {summary.reason && <p className="reason">{'السبب: ' + summary.reason}</p>}
           <p className="hero-muted" aria-live="polite"><span className="pulse" aria-hidden="true" />{lastCheckLabel(platforms)}</p>
+          {rows.length > 0 && (
+            <ul className="tally" aria-label="ملخص الحالة">
+              {([['ok', 'تعمل'], ['bad', 'مشاكل'], ['warn', 'تنبيهات'], ['local', 'محلية']] as const).map(([tone, label]) => {
+                const n = rows.filter(r => r.tone === tone).length;
+                return n > 0 ? <li key={tone} className={'tally-' + tone}><b>{n}</b><span>{label}</span></li> : null;
+              })}
+            </ul>
+          )}
           {summary.buttonLabel && (
             <button type="button" className={'btn btn-primary' + (copied === 'all' ? ' is-copied' : summary.tone === 'bad' ? ' btn-attn' : '')} onClick={() => void copy('all')}>
               {copied === 'all' ? 'نُسخ — الصقه في كلود' : summary.buttonLabel}

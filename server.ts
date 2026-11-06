@@ -675,6 +675,7 @@ async function startServer() {
   const sensorOrigins = () => new Map(platforms.map(p => [originOf(siteService.url(p)), p.id] as const).filter(([o]) => o !== null) as Array<[string, string]>);
   app.options('/api/public-sensor', (req, res) => {
     const origin = req.get('origin') || '';
+    res.set({ 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' });
     if (sensorOrigins().has(origin)) { res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' }); }
     res.status(204).end();
   });
@@ -682,6 +683,9 @@ async function startServer() {
     const origin = req.get('origin') || '';
     const programId = sensorOrigins().get(origin);
     // Unknown origins and rate-limited callers get the same quiet answer: nothing to learn from probing.
+    // The quiet 204 carries Cross-Origin-Resource-Policy too: without it a browser logs "blocked by CORP" in the console of the
+    // program that sent the beacon, even though the answer is deliberately empty. No CORS grant is given to unknown origins.
+    res.set({ 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' });
     if (!programId || !sensorHub.allow(`ip:${req.ip}`, 20, 60_000) || !sensorHub.allow(`app:${programId}`, 300, 60_000)) return res.status(204).end();
     res.set({ 'Access-Control-Allow-Origin': origin, 'Cross-Origin-Resource-Policy': 'cross-origin', Vary: 'Origin' });
     const { probe, rest: reports } = splitProbe(parseSensorBody(req.body));

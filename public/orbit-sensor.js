@@ -3,6 +3,9 @@
 (function () {
   try {
     var ENDPOINT = 'https://orbitq8.web.app/api/public-sensor';
+    // Local development pages (localhost, 127.0.0.1, *.localhost, file:) are not programs ORBIT watches: stay silent there, so no
+    // blocked or refused request ever shows up in a developer's console.
+    if (/^(localhost|127\.0\.0\.1|\[::1\]|.*\.localhost)$/i.test(location.hostname) || location.protocol === 'file:') return;
     var sent = 0, MAX = 8, queue = [], timer = 0, seen = {}, trail = [];
     var session = (function () {
       try { var k = 'orbit-s', v = sessionStorage.getItem(k); if (!v) { v = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); sessionStorage.setItem(k, v); } return v; }
