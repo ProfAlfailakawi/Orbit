@@ -357,3 +357,7 @@ button, a, input, .sat { touch-action: manipulation; }
 /* A more opaque glass bar: content scrolling underneath no longer ghosts through the logo. */
 :root { --glass: rgba(255, 255, 255, .93); }
 @media (prefers-color-scheme: dark) { :root { --glass: rgba(19, 26, 51, .93); } }
+
+/* ═══ Beauty pass 3: the bar is solid enough that nothing ghosts through it ═══ */
+:root { --glass: rgba(255, 255, 255, .985); }
+@media (prefers-color-scheme: dark) { :root { --glass: rgba(19, 26, 51, .985); } }
