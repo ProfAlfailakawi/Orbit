@@ -1,3 +1,4 @@
+import { forgetDemoId, ORBIT_DEMO_HEADER, readDemoId } from './demoTransport';
 import { HEALTH_PATH, isPlatformUpdating, showUpdatingNotice, UPDATING_MESSAGE } from './updatingNotice';
 
 const ORBIT_SESSION_KEY = 'orbit.operator.session';
@@ -5,6 +6,8 @@ const ORBIT_SESSION_KEY = 'orbit.operator.session';
 export function setOrbitSessionToken(token: string) {
   if (typeof window !== 'undefined' && token) window.sessionStorage.setItem(ORBIT_SESSION_KEY, token);
 }
+
+export { forgetDemoId };
 
 export function clearOrbitSessionToken() {
   if (typeof window !== 'undefined') window.sessionStorage.removeItem(ORBIT_SESSION_KEY);
@@ -14,8 +17,15 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
   const isApiRequest = typeof input === 'string' ? input.startsWith('/api/') : new URL(input instanceof Request ? input.url : input.toString(), window.location.href).pathname.startsWith('/api/');
   if (isApiRequest && typeof window !== 'undefined') {
-    const token = window.sessionStorage.getItem(ORBIT_SESSION_KEY);
-    if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    const demoId = readDemoId();
+    if (demoId) {
+      // Demo tab: only the sandbox id travels; the operator token is never attached.
+      headers.delete('Authorization');
+      headers.set(ORBIT_DEMO_HEADER, demoId);
+    } else {
+      const token = window.sessionStorage.getItem(ORBIT_SESSION_KEY);
+      if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    }
   }
   const response = await fetch(input, { ...init, headers, credentials: init.credentials || 'same-origin' });
   // Our /api routes answer JSON. A 5xx page in HTML is the platform swapping

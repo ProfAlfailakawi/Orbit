@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
+import { forgetDemoId, readDemoId, rememberDemoId } from './core/demoTransport';
 import { SERVER_BACK_EVENT } from './core/updatingNotice';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
@@ -39,6 +40,8 @@ export default function App() {
   const [syncBanner, setSyncBanner] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [logos, setLogos] = useState<Logos>({});
+  const [isDemo, setIsDemo] = useState(() => Boolean(readDemoId()));
+  const [demoAvailable, setDemoAvailable] = useState(false);
   const [pushState, setPushState] = useState<PushState>('unsupported');
   const autoSyncedRef = useRef(false);
   const logosAskedRef = useRef(false);
@@ -227,9 +230,29 @@ export default function App() {
   useEffect(() => {
     apiFetch('/api/auth/session').then(r => r.json()).then(data => {
       if (data.authenticated) setIsLocked(false);
-      else clearOrbitSessionToken();
+      else {
+        clearOrbitSessionToken();
+        if (readDemoId()) { forgetDemoId(); setIsDemo(false); } // demo expired or switched off
+      }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (readDemoId()) return;
+    fetch('/api/demo/config', { cache: 'no-store' }).then(r => r.json()).then(d => setDemoAvailable(d?.enabled === true)).catch(() => {});
+  }, []);
+
+  const handleDemoEnter = async () => {
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/demo/enter', { method: 'POST', headers: { Accept: 'application/json' } });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || !rememberDemoId(data.sessionId)) { setAuthError(data?.error || 'تعذر فتح العرض التجريبي الآن.'); return; }
+      clearOrbitSessionToken();
+      setIsDemo(true);
+      setIsLocked(false);
+    } catch { setAuthError('تعذر الاتصال بالخادم.'); }
+  };
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -273,6 +296,8 @@ export default function App() {
   const handleLogout = () => {
     void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => {
       clearOrbitSessionToken();
+      forgetDemoId();
+      setIsDemo(false);
       autoSyncedRef.current = false;
       logosAskedRef.current = false;
       setLogos({});
@@ -350,6 +375,11 @@ export default function App() {
           <input id="orbit-passkey-input" type="password" autoComplete="current-password" value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
           <button type="submit" className="btn btn-primary">دخول</button>
+          {demoAvailable && (
+            <button type="button" className="btn" onClick={() => void handleDemoEnter()}>
+              تجربة بدون حساب (بيانات وهمية)
+            </button>
+          )}
         </form>
       </div>
     );
@@ -363,7 +393,7 @@ export default function App() {
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
             {isSyncing ? 'جارٍ الفحص…' : 'تحديث'}
           </button>
-          {pushState !== 'unsupported' && (
+          {!isDemo && pushState !== 'unsupported' && (
             <button type="button" className={'btn' + (pushState === 'on' ? ' is-on' : '')} onClick={() => void handlePush()} aria-pressed={pushState === 'on'}>
               {pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}
             </button>
@@ -371,6 +401,7 @@ export default function App() {
           <button type="button" className="btn" onClick={handleLogout}>خروج</button>
         </div>
       </header>
+      {isDemo && <p className="banner banner-warn" role="status"><strong>وضع تجريبي</strong> — بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}
       {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
       {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
       {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
