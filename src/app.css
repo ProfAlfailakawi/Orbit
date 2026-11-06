@@ -208,7 +208,7 @@ button, a, input, .sat { touch-action: manipulation; }
 .tally { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
 .tally li { --c: var(--hero-ok); display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 14px; border-radius: 999px; background: rgba(255, 255, 255, .07); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); color: var(--hero-ink); font-size: .85rem; font-weight: 600; }
 .tally b { color: var(--c); font-family: 'Orbit Display', 'Orbit Sans', sans-serif; font-size: 1.15rem; line-height: 1; }
-.tally-bad { --c: var(--hero-bad); } .tally-warn { --c: var(--hero-warn); } .tally-local { --c: var(--hero-local); }
+.tally .tally-bad { --c: var(--hero-bad); } .tally .tally-warn { --c: var(--hero-warn); } .tally .tally-local { --c: var(--hero-local); }
 
 /* Folded / narrow and short: the orbit yields height so the headline and the copy button are reachable. */
 @media (max-width: 599px) {
