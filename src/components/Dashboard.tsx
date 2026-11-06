@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PlatformRecord } from '../core/types';
+import { Mark } from './Mark';
 import { apiFetch } from '../core/api';
 import { displayName } from '../core/displayName';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
@@ -56,7 +57,7 @@ function Avatar({ platform, src }: { platform: PlatformRecord; src?: string }) {
     return <span className="avatar"><img src={src} alt="" draggable={false} onError={() => setFailed(true)} /></span>;
   }
   const hue = hash(platform.codeName) % 360;
-  const letter = ([...shortName(platform)].find(ch => /[\p{L}\p{N}]/u.test(ch)) || '•').toUpperCase();
+  const letter = ([...shortName(platform).replace(/^DEMO[-_ ]/i, '')].find(ch => /[\p{L}\p{N}]/u.test(ch)) || '•').toUpperCase();
   return (
     <span className="avatar avatar-mono" style={{ background: `linear-gradient(135deg, hsl(${hue} 62% 36%), hsl(${(hue + 42) % 360} 62% 24%))` }}>{letter}</span>
   );
@@ -133,6 +134,37 @@ function Orbit({ rows, logos, working, total, selectedId, onSelect }: {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Every program as a card: the orbit is the picture, this is the list, so the wide canvas is never empty and each state can be read at a glance. */
+function Roster({ rows, logos, selectedId, onPick }: { rows: ProgramRow[]; logos: Logos; selectedId: string | null; onPick: (id: string) => void }) {
+  return (
+    <section className="roster" aria-labelledby="roster-title">
+      <div className="roster-head">
+        <h2 id="roster-title">برامجك</h2>
+        <span className="roster-count">{rows.length}</span>
+      </div>
+      <ul className="roster-grid">
+        {rows.map((row, k) => {
+          const p = row.platform;
+          return (
+            <li key={p.id} style={{ '--k': k } as React.CSSProperties}>
+              <button type="button" className={'rs rs-' + row.tone + (selectedId === p.id ? ' is-selected' : '')} aria-pressed={selectedId === p.id} onClick={() => onPick(p.id)}>
+                <span className="rs-badge" aria-hidden="true">
+                  <Avatar platform={p} src={logos[p.id]?.src} />
+                  <span className="rs-flag"><Glyph tone={row.tone} size={11} /></span>
+                </span>
+                <span className="rs-info">
+                  <strong dir="ltr">{shortName(p)}</strong>
+                  <span>{row.text}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -256,6 +288,13 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
         <Orbit rows={rows} logos={logos} working={working} total={verifiable.length} selectedId={selectedId} onSelect={setSelectedId} />
       </section>
 
+      {rows.length > 0 && (
+        <Roster rows={rows} logos={logos} selectedId={selectedId} onPick={id => {
+          setSelectedId(selectedId === id ? null : id);
+          if (selectedId !== id) document.querySelector('.hero')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+        }} />
+      )}
+
       {manualText !== null && (
         <section className="manual" role="status">
           <p>تعذر النسخ تلقائيًا. حدّد النص التالي وانسخه:</p>
@@ -300,7 +339,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
         </div>
       )}
 
-      <footer className="foot">أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</footer>
+      <footer className="foot"><Mark size={18} /><span>أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</span></footer>
     </main>
   );
 }
