@@ -347,3 +347,12 @@ button, a, input, .sat { touch-action: manipulation; }
 .add-ico { flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-size: 1.4rem; color: var(--btn-ink); background: linear-gradient(135deg, var(--btn), var(--btn2)); box-shadow: 0 8px 18px -8px var(--btn); }
 .add input:focus { border-color: var(--btn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--btn) 22%, transparent); outline: none; }
 .manual textarea { font-size: .9rem; }
+.roster-grid li { display: flex; } .roster-grid li > .rs { height: 100%; }
+/* The close button floats in the corner so the name gets the width. */
+.detail { position: relative; grid-template-columns: auto minmax(0, 1fr); }
+.detail .detail-close { position: absolute; inset-block-start: 2px; inset-inline-end: 2px; grid-column: auto; grid-row: auto; width: 40px; height: 40px; }
+.detail-info strong { padding-inline-end: 34px; }
+.detail-actions { grid-column: 1 / -1; }
+/* A more opaque glass bar: content scrolling underneath no longer ghosts through the logo. */
+:root { --glass: rgba(255, 255, 255, .93); }
+@media (prefers-color-scheme: dark) { :root { --glass: rgba(19, 26, 51, .93); } }
