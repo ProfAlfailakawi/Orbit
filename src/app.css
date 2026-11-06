@@ -272,6 +272,8 @@ button, a, input, .sat { touch-action: manipulation; }
 /* Even rows: a lone last card spans the row, and a last pair splits it, so no row ends ragged. */
 @media (min-width: 600px) {
   .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 600px) and (max-width: 899px) {
   .roster-grid li:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 @media (min-width: 900px) {
