@@ -180,6 +180,13 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
   const [removing, setRemoving] = useState<string | null>(null);
   const [explained, setExplained] = useState<{ id: string; state: 'loading' | 'failed' | Explanation } | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const addRef = useRef<HTMLFormElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!addOpen) return;
+    addRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    nameRef.current?.focus({ preventScroll: true });
+  }, [addOpen]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async (scope: 'all' | string) => {
@@ -291,7 +298,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
       {rows.length > 0 && (
         <Roster rows={rows} logos={logos} selectedId={selectedId} onPick={id => {
           setSelectedId(selectedId === id ? null : id);
-          if (selectedId !== id) document.querySelector('.hero')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+          if (selectedId !== id) document.querySelector('.hero')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
         }} />
       )}
 
@@ -304,9 +311,10 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
       )}
 
       {addOpen ? (
-        <form className="card add" onSubmit={submit} aria-label="إضافة برنامج جديد">
+        <form className="card add" ref={addRef} onSubmit={submit} aria-label="إضافة برنامج جديد">
+          <div className="add-head"><span className="add-ico" aria-hidden="true">＋</span><div><h2>إضافة برنامج</h2><p className="muted">اسم ورابط واحد يكفيان، وأوربت يبدأ المراقبة.</p></div></div>
           <label>اسم البرنامج
-            <input type="text" value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
+            <input type="text" ref={nameRef} value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
           </label>
           <label>رابط GitHub أو الموقع
             <input type="url" value={link} required dir="ltr" onChange={event => setLink(event.target.value)} placeholder="https://github.com/owner/project"/>
@@ -333,7 +341,7 @@ export function Dashboard({ rows, logos, summary, platforms, tokenMissing, onAdd
       ) : (
         <div className="row-center">
           <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
-          <button type="button" className="btn btn-add" disabled={weekly === 'loading'} onClick={() => void copyWeekly()}>
+          <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
             {weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
           </button>
         </div>
