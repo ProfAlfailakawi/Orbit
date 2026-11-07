@@ -361,3 +361,20 @@ button, a, input, .sat { touch-action: manipulation; }
 /* ═══ Beauty pass 3: the bar is solid enough that nothing ghosts through it ═══ */
 :root { --glass: rgba(255, 255, 255, .985); }
 @media (prefers-color-scheme: dark) { :root { --glass: rgba(19, 26, 51, .985); } }
+
+/* ═══ Beauty pass 4 ═══ */
+/* Solid bar: nothing scrolling underneath shows through. */
+.bar { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Detail card: the name sits beside the badge and the status line takes the full row, so narrow splits (600-760) no longer squeeze the name into an ellipsis. */
+.detail { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "badge name close" "text text text" "acts acts acts"; row-gap: 8px; }
+.detail-badge { grid-area: badge; }
+.detail-info { display: contents; }
+.detail-info strong { grid-area: name; padding-inline-end: 0; align-self: center; }
+.detail-info span { grid-area: text; }
+.detail .detail-close { grid-area: close; }
+.detail .detail-actions { grid-area: acts; }
+/* Dark theme: a deeper space, so the hero separates from the page instead of looking frosted grey. */
+@media (prefers-color-scheme: dark) {
+  .hero { background: radial-gradient(ellipse 60% 50% at 50% 34%, rgba(71, 155, 147, .2), transparent 70%), linear-gradient(124deg, #0b1d33 0%, #0b1428 53%, #070d1d 100%); }
+}
+@media (max-width: 760px) { .detail-info strong { font-size: .92rem; } }
