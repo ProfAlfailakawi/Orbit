@@ -420,3 +420,15 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
 /* Add form: the main action takes the row, close stays a compact pill. */
 .add .actions .btn-primary { flex: 1 1 auto; }
 .add .actions .btn:not(.btn-primary) { flex: 0 0 auto; padding-inline: 22px; }
+
+/* ═══ Responsive polish (2026-11) ═══ */
+/* The iOS shell draws under the status bar (contentInset: never), so the bar and the sign-in stage clear the notch / Dynamic Island. */
+.bar { padding-top: max(10px, env(safe-area-inset-top)); }
+@media (max-height: 480px) and (min-width: 560px) { .bar { padding-top: max(4px, env(safe-area-inset-top)); } }
+.login-wrap { padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+@media (max-height: 520px) { .login-wrap { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); } }
+/* The detail card's Latin name (dir=ltr) sits beside its badge at the reading start, like the roster since beauty pass 5. */
+.detail-info strong { text-align: right; }
+/* The core count scales with the orbit, so on 320-375px phones it stays inside its disc and clear of the satellites. */
+.orbit-core b { font-size: min(2.9rem, 12.5cqw); }
+.orbit-core i { letter-spacing: min(2.4px, .6cqw); }
