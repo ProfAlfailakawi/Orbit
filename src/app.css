@@ -395,7 +395,7 @@ button, a, input, .sat { touch-action: manipulation; }
 .btn-add.is-copied .ico, .btn-add.is-failed .ico { color: inherit; }
 .add-ico .ico { stroke-width: 2.4; }
 .btn-demo .ico { color: var(--btn); fill: currentColor; stroke-width: 1.4; }
-.login-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.login .login-label { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 600; }
 .login-label .ico { color: var(--btn); }
 .hero-hint { gap: 8px; }
 .hero-hint .ico { color: var(--hero-accent); opacity: .9; }
@@ -417,3 +417,6 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
 .tally b, .orbit-core b, .roster-count { font-variant-numeric: tabular-nums; }
 .tally li { align-items: center; }
 .tally li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c); flex: 0 0 auto; }
+/* Add form: the main action takes the row, close stays a compact pill. */
+.add .actions .btn-primary { flex: 1 1 auto; }
+.add .actions .btn:not(.btn-primary) { flex: 0 0 auto; padding-inline: 22px; }
