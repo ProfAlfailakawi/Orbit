@@ -1,0 +1,28 @@
+{
+  "appId": "com.dralfailakawi.orbit",
+  "appName": "Orbit",
+  "webDir": "www",
+  "server": {
+    "url": "https://orbitq8.web.app",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "orbitq8.web.app",
+      "*.googleapis.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#161C24",
+    "scheme": "Orbit",
+    "limitsNavigationsToAppBoundDomains": false,
+    "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#161C24",
+      "showSpinner": false
+    }
+  }
+}
