@@ -1,0 +1,19 @@
+{
+  "repo": "Orbit",
+  "appId": "com.dralfailakawi.orbit",
+  "nameAr": "أوربت",
+  "nameEn": "Orbit",
+  "displayName": "Orbit",
+  "url": "https://orbitq8.web.app",
+  "allowNavigation": [
+    "*.googleapis.com"
+  ],
+  "icon": "public/pwa-512x512.png",
+  "background": "#161C24",
+  "backgroundDark": "#161C24",
+  "accent": "#4F9DFF",
+  "lsCategory": "public.app-category.developer-tools",
+  "devRegion": "en",
+  "version": "1.0.0",
+  "build": 1
+}
