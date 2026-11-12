@@ -378,3 +378,45 @@ button, a, input, .sat { touch-action: manipulation; }
   .hero { background: radial-gradient(ellipse 60% 50% at 50% 34%, rgba(71, 155, 147, .2), transparent 70%), linear-gradient(124deg, #0b1d33 0%, #0b1428 53%, #070d1d 100%); }
 }
 @media (max-width: 760px) { .detail-info strong { font-size: .92rem; } }
+
+/* ═══ Beauty pass 5: icons beside short labels, calmer Arabic type, tidy roster ═══ */
+/* Icons: one line weight everywhere, sitting on the label's optical centre. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.ico { flex: 0 0 auto; display: block; }
+[dir=rtl] .ico-logout { transform: scaleX(-1); }
+.btn[aria-busy=true] .ico-refresh { animation: spin 1s linear infinite; }
+.bar-actions .btn { gap: 6px; }
+.bar-actions .ico { opacity: .85; }
+@media (max-width: 360px) { .bar-actions .ico { display: none; } }
+.btn-copy .ico, .btn-explain .ico { opacity: .9; }
+.btn-explain .ico { color: var(--hero-accent); }
+.detail-close { display: grid; place-items: center; }
+.btn-add .ico { color: var(--btn); }
+.btn-add.is-copied .ico, .btn-add.is-failed .ico { color: inherit; }
+.add-ico .ico { stroke-width: 2.4; }
+.btn-demo .ico { color: var(--btn); fill: currentColor; stroke-width: 1.4; }
+.login .login-label { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 600; }
+.login-label .ico { color: var(--btn); }
+.hero-hint { gap: 8px; }
+.hero-hint .ico { color: var(--hero-accent); opacity: .9; }
+
+/* Arabic is never tracked: letter-spacing stays on Latin only (ORBIT ONE, program codes). */
+h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
+/* Headlines break into balanced lines instead of leaving one word alone. */
+.hero h1, .login-copy h2, .hero-hint, .add-head h2 { text-wrap: balance; }
+.hero .reason, .rs-info span, .detail-info span, .banner, .explain p { text-wrap: pretty; }
+
+/* Roster: the program code sits at the reading start like the Arabic line under it,
+   and a long error stays two lines (the full text opens in the detail card). */
+.rs-info strong { align-self: flex-start; max-width: 100%; unicode-bidi: isolate; }
+.rs-info span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
+.rs { align-items: center; }
+.rs:focus-visible { outline-offset: 2px; }
+
+/* Tally numbers line up, and each chip leads with a small dot in its state colour. */
+.tally b, .orbit-core b, .roster-count { font-variant-numeric: tabular-nums; }
+.tally li { align-items: center; }
+.tally li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c); flex: 0 0 auto; }
+/* Add form: the main action takes the row, close stays a compact pill. */
+.add .actions .btn-primary { flex: 1 1 auto; }
+.add .actions .btn:not(.btn-primary) { flex: 0 0 auto; padding-inline: 22px; }

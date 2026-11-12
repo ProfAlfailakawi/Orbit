@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PlatformRecord } from '../core/types';
-import { Mark } from './Mark';
+import { Icon, Mark } from './Mark';
 import { apiFetch } from '../core/api';
 import { displayName } from '../core/displayName';
 import { buildCopyText, lastCheckLabel, type ProgramRow, type RowTone, type Summary } from '../core/fleetStatus';
@@ -250,16 +250,16 @@ export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tok
               </div>
               {selected.needsCopy && (
                 <span className="detail-actions">
-                  <button type="button" className="btn btn-explain" aria-label={'اشرح مشكلة: ' + shortName(selected.platform)} disabled={explained?.id === selected.platform.id && explained.state === 'loading'} onClick={() => void explain(selected.platform.id)}>اشرح</button>
+                  <button type="button" className="btn btn-explain" aria-label={'اشرح مشكلة: ' + shortName(selected.platform)} disabled={explained?.id === selected.platform.id && explained.state === 'loading'} onClick={() => void explain(selected.platform.id)}><Icon name="spark" size={16} />اشرح</button>
                   <button type="button" className={'btn btn-copy' + (copied === selected.platform.id ? ' is-copied' : '')} aria-label={'انسخ مشكلة: ' + shortName(selected.platform)} onClick={() => void copy(selected.platform.id)}>
-                    {copied === selected.platform.id ? 'نُسخ' : 'انسخ'}
+                    {copied !== selected.platform.id && <Icon name="copy" size={16} />}{copied === selected.platform.id ? 'نُسخ' : 'انسخ'}
                   </button>
                 </span>
               )}
-              <button type="button" className="detail-close" aria-label="إغلاق" onClick={() => setSelectedId(null)}>×</button>
+              <button type="button" className="detail-close" aria-label="إغلاق" onClick={() => setSelectedId(null)}><Icon name="close" size={16} /></button>
             </div>
           ) : (
-            <p className="hero-hint">اضغط أي قمر لترى اسمه ومشكلته</p>
+            <p className="hero-hint"><Icon name="tap" size={18} />اضغط أي قمر لترى اسمه ومشكلته</p>
           )}
           {selected && explained?.id === selected.platform.id && (
             <div className="explain" role="status" aria-live="polite">
@@ -288,7 +288,7 @@ export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tok
           )}
           {summary.buttonLabel && (
             <button type="button" className={'btn btn-primary' + (copied === 'all' ? ' is-copied' : summary.tone === 'bad' ? ' btn-attn' : '')} onClick={() => void copy('all')}>
-              {copied === 'all' ? 'نُسخ — الصقه في كلود' : summary.buttonLabel}
+              {copied !== 'all' && <Icon name="copy" />}{copied === 'all' ? 'نُسخ — الصقه في كلود' : summary.buttonLabel}
             </button>
           )}
           {tokenMissing && <p className="notice">لم يُضبط توكن GitHub على الخادم، لذلك لا تُقرأ المستودعات الخاصة.</p>}
@@ -313,7 +313,7 @@ export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tok
 
       {addOpen ? (
         <form className="card add" ref={addRef} onSubmit={submit} aria-label="إضافة برنامج جديد">
-          <div className="add-head"><span className="add-ico" aria-hidden="true">＋</span><div><h2>إضافة برنامج</h2><p className="muted">اسم ورابط واحد يكفيان، وأوربت يبدأ المراقبة.</p></div></div>
+          <div className="add-head"><span className="add-ico" aria-hidden="true"><Icon name="plus" size={22} /></span><div><h2>إضافة برنامج</h2><p className="muted">اسم ورابط واحد يكفيان، وأوربت يبدأ المراقبة.</p></div></div>
           <label>اسم البرنامج
             <input type="text" ref={nameRef} value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
           </label>
@@ -341,9 +341,9 @@ export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tok
         </form>
       ) : (
         <div className="row-center">
-          <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><span aria-hidden="true">＋</span> إضافة برنامج</button>
+          <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><Icon name="plus" />إضافة برنامج</button>
           {!isDemo && <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
-              {weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
+              {weekly !== 'copied' && <Icon name="calendar" />}{weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
             </button>}
         </div>
       )}

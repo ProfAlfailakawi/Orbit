@@ -11,7 +11,7 @@ import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEve
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
 import { tokenNotice } from './core/expiry';
 import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
-import { LoginArt, Mark } from './components/Mark';
+import { Icon, LoginArt, Mark } from './components/Mark';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
@@ -384,13 +384,13 @@ export default function App() {
         </aside>
         <form className="card login" onSubmit={handleLogin}>
           <div className="login-brand"><Mark size={44} /><div><h1>أوربت</h1><p className="login-sub">مراقب برامجك</p></div></div>
-          <label htmlFor="orbit-passkey-input">رمز الدخول</label>
+          <label htmlFor="orbit-passkey-input" className="login-label"><Icon name="key" size={16} />رمز الدخول</label>
           <input id="orbit-passkey-input" type="password" autoComplete="current-password" value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
           <button type="submit" className="btn btn-primary">دخول</button>
           {demoAvailable && (
-            <button type="button" className="btn" onClick={() => void handleDemoEnter()}>
-              تجربة بدون حساب (بيانات وهمية)
+            <button type="button" className="btn btn-demo" onClick={() => void handleDemoEnter()}>
+              <Icon name="play" size={16} />تجربة بدون حساب (بيانات وهمية)
             </button>
           )}
         </form>
@@ -405,14 +405,14 @@ export default function App() {
         <span className="brand"><Mark />أوربت</span>
         <div className="bar-actions">
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
-            {isSyncing ? 'جارٍ الفحص…' : 'تحديث'}
+            <Icon name="refresh" /><span className="btn-label">{isSyncing ? 'جارٍ الفحص…' : 'تحديث'}</span>
           </button>
           {!isDemo && pushState !== 'unsupported' && (
             <button type="button" className={'btn' + (pushState === 'on' ? ' is-on' : '')} onClick={() => void handlePush()} aria-pressed={pushState === 'on'}>
-              {pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}
+              <Icon name="bell" /><span className="btn-label">{pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}</span>
             </button>
           )}
-          <button type="button" className="btn" onClick={handleLogout}>خروج</button>
+          <button type="button" className="btn" onClick={handleLogout}><Icon name="logout" /><span className="btn-label">خروج</span></button>
         </div>
       </header>
       {isDemo && <p className="banner banner-warn banner-demo" role="status"><strong>وضع تجريبي</strong> بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}

@@ -43,3 +43,26 @@ export function LoginArt() {
     </svg>
   );
 }
+
+export type IconName = 'refresh' | 'bell' | 'logout' | 'copy' | 'spark' | 'plus' | 'calendar' | 'play' | 'tap' | 'check' | 'close' | 'key';
+
+/** Small line icons beside short labels. Decorative only: the label next to each icon stays the accessible name. */
+export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    refresh: <><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8" /><path d="M4 3.5V8h4.5" /><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16" /><path d="M20 20.5V16h-4.5" /></>,
+    bell: <><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 1.5h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></>,
+    logout: <><path d="M10 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H10" /><path d="M14.5 8 18.5 12l-4 4" /><path d="M18.5 12H9" /></>,
+    copy: <><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" /><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" /></>,
+    spark: <><path d="M12 3.5 13.8 9a2 2 0 0 0 1.2 1.2l5.5 1.8-5.5 1.8a2 2 0 0 0-1.2 1.2L12 20.5 10.2 15A2 2 0 0 0 9 13.8L3.5 12 9 10.2A2 2 0 0 0 10.2 9z" /></>,
+    plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
+    calendar: <><rect x="4" y="5.5" width="16" height="14.5" rx="3" /><path d="M8 3.5v4M16 3.5v4M4 10h16" /><path d="M8.5 14h3" /></>,
+    play: <path d="M8 5.5v13l10-6.5z" />,
+    tap: <><path d="M9.5 11.5V5.8a1.6 1.6 0 0 1 3.2 0v5" /><path d="M12.7 10.2a1.6 1.6 0 0 1 3.2 0v1.2a1.6 1.6 0 0 1 3.1.4v3.4a5.5 5.5 0 0 1-5.5 5.3h-1.2a5 5 0 0 1-4.1-2.2l-2.6-3.8a1.6 1.6 0 0 1 2.6-1.8l1.3 1.6" /></>,
+    check: <path d="m5.5 12.5 4.2 4.2 8.8-9.2" />,
+    close: <><path d="M6.5 6.5l11 11" /><path d="M17.5 6.5l-11 11" /></>,
+    key: <><circle cx="8" cy="15" r="4" /><path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5M14 9l2 2" /></>,
+  };
+  return (
+    <svg className={'ico ico-' + name} viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>
+  );
+}
