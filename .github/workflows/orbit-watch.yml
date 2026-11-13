@@ -2,8 +2,9 @@ name: ORBIT frequent site watch
 
 on:
   schedule:
-    # Once a day at 06:30 Kuwait time (03:30 UTC), half an hour before the daily browser visitor.
-    # The owner's «تحديث» button and opening the page run the same check on demand, so nothing waits a day when it matters.
+    # Once a month: the 1st at 06:30 Kuwait time (03:30 UTC). Reduced from daily on purpose to keep runs
+    # (and the Cloud Run / Firestore work each one triggers) to a minimum. Opening the page and the owner's
+    # «تحديث» button run the same check on demand. src/core/fleetStatus.ts WATCH_STALE_MINUTES follows this schedule.
     - cron: '30 3 1 * *'
   workflow_dispatch:
 

@@ -25,7 +25,7 @@ const state = JSON.parse(text);
 ok(stateRes.status === 200 && state.platforms?.length >= 4 && state.demo === true, `demo state has ${state.platforms?.length} synthetic programs`);
 ok(!/ghp_|github_pat|api\.github\.com|run\.app|ProfAlfailakawi|AIza|PRIVATE KEY/.test(text), 'no tokens/real hosts in demo state');
 
-for (const [m, p] of [['POST', '/api/sensor/ingest'], ['POST', '/api/ai/diagnose'], ['GET', '/api/stream'], ['POST', '/api/canary/run'], ['POST', '/api/fleet/x/verify']]) {
+for (const [m, p] of [['POST', '/api/sensor/ingest'], ['POST', '/api/radar/ingest'], ['POST', '/api/memory/save'], ['POST', '/api/incidents/x/transition'], ['POST', '/api/fleet/x/verify']]) {
   const r = await fetch(base + p, { method: m, headers, body: m === 'POST' ? '{}' : undefined });
   ok(r.status === 403, `${m} ${p} blocked in demo (${r.status})`);
 }

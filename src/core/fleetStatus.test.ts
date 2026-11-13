@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRows, sharedLinkReason, summarize, programsPhrase, lastCheckLabel, buildCopyText, watchHealth, minutesPhrase } from './fleetStatus.ts';
+import { buildRows, sharedLinkReason, summarize, programsPhrase, lastCheckLabel, buildCopyText, watchHealth, minutesPhrase, WATCH_STALE_MINUTES, WATCH_SCHEDULE_INTERVAL_MINUTES } from './fleetStatus.ts';
 import { applyCert } from './certs.ts';
 import { applySensor } from './sensor.ts';
 import { inspectRepositoryCapabilities } from './engine.ts';
@@ -103,8 +103,10 @@ test('the owner is told when the automatic watch itself has gone quiet', () => {
   const now = Date.parse('2026-05-01T12:00:00Z');
   const seen = (minutesAgo: number) => app('A', { siteCheckedAt: new Date(now - minutesAgo * 60_000).toISOString() });
   assert.deepEqual(watchHealth([seen(10)], now), { stale: false, minutes: 10 });
-  assert.deepEqual(watchHealth([seen(200), seen(400)], now), { stale: false, minutes: 200 }, 'a daily watch is not late after a few hours');
-  assert.deepEqual(watchHealth([seen(27 * 60), seen(30 * 60)], now), { stale: true, minutes: 27 * 60 });
+  assert.deepEqual(watchHealth([seen(200), seen(400)], now), { stale: false, minutes: 200 }, 'a watch is not late after a few hours');
+  assert.deepEqual(watchHealth([seen(20 * 24 * 60)], now), { stale: false, minutes: 20 * 24 * 60 }, 'a monthly schedule is not late after 20 days');
+  assert.deepEqual(watchHealth([seen(34 * 24 * 60), seen(40 * 24 * 60)], now), { stale: true, minutes: 34 * 24 * 60 }, 'more than a month and the grace means the schedule stopped');
+  assert.equal(WATCH_STALE_MINUTES > WATCH_SCHEDULE_INTERVAL_MINUTES, true, 'the threshold follows the schedule');
   assert.equal(watchHealth([app('B')], now), null, 'no site to watch means nothing to be stale');
   assert.deepEqual([minutesPhrase(45), minutesPhrase(200), minutesPhrase(60 * 30)], ['45 دقيقة', '3 ساعات', 'يوم']);
 });

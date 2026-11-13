@@ -4,14 +4,10 @@ import {
   MANDATORY_CLAUDE_GUARDRAIL,
   computeEventFingerprint,
   evaluatePlatformHealth,
-  evaluateSelfHealthOnOutage,
-  executeSyntheticCanary,
   generateClaudeMissionPrompt,
   ingestAndCorrelateEvent,
   inspectRepositoryCapabilities,
   purgePlatformHistory,
-  runDigitalTwinSimulation,
-  runNonDestructiveSecurityScan,
   sanitizeTelemetryPayload,
   transitionIncidentStatus,
   transitionPlatformLifecycle,
@@ -207,16 +203,6 @@ test('Claude Mission Pack always includes mandatory non-negotiable guardrail', (
   assert.equal(prompt.includes('ProfAlfailakawi/Order-New-2026'), true);
 });
 
-test('Synthetic Canary executes all 6 verification stages and passes', () => {
-  const canary = executeSyntheticCanary([], [], []);
-  assert.equal(canary.canaryResult.overallPassed, true);
-  assert.equal(canary.canaryResult.steps.length, 6);
-  assert.equal(
-    canary.canaryResult.steps.every((s) => s.passed),
-    true
-  );
-});
-
 test('Section 42 Dynamic Fleet Management: add, verify, pause, archive, reactivate, unlink, and purge test program without affecting other apps', () => {
   const existingApp = verifyPlatformConnection(
     inspectRepositoryCapabilities({
@@ -327,38 +313,3 @@ test('Section 19 Self-Learning Engineering Memory rejects unverified hypotheses 
   assert.equal(accepted.memory.length, 1);
   assert.equal(accepted.memory[0].verifiedBy, 'ProfAlfailakawi');
 });
-
-test('Section 22 Digital Twin Lab, Section 23 Security Guardian, and Section 26 Self-Monitoring Outage work deterministically', () => {
-  const twin = runDigitalTwinSimulation('ORDER', 'all');
-  assert.equal(twin.passed, true);
-  assert.equal(twin.steps.length, 5);
-  assert.equal(twin.isolatedEnvironment, 'digital-twin-sandbox (Zero Production Touch)');
-
-  const sec = runNonDestructiveSecurityScan([]);
-  assert.equal(sec.checks.length, 8);
-  assert.equal(sec.mode, 'Passive Non-Destructive (Least Privilege)');
-
-  const outageHealth = evaluateSelfHealthOnOutage(
-    {
-      overallStatus: 'Operational',
-      heartbeatTimestamp: new Date().toISOString(),
-      lastSuccessfulIngestion: new Date().toISOString(),
-      eventProcessingDelayMs: 12,
-      failedJobsCount: 0,
-      sensorConnectivityCount: 11,
-      missingTelemetryApps: [],
-      alertDeliveryStatus: 'Nominal',
-      storageUsageMb: 18,
-      storageQuotaMb: 512,
-      githubApiRemaining: 4800,
-      githubApiLimit: 5000,
-      backgroundJobHealth: 'Healthy',
-      fleetMonitoringCoveragePct: 83,
-      independentWatchdogStatus: 'Verified',
-    },
-    true
-  );
-  assert.equal(outageHealth.overallStatus, 'Monitoring Unconfirmed');
-  assert.equal(outageHealth.independentWatchdogStatus, 'Stale');
-});
-

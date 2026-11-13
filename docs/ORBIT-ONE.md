@@ -8,11 +8,11 @@ Implemented server-only functions:
 - CINEMA: privacy-safe action metadata timeline from authenticated sensor breadcrumbs only; not screen recording, DOM capture or session replay.
 - BUTTERFLY: advisory-only cross-app dependency overlap, NOT proven failure of other programs.
 - REPAIR: automatically append verified evidence, available metadata, regression requirements and uncertainty to one-click repair prompt.
-- SELF GUARDIAN: public /healthz liveness endpoint and independent scheduled GitHub runner, opt-in.
+- SELF GUARDIAN: public /api/healthz liveness endpoint (also /healthz/) and independent scheduled GitHub runner, opt-in.
 - FUTURE RADAR: evidence-qualified risk checks based on real Live GitHub commits only.
 
 Optional GitHub repository secrets required for independent checks:
-ORBIT_HEALTHCHECK_URL = https://your-orbit-production-host/healthz/  (keep the trailing slash: Cloud Run reserves /healthz itself and Hosting answers it with 404)
+ORBIT_HEALTHCHECK_URL = https://your-orbit-production-host/api/healthz  (preferred; /healthz/ with the trailing slash also works. Bare /healthz returns 404 in production because Cloud Run reserves that exact path)
 ORBIT_GHOST_TARGETS = JSON array containing up to 15 publicly accessible HTTPS read-only URLs.
 Until those secrets are configured, this external guard reports UNCONFIGURED. A successful GET does NOT establish that user journeys work. GitHub Actions schedule can run late; external push delivery remains unconfigured.
 
