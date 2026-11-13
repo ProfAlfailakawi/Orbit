@@ -446,7 +446,9 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .hero-text { max-width: none; }
   .orbit { width: min(100%, 400px); }
   .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--fold-gap); }
-  .roster-grid li, .roster-grid li:last-child:nth-child(odd) { grid-column: auto; }
+  /* Every desktop placement rule is reset here (same specificity, later in the file), so each card stays inside one segment. */
+  .roster-grid li, .roster-grid li:last-child:nth-child(odd), .roster-grid li:last-child:nth-child(3n + 1),
+  .roster-grid li:nth-last-child(2):nth-child(3n + 1), .roster-grid li:last-child:nth-child(3n + 2) { grid-column: auto; }
   .row-center { justify-content: flex-start; }
   .add, .manual { align-self: flex-start; width: 100%; max-width: calc((100% - var(--fold-gap)) / 2); }
   .login-stage { max-width: none; flex-direction: row-reverse; gap: var(--fold-gap); }
