@@ -35,7 +35,7 @@ async function validateUrl(raw, isOrbit) {
   if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password ||
       (url.port && url.port !== '443') || net.isIP(url.hostname) ||
       /(\.localhost|\.local|\.internal|\.invalid|\.test)$/i.test(url.hostname) ||
-      (isOrbit && !['/healthz', '/healthz/'].includes(url.pathname))) {
+      (isOrbit && !['/healthz', '/healthz/', '/api/healthz'].includes(url.pathname))) {
     throw new Error('Target does not meet safe public HTTPS requirements.');
   }
   const addresses = await dns.lookup(url.hostname, { all: true });

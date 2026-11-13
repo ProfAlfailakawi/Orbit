@@ -1,7 +1,7 @@
 name: ORBIT independent guardian (opt-in)
 on:
   schedule:
-    # Once a day, like the rest of ORBIT's automatic checks (each run is billed as a full GitHub Actions minute).
+    # Once a day (exits without work unless its secrets are set). Free: Actions minutes cost nothing on this public repo.
     - cron: "13 4 * * *"
   workflow_dispatch:
 permissions:

@@ -172,10 +172,10 @@ export default function App() {
     try {
       const res = await apiFetch('/api/watch/run', { method: 'POST' });
       if (res.ok) await fetchServerState();
-    } catch { /* the daily watch covers it */ }
+    } catch { /* the scheduled watch covers it */ }
   };
 
-  /** «تحديث»: read GitHub, then visit every site, so one press refreshes everything the daily schedule would. */
+  /** «تحديث»: read GitHub, then visit every site, so one press refreshes everything the schedule would. */
   const handleSync = async ({ visitSites = true }: { visitSites?: boolean } = {}) => {
     if (isSyncing) return;
     setIsSyncing(true);

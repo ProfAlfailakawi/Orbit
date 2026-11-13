@@ -1,4 +1,4 @@
-// Daily real-browser visitor: opens each program's site like a person would — on a desktop, on a phone, and on a phone with a
+// Scheduled real-browser visitor (weekly, orbit-visitor.yml): opens each program's site like a person would — on a desktop, on a phone, and on a phone with a
 // weak connection — follows a few of its own pages, and reports what went wrong. Judgement lives in src/core/pageAudit.ts.
 // Run with `npx tsx scripts/browser-visitor.mjs` (the audit module is TypeScript).
 // Env: ORBIT_URL (service url), ORBIT_TOKEN (Google identity token for the scheduler identity). Never prints the token.

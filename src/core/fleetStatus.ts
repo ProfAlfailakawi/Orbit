@@ -117,11 +117,18 @@ export function buildCopyText(rows: ProgramRow[], scope: 'all' | string): string
   return [report, ...missions].join('\n\n');
 }
 
-/** The scheduled watch runs once a day; a little over a day without any visit means the schedule itself has stopped. */
-export const WATCH_STALE_MINUTES = 26 * 60;
+/**
+ * Longest gap between two scheduled watches. Must follow the cron in .github/workflows/orbit-watch.yml, which runs once a
+ * month (the 1st), so the longest gap is 31 days.
+ */
+export const WATCH_SCHEDULE_INTERVAL_MINUTES = 31 * 24 * 60;
+/** Slack for GitHub's delayed scheduled runs before the silence counts as a stopped schedule. */
+const WATCH_GRACE_MINUTES = 2 * 24 * 60;
+/** A little over one schedule interval without any visit means the schedule itself has stopped. */
+export const WATCH_STALE_MINUTES = WATCH_SCHEDULE_INTERVAL_MINUTES + WATCH_GRACE_MINUTES;
 
 /**
- * The automatic watch records a site visit once a day (and whenever the owner opens the page or presses «تحديث»). If the newest
+ * The automatic watch records a site visit on every scheduled run (and whenever the owner opens the page or presses «تحديث»). If the newest
  * one is older than that, the watch itself has stopped (a paused schedule, an expired token) and no alert can be trusted to arrive,
  * so the owner is told on opening the page.
  */

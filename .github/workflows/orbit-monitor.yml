@@ -2,8 +2,8 @@ name: ORBIT scheduled GitHub monitoring
 
 on:
   schedule:
-    # Daily at 08:00 Kuwait time; the backend's durable Firestore gate runs
-    # an actual GitHub scan at most once every 72 hours.
+    # Once a month: the 1st at 08:00 Kuwait time (05:00 UTC). The backend's durable Firestore gate
+    # also limits an actual GitHub scan to at most once every 72 hours; «تحديث» in the dashboard syncs on demand.
     - cron: '0 5 1 * *'
   workflow_dispatch:
 

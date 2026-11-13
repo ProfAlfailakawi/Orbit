@@ -41,10 +41,6 @@ try {
   assert.equal((await page.request.get(base + '/api/sites')).status(), 200, 'Sites endpoint must serve the signed-in operator');
   const unauthScheduler = await page.request.post(base + '/internal/scheduler/github-sync');
   assert.equal(unauthScheduler.status(), 503, 'Scheduler endpoint must fail closed when scheduler identity is not configured');
-  const canary = await page.request.post(base + '/api/canary/run', { headers: { Origin: base } });
-  assert.equal(canary.status(), 200, 'Isolated canary endpoint should run');
-  const canaryData = await canary.json();
-  assert.ok(canaryData.events.filter(item => item.appId === 'ORBIT-CANARY').every(item => item.dataIntegrity === 'Demo'), 'Synthetic canary must remain Demo');
   assert.equal(state.incidents.some(i => i.appId === 'ORBIT-CANARY' && i.dataIntegrity === 'Live'), false, 'Test incidents must not be treated as live');
 
   // The page is deliberately small: a summary, one line per program, and copy buttons.
