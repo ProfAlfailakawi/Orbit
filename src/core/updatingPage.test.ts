@@ -207,3 +207,7 @@ test('the health probe is public and sits before the auth middleware', () => {
   assert.ok(version > 0 && auth > version);
   assert.match(server.slice(version, version + 200), /Cache-Control', 'no-store'/);
 });
+
+test('narrow phones: the telemetry line wraps instead of cutting the timer off with an ellipsis', () => {
+  assert.match(PAGE, /@media \(max-width:400px\)\{[^\n]*\.telemetry span\{white-space:normal/);
+});
