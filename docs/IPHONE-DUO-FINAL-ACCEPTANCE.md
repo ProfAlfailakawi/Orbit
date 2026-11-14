@@ -157,3 +157,20 @@ PW_MODULE=/opt/node22/lib/node_modules/playwright/index.mjs PLAYWRIGHT_BROWSERS_
 6. مطوي: الحكم وزر النسخ على الشاشة الأولى.
 7. الدخول على الشاشة الداخلية: النموذج يمينًا والصورة يسارًا.
 8. الوضع الداكن: الطيّ ظل خفيف، لا خط أبيض صارخ.
+
+## Duo ≠ iPad
+
+The two-page spread, the spine and the laptop bottom bar are for the iPhone Duo's inner screen only. Safari exposes only the window size, so the size ranges are the discriminator, and every Duo query is scoped to `screen`.
+
+| Posture | Query (all `screen and`) | Matches |
+|---|---|---|
+| Portrait spread | width 640–720, height ≥ 640 | Duo 669×867, 660×800, 700×900, 720×900. No iPad (portrait iPads start at 744 wide). |
+| Landscape spread | width 820–1000, height ≥ 500, aspect ≥ 7/5 | Duo 951×585, 880×585, 1000×600. No iPad (landscape iPads start at 1024 wide, with or without Safari chrome). |
+| Laptop dock | height ≤ 420, width ≥ 560 | Short windows only; no iPad is that short. |
+| Real hinge | `horizontal-viewport-segments: 2` | Only where the browser reports two segments. Kept as an optional block. |
+
+Probe (WebKit, demo sandbox; marker = `.page` display and its `::before` spine, plus `main` on the privacy page): the iPad sizes 744×1133, 768×1024, 820×1180, 834×1194, 1024×1366, 1133×744, 1024×768, 1180×820, 1366×1024 and with Safari chrome 744×1040, 768×920, 1024×690, 1133×660, 1180×735 all keep `flex`, no spine, `static` bar, no horizontal overflow, on sign-in, the dashboard and a program detail. The Duo sizes 669×867, 660×800, 700×900, 720×900, 951×585, 880×585, 1000×600 keep the spread (`grid`, six columns, spine present). 669×520 is below the portrait spread's 640 px height floor by design and stays a single column (pose F).
+
+Fix in this round: the queries were not scoped to `screen` (an A4 print page, about 658 px wide, fell in the portrait range), and `updating.html` had a dark-mode rule spanning 640–1000 px. Both are now exact. `src/core/duoLayout.test.ts` fails if a portrait spread allows more than 720 px, a landscape one more than 1000 px, or a Duo query is not `screen`-scoped.
+
+Known limitation: an iPad Split View or Slide Over window of about 640–720 px wide is indistinguishable from the Duo by size. Only the real-hinge query tells them apart, and only where the browser exposes it. Not tested on a real device.
