@@ -482,12 +482,12 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
 }
 
 /* ═══ iPhone Duo round 2 (2026-11-14): system widget keep-out ═══
-   The installed app (standalone) on the opened Duo has a system status widget floating over the physical top-right corner (about
+   The opened Duo (in a Safari tab and in the installed app alike, so no display-mode condition) has a system status widget floating over the physical top-right corner (about
    55-80 px wide, up to y=125). Its exact box is not ours to know, so a generous corner is reserved: nothing readable or tappable sits
    in it, while backgrounds stay full-bleed. Physical `right` on purpose: in RTL the corner is the START side. Everywhere else the
    variables are undefined and every use falls back to 0, so phones, iPads and desktops are untouched. Book = landscape inner screen. */
-@media screen and (display-mode: standalone) and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape),
-       screen and (display-mode: standalone) and (min-width: 640px) and (max-width: 720px) and (min-height: 520px) and (max-height: 960px) and (orientation: portrait) {
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape),
+       screen and (min-width: 640px) and (max-width: 720px) and (min-height: 520px) and (max-height: 960px) and (orientation: portrait) {
   :root {
     --duo-cutout-w: 116px; --duo-cutout-h: 116px;
     /* How far below the bar the first content must start to clear the corner box. */
