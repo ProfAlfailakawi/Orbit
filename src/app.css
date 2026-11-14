@@ -52,7 +52,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 @media (max-width: 420px) { .bar { gap: 8px; } .bar-actions { gap: 6px; } .bar-actions .btn { padding-inline: 12px; } }
 /* On very narrow phones the actions wrap to two rows, so the bar scrolls away instead of eating a fifth of the screen. */
 @media (max-width: 360px) { .bar { position: static; } }
-.banner { margin: 12px auto 0; max-width: 1080px; width: calc(100% - var(--gut-l) - var(--gut-r)); padding: 10px 16px; border-radius: var(--r-sm); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: .9rem; animation: rise .35s cubic-bezier(.2, .7, .2, 1) backwards; }
+.banner { margin: 0; padding: 10px 16px; border-radius: var(--r-sm); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: .9rem; animation: rise .35s cubic-bezier(.2, .7, .2, 1) backwards; }
 .banner-warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-edge); }
 
 .btn { min-height: 44px; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 600; transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease; }
@@ -68,6 +68,11 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .btn-add { align-self: center; border-style: dashed; border-color: var(--muted); background: transparent; color: var(--ink); padding-inline: 22px; }
 
 .page { display: flex; flex-direction: column; gap: 18px; max-width: calc(1080px - 2 * var(--gut) + var(--gut-l) + var(--gut-r)); margin: 0 auto; padding: 20px var(--gut-r) max(44px, env(safe-area-inset-bottom)) var(--gut-l); }
+/* The context page (notices, roster, add form, footer) is one box only in the book spread; elsewhere its children join the page
+   column and the notices lead it, above the orbit. */
+.page-aside { display: contents; }
+.page-notices { order: -1; display: flex; flex-direction: column; gap: 8px; }
+.page-notices:empty { display: none; }
 
 /* ── The orbit ───────────────────────────────────────────── */
 .hero { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 18px 30px; border-radius: var(--r-lg); color: var(--hero-ink); background: radial-gradient(ellipse 60% 50% at 50% 34%, rgba(71, 155, 147, .26), transparent 70%), linear-gradient(124deg, var(--hero-2) 0%, #111f38 53%, var(--hero-1) 100%); box-shadow: 0 30px 60px -28px rgba(8, 24, 45, .8), inset 0 1px 0 rgba(255, 255, 255, .08); animation: rise .6s cubic-bezier(.2, .7, .2, 1) backwards; }
@@ -93,7 +98,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .hero .btn-primary.btn-attn { animation: attn 2.8s ease-in-out infinite; }
 .hero .btn.is-copied { animation: pop .35s cubic-bezier(.2, .8, .2, 1); }
 .btn-explain { min-height: 42px; background: transparent; color: var(--hero-ink); border-color: rgba(157, 236, 228, .4); }
-.detail-actions { grid-column: 1 / -1; grid-row: 2; display: flex; gap: 8px; justify-content: flex-end; }
+.detail-actions { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .detail-actions .btn { flex: 1; }
 .detail-close { grid-column: 3; grid-row: 1; }
 .explain { width: 100%; padding: 12px 14px; border-radius: var(--r-sm); background: rgba(255, 255, 255, .07); border: 1px solid rgba(157, 236, 228, .22); text-align: start; animation: rise .3s cubic-bezier(.2, .7, .2, 1) backwards; }
@@ -134,7 +139,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 /* A glowing arc sweeps along each ring, a comet tail that turns with it. */
 .ring::before { content: ''; position: absolute; inset: -1px; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, transparent 0deg, transparent 250deg, rgba(134, 237, 201, .05) 250deg, rgba(134, 237, 201, .5) 350deg, rgba(226, 255, 246, .95) 360deg); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); filter: drop-shadow(0 0 5px rgba(134, 237, 201, .8)); }
 .ring-inn::before { transform: scaleX(-1); }
-.sat { position: absolute; width: calc(14cqw + 14px); height: calc(14cqw + 14px); margin: calc(-7cqw - 7px) 0 0 calc(-7cqw - 7px); padding: 0; border: 0; background: transparent; display: grid; place-items: center; color: var(--hero-1); z-index: 1; pointer-events: auto; }
+.sat { position: absolute; width: max(44px, 14cqw + 14px); height: max(44px, 14cqw + 14px); margin: min(-22px, -7cqw - 7px) 0 0 min(-22px, -7cqw - 7px); padding: 0; border: 0; background: transparent; display: grid; place-items: center; color: var(--hero-1); z-index: 1; pointer-events: auto; }
 .sat:focus-visible { outline: 3px solid var(--hero-accent); outline-offset: 0; border-radius: 50%; }
 .sat-in { position: relative; display: grid; place-items: center; width: 14cqw; height: 14cqw; animation: spin var(--dur) linear infinite; }
 .ring-out .sat-in { animation-direction: reverse; }
@@ -169,7 +174,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 22px; box-shadow: var(--shadow); }
 .add label, .login label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 input[type=text], input[type=url], input[type=password], textarea { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: var(--r-sm); border: 1px solid var(--muted); background: var(--bg); color: var(--ink); }
-.actions { display: flex; gap: 10px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .mine { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .mine-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .manual { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--r-md); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
@@ -233,14 +238,14 @@ button, a, input, .sat { touch-action: manipulation; }
 /* Short landscape (folded-landscape, iPhone landscape, pinned video): one tight row, compact bar. */
 @media (max-height: 480px) and (min-width: 560px) {
   .bar { padding-block: 4px; }
-  .banner { margin-top: 6px; padding: 6px 14px; }
+  .banner { padding: 6px 14px; }
   .page { padding-top: 10px; gap: 12px; }
   .hero { min-height: 0; padding: 14px 20px; }
   .orbit { width: min(44%, 300px, max(210px, calc(100dvh - 120px))); }
   .hero h1 { font-size: 1.35rem; }
   .hero-hint { min-height: 0; }
 }
-@media (max-width: 380px) { .tally li { padding: 4px 10px; } }
+@media (max-width: 380px) { .tally { gap: 6px; } .tally li { padding: 4px 9px; gap: 5px; font-size: .8rem; } .tally b { font-size: 1.05rem; } }
 @media (prefers-reduced-motion: reduce) { .hero .btn-primary.btn-attn { animation: none !important; } }
 
 /* ═══ Beauty pass: roster, sign-in stage, demo banner, footer ═══ */
@@ -432,28 +437,16 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .hero-hint { min-height: 0; font-size: .84rem; }
   .hero h1 { font-size: 1.3rem; line-height: 1.3; margin-top: 0; }
   .hero .btn-primary { margin-top: 4px; min-height: 48px; }
-  .banner { margin-top: 8px; padding: 6px 12px; font-size: .8rem; line-height: 1.45; }
+  .banner { padding: 6px 12px; font-size: .8rem; line-height: 1.45; }
   .banner-demo strong { font-size: .74rem; padding: 2px 10px; }
   .page { padding-top: 12px; gap: 14px; }
 }
-
-/* Partially folded, book posture (two side-by-side viewport segments; Safari 27.1 exposes them only behind a flag).
-   The orbit and the verdict each take one segment and the gutter between them sits on the hinge, so no control crosses
-   the fold. The roster's two columns split on the same line. Without the API this block never applies. */
-@media (horizontal-viewport-segments: 2) {
-  :root { --fold-gap: calc(env(viewport-segment-left 1 0, 50vw) - env(viewport-segment-right 0 0, 50vw) + 2 * var(--gut)); }
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--fold-gap); justify-items: center; }
-  .hero-text { max-width: none; }
-  .orbit { width: min(100%, 400px); }
-  .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--fold-gap); }
-  /* Every desktop placement rule is reset here (same specificity, later in the file), so each card stays inside one segment. */
-  .roster-grid li, .roster-grid li:last-child:nth-child(odd), .roster-grid li:last-child:nth-child(3n + 1),
-  .roster-grid li:nth-last-child(2):nth-child(3n + 1), .roster-grid li:last-child:nth-child(3n + 2) { grid-column: auto; }
-  .row-center { justify-content: flex-start; }
-  .add, .manual { align-self: flex-start; width: 100%; max-width: calc((100% - var(--fold-gap)) / 2); }
-  .login-stage { max-width: none; flex-direction: row-reverse; gap: var(--fold-gap); }
-  .login-stage > * { flex: 1 1 0; min-width: 0; }
+/* Smallest phones (320x568): the orbit yields a little more, so the copy button joins the verdict on the first screen. */
+@media (max-width: 599px) and (max-height: 600px) {
+  .orbit { width: min(100%, 400px, max(172px, 31dvh)); }
+  .page { gap: 10px; }
 }
+
 /* Tabletop posture (segments stacked): on sign-in the picture takes the upper half and the form the lower one. The dashboard is a
    scrolling page, so it keeps its normal flow (documented as partial in docs/IPHONE-DUO-ADAPTIVE-QUALITY.md). */
 @media (vertical-viewport-segments: 2) {
@@ -485,3 +478,155 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .hero .btn-primary { width: auto; align-self: stretch; }
   .hero h1 { font-size: 1.25rem; }
 }
+
+/* ═══ iPhone Duo final (2026-11-14): book spread, laptop posture — see docs/IPHONE-DUO-FINAL-ACCEPTANCE.md ═══ */
+/* Book spread: the opened inner screen (669x867 portrait, 951x585 landscape) shows two pages around a quiet spine instead of one
+   stretched column. Right page (reading start in RTL): the fleet verdict, the orbit and the chosen program. Left page: the
+   notices, the program index, the add form and the footer. Nothing is remounted: the same elements are placed by the grid, so a
+   typed field, an open form or a chosen program survive the fold. Tablets (768+ portrait, 1024+) keep the wide layout.
+   --spine-x is the centre of the fold, measured from the left edge; with real viewport segments it follows the hinge. */
+@media (min-width: 640px) and (max-width: 720px) and (min-height: 640px),
+       (min-width: 820px) and (max-width: 1000px) and (min-height: 500px) and (min-aspect-ratio: 7/5),
+       (horizontal-viewport-segments: 2) {
+  :root {
+    --spine: 32px; --spine-x: 50vw;
+    /* The top bar's height (its controls grow with the text size), so the right page can stay in view beneath it. */
+    --bar-h: calc(max(10px, env(safe-area-inset-top, 0px)) + 11px + max(44px, 1.6rem + 18px));
+    --page-h: calc(100dvh - var(--bar-h) - 32px);
+  }
+  .page {
+    display: grid; align-items: start; max-width: none; column-gap: 0; row-gap: 0;
+    grid-template-columns: [page-r] minmax(0, calc(100vw - var(--spine-x) - var(--spine) / 2 - var(--gut-r))) [spine] var(--spine) [page-l] minmax(0, 1fr);
+    padding-top: 16px; min-height: calc(100dvh - var(--bar-h));
+  }
+  /* The spine: a soft fold shadow with a hairline, fading out at both ends. It carries no content. */
+  .page::before {
+    content: ''; grid-column: spine; grid-row: 1; align-self: stretch; margin-block: -16px calc(-1 * max(44px, env(safe-area-inset-bottom)));
+    background: linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat,
+      linear-gradient(90deg, transparent, rgba(16, 22, 47, .045) 32%, rgba(16, 22, 47, .1) 50%, rgba(16, 22, 47, .045) 68%, transparent);
+    -webkit-mask: linear-gradient(transparent, #000 48px, #000 calc(100% - 48px), transparent);
+    mask: linear-gradient(transparent, #000 48px, #000 calc(100% - 48px), transparent);
+    pointer-events: none;
+  }
+  /* Right page: the orbit plate fills the page height and stays in view while the index scrolls beside it. */
+  .hero {
+    grid-column: page-r; grid-row: 1; position: sticky; top: calc(var(--bar-h) + 16px); scroll-margin-top: calc(var(--bar-h) + 16px);
+    flex-direction: column; justify-content: flex-start; align-items: center; gap: 12px;
+    min-height: var(--page-h); max-height: var(--page-h); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    padding: 24px clamp(16px, 2.4vw, 26px);
+    --text-h: 250px;
+  }
+  .hero::-webkit-scrollbar { display: none; }
+  /* Auto margins centre the plate's content and, unlike centring, keep its top reachable when a long explanation overflows. */
+  .hero > .orbit { margin-top: auto; }
+  .hero > .hero-text { margin-bottom: auto; }
+  .hero:has(.detail) { --text-h: 330px; }
+  .hero:has(.explain) { --text-h: 470px; }
+  .orbit { order: 1; flex: 0 0 auto; margin: 0; width: min(100%, 380px, max(168px, calc(var(--page-h) - 48px - var(--text-h)))); }
+  .hero-text { order: 2; flex: 0 0 auto; align-items: center; text-align: center; max-width: 420px; gap: 8px; }
+  .hero-hint { min-height: 0; }
+  .hero h1 { font-size: clamp(1.4rem, 2.6vw + .4rem, 1.85rem); }
+  .tally { justify-content: center; }
+  .hero .btn-primary { width: 100%; min-width: 0; align-self: stretch; margin-top: 6px; }
+  /* Left page: notices, then the index of programs as one calm column, then the actions and the footer. */
+  html { scroll-padding-top: calc(var(--bar-h) + 8px); }
+  /* The bar runs across both pages: the brand stays on the right page and the actions on the left one, wrapping before the spine. */
+  .bar { padding-right: var(--gut-r); padding-left: var(--gut-l); }
+  .bar-actions { max-width: calc(var(--spine-x) - var(--spine) / 2 - var(--gut-l)); }
+  .brand { max-width: calc(100vw - var(--spine-x) - var(--spine) / 2 - var(--gut-r)); }
+  .page-aside { grid-column: page-l; grid-row: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; padding-bottom: 8px; }
+  .page-notices { order: 0; }
+  /* The demo chip heads its note instead of squeezing it into a narrow column beside it. */
+  .banner-demo { flex-direction: column; align-items: flex-start; gap: 6px; border-radius: var(--r-md); padding: 10px 14px; }
+  .roster-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  /* Every wide placement rule is reset here (same specificity, later in the file), so each card stays one row of the index. */
+  .roster-grid li, .roster-grid li:last-child:nth-child(odd), .roster-grid li:last-child:nth-child(3n + 1),
+  .roster-grid li:nth-last-child(2):nth-child(3n + 1), .roster-grid li:last-child:nth-child(3n + 2) { grid-column: auto; }
+  .add, .manual { align-self: stretch; max-width: none; }
+  .add { scroll-margin-top: calc(var(--bar-h) + 16px); }
+  .row-center { justify-content: flex-start; }
+  .row-center .btn-add { flex: 1 1 auto; white-space: nowrap; }
+  .foot { margin-top: auto; justify-content: flex-start; }
+
+  /* Sign-in as a spread: the form on the right page, the picture of the product on the left one, both full height. */
+  .login-wrap { padding-right: var(--gut-r); padding-left: var(--gut-l); place-items: stretch; }
+  .login-stage {
+    display: grid; max-width: none; gap: 0; align-items: stretch; min-height: calc(100dvh - 40px);
+    grid-template-columns: [page-r] minmax(0, calc(100vw - var(--spine-x) - var(--spine) / 2 - var(--gut-r))) [spine] var(--spine) [page-l] minmax(0, 1fr);
+  }
+  .login-stage::before {
+    content: ''; grid-column: spine; grid-row: 1; margin-block: -20px;
+    background: linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat,
+      linear-gradient(90deg, transparent, rgba(16, 22, 47, .045) 32%, rgba(16, 22, 47, .1) 50%, rgba(16, 22, 47, .045) 68%, transparent);
+    -webkit-mask: linear-gradient(transparent, #000 48px, #000 calc(100% - 48px), transparent);
+    mask: linear-gradient(transparent, #000 48px, #000 calc(100% - 48px), transparent);
+    pointer-events: none;
+  }
+  .login .btn-demo { padding-inline: 12px; font-size: .94rem; }
+  .login-stage .login { grid-column: page-r; grid-row: 1; flex: none; align-self: stretch; justify-content: center; padding: 32px clamp(20px, 3vw, 36px); }
+  .login-aside {
+    grid-column: page-l; grid-row: 1; display: flex; flex: none; min-height: 0; flex-direction: column; justify-content: center; align-items: flex-start;
+    gap: 16px; padding: 32px clamp(20px, 3vw, 36px);
+  }
+  .login-art { width: min(220px, 100%); height: auto; aspect-ratio: 1; align-self: center; }
+  .login-copy h2 { font-size: clamp(1.2rem, 1.6vw + .6rem, 1.6rem); }
+  .login-copy p { font-size: .95rem; margin-top: 6px; }
+  .login-points { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .login-points li { display: flex; align-items: center; gap: 10px; font-size: .92rem; font-weight: 600; color: var(--hero-ink); }
+  .login-points svg { flex: 0 0 auto; width: 26px; height: 26px; padding: 4px; border-radius: 50%; background: rgba(134, 237, 201, .14); border: 1px solid rgba(134, 237, 201, .4); fill: none; stroke: var(--hero-accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .login-points circle { fill: var(--hero-accent); stroke: none; }
+}
+/* Portrait spread (669x867): the left page is about 300px wide, so the bar's actions drop their icons (the words stay) and the
+   operator's three buttons keep one row, which the right page's sticky offset assumes. */
+@media (min-width: 640px) and (max-width: 720px) and (min-height: 640px) {
+  .bar-actions { gap: 6px; }
+  .bar-actions .btn { padding-inline: 14px; }
+  .bar-actions .ico { display: none; }
+}
+/* Landscape spread (951x585): a shorter page, so the plate tightens and the art and copy of the sign-in sit tighter. */
+@media (min-width: 820px) and (max-width: 1000px) and (min-height: 500px) and (max-height: 760px) and (min-aspect-ratio: 7/5) {
+  .hero { padding-block: 18px; gap: 8px; --text-h: 214px; }
+  .hero:has(.detail) { --text-h: 300px; }
+  .hero h1 { font-size: 1.5rem; line-height: 1.3; }
+  .hero-text { gap: 6px; }
+  .login-art { width: min(170px, 100%); }
+  .login-aside, .login-stage .login { padding-block: 22px; gap: 12px; }
+  .login-stage .login { gap: 12px; }
+}
+@media (prefers-color-scheme: dark) {
+  .page::before, .login-stage::before {
+    background: linear-gradient(rgba(255, 255, 255, .08), rgba(255, 255, 255, .08)) center / 1px 100% no-repeat,
+      linear-gradient(90deg, transparent, rgba(0, 0, 0, .22) 32%, rgba(0, 0, 0, .42) 50%, rgba(0, 0, 0, .22) 68%, transparent);
+  }
+}
+/* Real hinge (progressive): when the browser reports two side-by-side segments, the spine covers the hinge exactly. */
+@media (horizontal-viewport-segments: 2) {
+  :root {
+    --spine: max(28px, env(viewport-segment-left 1 0, 50vw) - env(viewport-segment-right 0 0, 50vw));
+    --spine-x: calc((env(viewport-segment-right 0 0, 50vw) + env(viewport-segment-left 1 0, 50vw)) / 2);
+  }
+}
+
+/* Laptop posture and short landscape (951x350, 600x350, folded landscape 594x368, phones on their side): the content keeps the
+   top of the screen and the controls move to a bar at the bottom, within thumb reach. The page reserves the bar's height, so the
+   bar never covers the last line. */
+@media (max-height: 420px) and (min-width: 560px) {
+  :root { --dock-h: calc(max(44px, 1.6rem + 18px) + 13px + max(6px, env(safe-area-inset-bottom, 0px))); }
+  .bar {
+    position: fixed; top: auto; bottom: 0; left: 0; right: 0;
+    padding: 6px max(var(--gut), env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(var(--gut), env(safe-area-inset-left));
+    border-bottom: 0; border-top: 1px solid var(--line); box-shadow: 0 -12px 28px -22px rgba(16, 22, 47, .45);
+  }
+  .shell { padding-bottom: var(--dock-h); }
+  html { scroll-padding-bottom: var(--dock-h); }
+  .page { padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: 16px; }
+  .hero { padding: 12px 18px; gap: clamp(14px, 3vw, 40px); }
+  .orbit { width: min(42%, 280px, max(150px, calc(100dvh - var(--dock-h) - 82px))); }
+  .hero-text { gap: 6px; }
+  .hero-hint { font-size: .82rem; }
+  .hero h1 { font-size: 1.3rem; line-height: 1.3; margin-top: 0; }
+  .tally li { padding: 4px 12px; }
+  .hero .btn-primary { min-height: 46px; margin-top: 2px; }
+  .add, .hero { scroll-margin-top: 10px; }
+}
+@media (max-height: 420px) and (min-width: 560px) and (prefers-color-scheme: dark) { .bar { box-shadow: 0 -12px 28px -20px rgba(0, 0, 0, .8); } }

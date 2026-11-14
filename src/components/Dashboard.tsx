@@ -18,6 +18,8 @@ interface DashboardProps {
   onAdd: (name: string, link: string) => Promise<string>;
   onRemove: (id: string) => Promise<void>;
   onExplain: (id: string) => Promise<Explanation>;
+  /** Status banners (demo, offline, stale watch, token, sync). They open the context page: above the orbit on a phone, atop the left page of the book spread. */
+  notices?: React.ReactNode;
 }
 
 const shortName = displayName;
@@ -169,7 +171,7 @@ function Roster({ rows, logos, selectedId, onPick }: { rows: ProgramRow[]; logos
   );
 }
 
-export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tokenMissing, onAdd, onRemove, onExplain }: DashboardProps) {
+export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tokenMissing, onAdd, onRemove, onExplain, notices }: DashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [manualText, setManualText] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -296,59 +298,64 @@ export function Dashboard({ isDemo = false, rows, logos, summary, platforms, tok
         <Orbit rows={rows} logos={logos} working={working} total={verifiable.length} selectedId={selectedId} onSelect={setSelectedId} />
       </section>
 
-      {rows.length > 0 && (
-        <Roster rows={rows} logos={logos} selectedId={selectedId} onPick={id => {
-          setSelectedId(selectedId === id ? null : id);
-          if (selectedId !== id) document.querySelector('.hero')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-        }} />
-      )}
+      {/* The context page: always rendered, so nothing remounts when the window crosses into or out of the book spread. */}
+      <div className="page-aside">
+        <div className="page-notices">{notices}</div>
 
-      {manualText !== null && (
-        <section className="manual" role="status">
-          <p>تعذر النسخ تلقائيًا. حدّد النص التالي وانسخه:</p>
-          <textarea readOnly value={manualText} rows={8} onFocus={event => event.currentTarget.select()} dir="auto" aria-label="نص التقرير"/>
-          <button type="button" className="btn" onClick={() => setManualText(null)}>إغلاق</button>
-        </section>
-      )}
+        {rows.length > 0 && (
+          <Roster rows={rows} logos={logos} selectedId={selectedId} onPick={id => {
+            setSelectedId(selectedId === id ? null : id);
+            if (selectedId !== id) document.querySelector('.hero')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+          }} />
+        )}
 
-      {addOpen ? (
-        <form className="card add" ref={addRef} onSubmit={submit} aria-label="إضافة برنامج جديد">
-          <div className="add-head"><span className="add-ico" aria-hidden="true"><Icon name="plus" size={22} /></span><div><h2>إضافة برنامج</h2><p className="muted">اسم ورابط واحد يكفيان، وأوربت يبدأ المراقبة.</p></div></div>
-          <label>اسم البرنامج
-            <input type="text" ref={nameRef} value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
-          </label>
-          <label>رابط GitHub أو الموقع
-            <input type="url" value={link} required dir="ltr" onChange={event => setLink(event.target.value)} placeholder="https://github.com/owner/project"/>
-          </label>
-          <div className="actions">
-            <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة'}</button>
-            <button className="btn" type="button" onClick={() => { setAddOpen(false); setFeedback(''); }}>إغلاق</button>
-          </div>
-          {feedback && <p className="muted" role="status">{feedback}</p>}
-          {mine.length > 0 && (
-            <div className="mine">
-              <p className="muted">برامج أضفتها</p>
-              {mine.map(p => (
-                <div className="mine-row" key={p.id}>
-                  <bdi dir="ltr">{shortName(p)}</bdi>
-                  {removing === p.id
-                    ? <button type="button" className="btn btn-danger" onClick={() => { setRemoving(null); setFeedback(''); onRemove(p.id).catch(error => setFeedback(error instanceof Error && /[\u0600-\u06FF]/.test(error.message) ? error.message : 'تعذرت الإزالة الآن، حاول بعد قليل.')); }}>تأكيد الإزالة</button>
-                    : <button type="button" className="btn" onClick={() => setRemoving(p.id)}>إزالة</button>}
-                </div>
-              ))}
+        {manualText !== null && (
+          <section className="manual" role="status">
+            <p>تعذر النسخ تلقائيًا. حدّد النص التالي وانسخه:</p>
+            <textarea readOnly value={manualText} rows={8} onFocus={event => event.currentTarget.select()} dir="auto" aria-label="نص التقرير"/>
+            <button type="button" className="btn" onClick={() => setManualText(null)}>إغلاق</button>
+          </section>
+        )}
+
+        {addOpen ? (
+          <form className="card add" ref={addRef} onSubmit={submit} aria-label="إضافة برنامج جديد">
+            <div className="add-head"><span className="add-ico" aria-hidden="true"><Icon name="plus" size={22} /></span><div><h2>إضافة برنامج</h2><p className="muted">اسم ورابط واحد يكفيان، وأوربت يبدأ المراقبة.</p></div></div>
+            <label>اسم البرنامج
+              <input type="text" ref={nameRef} value={name} maxLength={100} required onChange={event => setName(event.target.value)} placeholder="مثال: برنامجي الجديد"/>
+            </label>
+            <label>رابط GitHub أو الموقع
+              <input type="url" value={link} required dir="ltr" onChange={event => setLink(event.target.value)} placeholder="https://github.com/owner/project"/>
+            </label>
+            <div className="actions">
+              <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'جارٍ الإضافة…' : 'إضافة'}</button>
+              <button className="btn" type="button" onClick={() => { setAddOpen(false); setFeedback(''); }}>إغلاق</button>
             </div>
-          )}
-        </form>
-      ) : (
-        <div className="row-center">
-          <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><Icon name="plus" />إضافة برنامج</button>
-          {!isDemo && <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
-              {weekly !== 'copied' && <Icon name="calendar" />}{weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
-            </button>}
-        </div>
-      )}
+            {feedback && <p className="muted" role="status">{feedback}</p>}
+            {mine.length > 0 && (
+              <div className="mine">
+                <p className="muted">برامج أضفتها</p>
+                {mine.map(p => (
+                  <div className="mine-row" key={p.id}>
+                    <bdi dir="ltr">{shortName(p)}</bdi>
+                    {removing === p.id
+                      ? <button type="button" className="btn btn-danger" onClick={() => { setRemoving(null); setFeedback(''); onRemove(p.id).catch(error => setFeedback(error instanceof Error && /[\u0600-\u06FF]/.test(error.message) ? error.message : 'تعذرت الإزالة الآن، حاول بعد قليل.')); }}>تأكيد الإزالة</button>
+                      : <button type="button" className="btn" onClick={() => setRemoving(p.id)}>إزالة</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </form>
+        ) : (
+          <div className="row-center">
+            <button type="button" className="btn btn-add" onClick={() => setAddOpen(true)}><Icon name="plus" />إضافة برنامج</button>
+            {!isDemo && <button type="button" className={'btn btn-add' + (weekly === 'copied' ? ' is-copied' : weekly === 'failed' ? ' is-failed' : '')} disabled={weekly === 'loading'} aria-busy={weekly === 'loading'} onClick={() => void copyWeekly()}>
+                {weekly !== 'copied' && <Icon name="calendar" />}{weekly === 'copied' ? 'نُسخ تقرير الأسبوع' : weekly === 'failed' ? 'تعذر جلب التقرير' : 'تقرير الأسبوع'}
+              </button>}
+          </div>
+        )}
 
-      <footer className="foot"><Mark size={18} /><span>أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</span></footer>
+        <footer className="foot"><Mark size={18} /><span>أوربت يراقب ويقترح فقط، ولا يعدّل برامجك.</span></footer>
+      </div>
     </main>
   );
 }
