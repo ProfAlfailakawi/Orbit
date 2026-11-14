@@ -131,7 +131,7 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
 }
 @media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape) and (prefers-color-scheme:dark){body::after{background:linear-gradient(90deg,transparent,rgba(0,0,0,.32) 50%,transparent)}}
 /* System status widget over the physical top-right of the installed Duo: the words start below that corner box. */
-@media screen and (display-mode:standalone) and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),screen and (display-mode:standalone) and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){:root{--duo-cutout-w:116px;--duo-cutout-h:116px}.hud{padding-top:max(32px,var(--duo-cutout-h))}}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),screen and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){:root{--duo-cutout-w:116px;--duo-cutout-h:116px}.hud{padding-top:max(32px,var(--duo-cutout-h))}}
 /* Wide and short (laptop posture 951x350, 600x350, folded landscape): words on the right half, the planet on the left half. */
 @media screen and (max-height:420px) and (min-width:560px){
   .hud{max-width:56%;padding-top:max(18px,env(safe-area-inset-top));padding-inline:max(24px,env(safe-area-inset-right)) 24px}
