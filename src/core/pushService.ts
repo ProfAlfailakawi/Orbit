@@ -6,9 +6,10 @@ import fs from 'node:fs';
 import webpush from 'web-push';
 import type { Firestore } from 'firebase-admin/firestore';
 import type { AlertMemory, PushMessage } from './alerts.ts';
+import { sendApns } from './apns.ts';
 
 export interface PushSubscriptionJson { endpoint: string; keys: { p256dh: string; auth: string } }
-interface Stored { vapid?: { publicKey: string; privateKey: string }; subscriptions: Array<PushSubscriptionJson & { addedAt: number }>; alerts?: AlertMemory }
+interface Stored { vapid?: { publicKey: string; privateKey: string }; subscriptions: Array<PushSubscriptionJson & { addedAt: number }>; nativeTokens?: Array<{ token: string; addedAt: number }>; alerts?: AlertMemory }
 
 const MAX_SUBSCRIPTIONS = 10;
 const SUBJECT = 'https://orbitq8.web.app';
@@ -43,7 +44,7 @@ export function createPushService(options: { firestore: Firestore | null; snapsh
   }
 
   const publicKey = () => state.vapid!.publicKey;
-  const count = () => state.subscriptions.length;
+  const count = () => state.subscriptions.length + (state.nativeTokens?.length || 0);
 
   async function subscribe(sub: PushSubscriptionJson) {
     state.subscriptions = [{ endpoint: sub.endpoint, keys: sub.keys, addedAt: Date.now() }, ...state.subscriptions.filter(s => s.endpoint !== sub.endpoint)].slice(0, MAX_SUBSCRIPTIONS);
@@ -52,6 +53,17 @@ export function createPushService(options: { firestore: Firestore | null; snapsh
 
   async function unsubscribe(endpoint: string) {
     state.subscriptions = state.subscriptions.filter(s => s.endpoint !== endpoint);
+    await save();
+  }
+
+  /** The owner's iPhone app: an APNs device token instead of a Web Push subscription. */
+  async function subscribeNative(token: string) {
+    state.nativeTokens = [{ token, addedAt: Date.now() }, ...(state.nativeTokens || []).filter(t => t.token !== token)].slice(0, MAX_SUBSCRIPTIONS);
+    await save();
+  }
+
+  async function unsubscribeNative(token: string) {
+    state.nativeTokens = (state.nativeTokens || []).filter(t => t.token !== token);
     await save();
   }
 
@@ -64,7 +76,7 @@ export function createPushService(options: { firestore: Firestore | null; snapsh
 
   /** Send to every device; devices that report the subscription gone (404/410) are forgotten. */
   async function send(messages: PushMessage[]): Promise<{ sent: number; removed: number }> {
-    if (!messages.length || !state.subscriptions.length) return { sent: 0, removed: 0 };
+    if (!messages.length || (!state.subscriptions.length && !state.nativeTokens?.length)) return { sent: 0, removed: 0 };
     webpush.setVapidDetails(SUBJECT, state.vapid!.publicKey, state.vapid!.privateKey);
     let sent = 0;
     const gone = new Set<string>();
@@ -77,9 +89,20 @@ export function createPushService(options: { firestore: Firestore | null; snapsh
         if (status === 404 || status === 410) gone.add(sub.endpoint);
       }
     })));
-    if (gone.size) { state.subscriptions = state.subscriptions.filter(s => !gone.has(s.endpoint)); await save(); }
-    return { sent, removed: gone.size };
+    // Native iPhone app: straight to APNs. A failure here never affects the Web Push sends above.
+    const deadNative = new Set<string>();
+    await Promise.all((state.nativeTokens || []).flatMap(device => messages.map(async message => {
+      try {
+        const result = await sendApns(device.token, message.title, message.body, { kind: String(message.kind || ''), url: String(message.url || '/'), tag: String(message.tag || '') });
+        if (result.sent) sent += 1;
+        else if (result.dead) deadNative.add(device.token);
+      } catch { /* one device failing must not stop the rest */ }
+    })));
+    if (deadNative.size) state.nativeTokens = (state.nativeTokens || []).filter(t => !deadNative.has(t.token));
+    if (gone.size) state.subscriptions = state.subscriptions.filter(s => !gone.has(s.endpoint));
+    if (gone.size || deadNative.size) await save();
+    return { sent, removed: gone.size + deadNative.size };
   }
 
-  return { load, publicKey, count, subscribe, unsubscribe, alerts, setAlerts, send };
+  return { load, publicKey, count, subscribe, unsubscribe, subscribeNative, unsubscribeNative, alerts, setAlerts, send };
 }

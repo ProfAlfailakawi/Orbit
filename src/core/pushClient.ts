@@ -1,5 +1,11 @@
 /** Browser side of alerts: permission, subscription, and what to show the owner. */
 import { apiFetch } from './api';
+import { isNativePushAvailable, readNativePushPermission, registerNativePushToken, requestNativePushPermission } from '../native-push';
+
+/** The iPhone app keeps its APNs token here so it can be removed again. */
+const NATIVE_TOKEN_KEY = 'orbit_native_push_token';
+const readNativeToken = () => { try { return localStorage.getItem(NATIVE_TOKEN_KEY) || ''; } catch { return ''; } };
+const writeNativeToken = (value: string) => { try { if (value) localStorage.setItem(NATIVE_TOKEN_KEY, value); else localStorage.removeItem(NATIVE_TOKEN_KEY); } catch { /* storage unavailable */ } };
 
 export type PushState = 'unsupported' | 'ios-install' | 'blocked' | 'off' | 'on';
 
@@ -12,6 +18,12 @@ function keyBytes(base64Url: string): Uint8Array {
 }
 
 export async function readPushState(): Promise<PushState> {
+  // Inside the iPhone app there is no Service Worker: the system permission and an APNs token are used instead.
+  if (isNativePushAvailable()) {
+    const permission = await readNativePushPermission();
+    if (permission === 'denied') return 'blocked';
+    return permission === 'granted' && readNativeToken() ? 'on' : 'off';
+  }
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return 'unsupported';
   // iPhone and iPad deliver web alerts only to an app added to the Home Screen.
   if (isIOS() && !isInstalled()) return 'ios-install';
@@ -25,6 +37,16 @@ export async function readPushState(): Promise<PushState> {
 }
 
 export async function enablePush(): Promise<PushState> {
+  if (isNativePushAvailable()) {
+    const permission = await requestNativePushPermission();
+    if (permission !== 'granted') return permission === 'denied' ? 'blocked' : 'off';
+    const token = await registerNativePushToken();
+    if (!token) return 'off';
+    const res = await apiFetch('/api/push/subscribe-native', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    if (!res.ok) return 'off';
+    writeNativeToken(token);
+    return 'on';
+  }
   const state = await readPushState();
   if (state !== 'off') return state;
   const permission = await Notification.requestPermission();
@@ -37,6 +59,12 @@ export async function enablePush(): Promise<PushState> {
 }
 
 export async function disablePush(): Promise<PushState> {
+  if (isNativePushAvailable()) {
+    const token = readNativeToken();
+    try { if (token) await apiFetch('/api/push/unsubscribe-native', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) }); } catch { /* already off */ }
+    writeNativeToken('');
+    return 'off';
+  }
   try {
     const registration = await navigator.serviceWorker.getRegistration();
     const subscription = await registration?.pushManager.getSubscription();
