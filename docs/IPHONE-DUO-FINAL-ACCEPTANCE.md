@@ -174,3 +174,11 @@ Probe (WebKit, demo sandbox; marker = `.page` display and its `::before` spine, 
 Fix in this round: the queries were not scoped to `screen` (an A4 print page, about 658 px wide, fell in the portrait range), and `updating.html` had a dark-mode rule spanning 640–1000 px. Both are now exact. `src/core/duoLayout.test.ts` fails if a portrait spread allows more than 720 px, a landscape one more than 1000 px, or a Duo query is not `screen`-scoped.
 
 Known limitation: an iPad Split View or Slide Over window of about 640–720 px wide is indistinguishable from the Duo by size. Only the real-hinge query tells them apart, and only where the browser exposes it. Not tested on a real device.
+
+## الجولة الثانية (2026-11-14): الكتاب أفقيًّا فقط + منطقة الودجت
+
+- **الكتاب (صفحتان وكعب)** يظهر فقط في الوضع الأفقي: `screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape)`. الوضع العمودي على الشاشة الداخلية (669×867) عمود واحد عادي بلا انقسام. حُذف فرع `640–720` العمودي وفرع `min-aspect-ratio` من `app.css` و`updating.html` و`privacy-policy.html`.
+- **منطقة الودجت العلوية اليمنى** (ودجت النظام فوق الزاوية في التطبيق المثبّت): داخل `(display-mode: standalone)` وعلى الشاشة الداخلية فقط تُعرَّف `--duo-cutout-w/h: 116px`، ويبتعد الشريط العلوي والصفحة اليمنى وعنوان صفحة الخصوصية وكتلة صفحة التحديث عن ذلك المربع (يمين فيزيائي، حتى في RTL). الخلفيات تبقى بكامل العرض. خارج هذا الشرط لا شيء يتغير.
+- **حدّ معروف:** الشاشة الخارجية المطويّة (367×740) لا يمكن تمييزها عن أي iPhone عادي، فلا تُخمَّن لها منطقة ودجت. والمحتوى الذي يُمرَّر تحت الزاوية أثناء التمرير لا يمكن منعه.
+- **صفحة الخصوصية** في الكتاب: عمودان متدفقان (العنوان أول عمود على اليمين) بدل صفحة يسرى شبه فارغة.
+- الحارس: `src/core/duoLayout.test.ts`.

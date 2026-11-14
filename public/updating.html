@@ -122,14 +122,16 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
 .retry:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
 .note{min-height:22px;margin:14px 0 0;font-size:13px;line-height:1.65;color:var(--muted);max-width:34ch}
 
-/* iPhone Duo, opened as a book (669x867, 951x585): the words take the right page and the planet the left one, around a quiet
+/* iPhone Duo, opened as a book (landscape only: 951x585..669): the words take the right page and the planet the left one, around a quiet
    fold, so no line or button sits on the hinge. */
-@media screen and (min-width:640px) and (max-width:720px) and (min-height:640px),screen and (min-width:820px) and (max-width:1000px) and (min-height:500px) and (min-aspect-ratio:7/5){
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){
   .hud{max-width:calc(50vw - 16px);min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding-block:max(32px,env(safe-area-inset-top)) 40px;padding-inline:max(28px,env(safe-area-inset-right)) 28px}
   .scene{inset-inline:auto 0;margin:0;width:min(calc(50vw - 16px),78vh);bottom:auto;top:50%;transform:translateY(-50%)}
   body::after{content:"";position:fixed;top:0;bottom:0;left:calc(50% - 16px);width:32px;z-index:1;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(16,22,47,.07) 50%,transparent)}
 }
-@media screen and (prefers-color-scheme:dark) and (min-width:640px) and (max-width:720px) and (min-height:640px),screen and (prefers-color-scheme:dark) and (min-width:820px) and (max-width:1000px) and (min-height:500px) and (min-aspect-ratio:7/5){body::after{background:linear-gradient(90deg,transparent,rgba(0,0,0,.32) 50%,transparent)}}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape) and (prefers-color-scheme:dark){body::after{background:linear-gradient(90deg,transparent,rgba(0,0,0,.32) 50%,transparent)}}
+/* System status widget over the physical top-right of the installed Duo: the words start below that corner box. */
+@media screen and (display-mode:standalone) and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),screen and (display-mode:standalone) and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){:root{--duo-cutout-w:116px;--duo-cutout-h:116px}.hud{padding-top:max(32px,var(--duo-cutout-h))}}
 /* Wide and short (laptop posture 951x350, 600x350, folded landscape): words on the right half, the planet on the left half. */
 @media screen and (max-height:420px) and (min-width:560px){
   .hud{max-width:56%;padding-top:max(18px,env(safe-area-inset-top));padding-inline:max(24px,env(safe-area-inset-right)) 24px}

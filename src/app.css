@@ -4,6 +4,8 @@
   --gut: 16px;
   --gut-l: max(var(--gut), env(safe-area-inset-left, 0px));
   --gut-r: max(var(--gut), env(safe-area-inset-right, 0px));
+  /* The sticky top bar's height (its controls grow with the text size). */
+  --bar-h: calc(max(10px, env(safe-area-inset-top, 0px)) + 11px + max(44px, 1.6rem + 18px));
   --bg: #f3f4fb; --card: #ffffff; --ink: #10162f; --muted: #475069; --line: #dfe3f1;
   --btn: #3f46e0; --btn2: #6a3fe0; --btn-ink: #ffffff; --focus: #3f46e0;
   --bad-ink: #a3200f; --bad-bg: #fff0ee; --bad-edge: #e0402e;
@@ -67,7 +69,7 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .row-center { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .btn-add { align-self: center; border-style: dashed; border-color: var(--muted); background: transparent; color: var(--ink); padding-inline: 22px; }
 
-.page { display: flex; flex-direction: column; gap: 18px; max-width: calc(1080px - 2 * var(--gut) + var(--gut-l) + var(--gut-r)); margin: 0 auto; padding: 20px var(--gut-r) max(44px, env(safe-area-inset-bottom)) var(--gut-l); }
+.page { display: flex; flex-direction: column; gap: 18px; max-width: calc(1080px - 2 * var(--gut) + var(--gut-l) + var(--gut-r)); margin: 0 auto; padding: calc(20px + var(--duo-extra, 0px)) var(--gut-r) max(44px, env(safe-area-inset-bottom)) var(--gut-l); }
 /* The context page (notices, roster, add form, footer) is one box only in the book spread; elsewhere its children join the page
    column and the notices lead it, above the orbit. */
 .page-aside { display: contents; }
@@ -479,20 +481,31 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .hero h1 { font-size: 1.25rem; }
 }
 
+/* ═══ iPhone Duo round 2 (2026-11-14): system widget keep-out ═══
+   The installed app (standalone) on the opened Duo has a system status widget floating over the physical top-right corner (about
+   55-80 px wide, up to y=125). Its exact box is not ours to know, so a generous corner is reserved: nothing readable or tappable sits
+   in it, while backgrounds stay full-bleed. Physical `right` on purpose: in RTL the corner is the START side. Everywhere else the
+   variables are undefined and every use falls back to 0, so phones, iPads and desktops are untouched. Book = landscape inner screen. */
+@media screen and (display-mode: standalone) and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape),
+       screen and (display-mode: standalone) and (min-width: 640px) and (max-width: 720px) and (min-height: 520px) and (max-height: 960px) and (orientation: portrait) {
+  :root {
+    --duo-cutout-w: 116px; --duo-cutout-h: 116px;
+    /* How far below the bar the first content must start to clear the corner box. */
+    --duo-extra: max(0px, calc(var(--duo-cutout-h) - var(--bar-h) - 8px));
+  }
+  .bar { padding-right: calc(var(--gut-r) + var(--duo-cutout-w)); }
+}
+
 /* ═══ iPhone Duo final (2026-11-14): book spread, laptop posture — see docs/IPHONE-DUO-FINAL-ACCEPTANCE.md ═══ */
-/* Book spread: the opened inner screen (669x867 portrait, 951x585 landscape) shows two pages around a quiet spine instead of one
+/* Book spread: the opened inner screen in LANDSCAPE only (951x585..669) shows two pages around a quiet spine instead of one
    stretched column. Right page (reading start in RTL): the fleet verdict, the orbit and the chosen program. Left page: the
    notices, the program index, the add form and the footer. Nothing is remounted: the same elements are placed by the grid, so a
    typed field, an open form or a chosen program survive the fold. Tablets (768+ portrait, 1024+) keep the wide layout.
    --spine-x is the centre of the fold, measured from the left edge; with real viewport segments it follows the hinge. */
-@media screen and (min-width: 640px) and (max-width: 720px) and (min-height: 640px),
-       screen and (min-width: 820px) and (max-width: 1000px) and (min-height: 500px) and (min-aspect-ratio: 7/5),
-       screen and (horizontal-viewport-segments: 2) {
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
   :root {
     --spine: 32px; --spine-x: 50vw;
-    /* The top bar's height (its controls grow with the text size), so the right page can stay in view beneath it. */
-    --bar-h: calc(max(10px, env(safe-area-inset-top, 0px)) + 11px + max(44px, 1.6rem + 18px));
-    --page-h: calc(100dvh - var(--bar-h) - 32px);
+    --page-h: calc(100dvh - var(--bar-h) - 32px - var(--duo-extra, 0px));
   }
   .page {
     display: grid; align-items: start; max-width: none; column-gap: 0; row-gap: 0;
@@ -510,7 +523,7 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   }
   /* Right page: the orbit plate fills the page height and stays in view while the index scrolls beside it. */
   .hero {
-    grid-column: page-r; grid-row: 1; position: sticky; top: calc(var(--bar-h) + 16px); scroll-margin-top: calc(var(--bar-h) + 16px);
+    grid-column: page-r; grid-row: 1; position: sticky; top: calc(var(--bar-h) + 16px + var(--duo-extra, 0px)); margin-top: var(--duo-extra, 0px); scroll-margin-top: calc(var(--bar-h) + 16px + var(--duo-extra, 0px));
     flex-direction: column; justify-content: flex-start; align-items: center; gap: 12px;
     min-height: var(--page-h); max-height: var(--page-h); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
     padding: 24px clamp(16px, 2.4vw, 26px);
@@ -531,9 +544,9 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   /* Left page: notices, then the index of programs as one calm column, then the actions and the footer. */
   html { scroll-padding-top: calc(var(--bar-h) + 8px); }
   /* The bar runs across both pages: the brand stays on the right page and the actions on the left one, wrapping before the spine. */
-  .bar { padding-right: var(--gut-r); padding-left: var(--gut-l); }
+  .bar { padding-right: calc(var(--gut-r) + var(--duo-cutout-w, 0px)); padding-left: var(--gut-l); }
   .bar-actions { max-width: calc(var(--spine-x) - var(--spine) / 2 - var(--gut-l)); }
-  .brand { max-width: calc(100vw - var(--spine-x) - var(--spine) / 2 - var(--gut-r)); }
+  .brand { max-width: calc(100vw - var(--spine-x) - var(--spine) / 2 - var(--gut-r) - var(--duo-cutout-w, 0px)); }
   .page-aside { grid-column: page-l; grid-row: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; padding-bottom: 8px; }
   .page-notices { order: 0; }
   /* The demo chip heads its note instead of squeezing it into a narrow column beside it. */
@@ -576,15 +589,8 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .login-points svg { flex: 0 0 auto; width: 26px; height: 26px; padding: 4px; border-radius: 50%; background: rgba(134, 237, 201, .14); border: 1px solid rgba(134, 237, 201, .4); fill: none; stroke: var(--hero-accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .login-points circle { fill: var(--hero-accent); stroke: none; }
 }
-/* Portrait spread (669x867): the left page is about 300px wide, so the bar's actions drop their icons (the words stay) and the
-   operator's three buttons keep one row, which the right page's sticky offset assumes. */
-@media screen and (min-width: 640px) and (max-width: 720px) and (min-height: 640px) {
-  .bar-actions { gap: 6px; }
-  .bar-actions .btn { padding-inline: 14px; }
-  .bar-actions .ico { display: none; }
-}
 /* Landscape spread (951x585): a shorter page, so the plate tightens and the art and copy of the sign-in sit tighter. */
-@media screen and (min-width: 820px) and (max-width: 1000px) and (min-height: 500px) and (max-height: 760px) and (min-aspect-ratio: 7/5) {
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 760px) and (orientation: landscape) {
   .hero { padding-block: 18px; gap: 8px; --text-h: 214px; }
   .hero:has(.detail) { --text-h: 300px; }
   .hero h1 { font-size: 1.5rem; line-height: 1.3; }
@@ -600,7 +606,7 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   }
 }
 /* Real hinge (progressive): when the browser reports two side-by-side segments, the spine covers the hinge exactly. */
-@media screen and (horizontal-viewport-segments: 2) {
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) and (horizontal-viewport-segments: 2) {
   :root {
     --spine: max(28px, env(viewport-segment-left 1 0, 50vw) - env(viewport-segment-right 0 0, 50vw));
     --spine-x: calc((env(viewport-segment-right 0 0, 50vw) + env(viewport-segment-left 1 0, 50vw)) / 2);
