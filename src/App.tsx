@@ -415,11 +415,6 @@ export default function App() {
           <button type="button" className="btn" onClick={handleLogout}><Icon name="logout" /><span className="btn-label">خروج</span></button>
         </div>
       </header>
-      {isDemo && <p className="banner banner-warn banner-demo" role="status"><strong>وضع تجريبي</strong> بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}
-      {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
-      {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
-      {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
-      {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
       <Dashboard
         isDemo={isDemo}
         rows={rows}
@@ -430,6 +425,15 @@ export default function App() {
         onAdd={handleAdd}
         onRemove={handleRemove}
         onExplain={handleExplain}
+        notices={(
+          <>
+            {isDemo && <p className="banner banner-warn banner-demo" role="status"><strong>وضع تجريبي</strong> بيانات وهمية معزولة تمامًا؛ لا اتصال بأي موقع أو مستودع أو سجل حقيقي، وتُمحى تلقائيًا.</p>}
+            {!online && <p className="banner banner-warn" role="status">لا يوجد اتصال بالإنترنت. المعروض آخر ما وصل.</p>}
+            {watch?.stale && <p className="banner banner-warn" role="status">المراقبة التلقائية صامتة منذ {minutesPhrase(watch.minutes)}، فقد لا تصلك التنبيهات. افحص جدولة GitHub Actions.</p>}
+            {tokenWarning && <p className="banner banner-warn" role="status">{tokenWarning.text}</p>}
+            {syncBanner && <p className="banner" role="status">{syncBanner}</p>}
+          </>
+        )}
       />
     </div>
   );
