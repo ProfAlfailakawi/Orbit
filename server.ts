@@ -12,6 +12,7 @@ import { createServer as createViteServer } from 'vite';
 import { createLogoService } from './src/core/logoService.ts';
 import { createSiteService } from './src/core/siteService.ts';
 import { createPushService, validSubscription } from './src/core/pushService.ts';
+import { validApnsToken } from './src/core/apns.ts';
 import { computeAlertChanges } from './src/core/alerts.ts';
 import { applyCert, certDue } from './src/core/certs.ts';
 import { readCertificate } from './src/core/tlsExpiry.ts';
@@ -746,6 +747,17 @@ async function startServer() {
     await pushService.subscribe(req.body.subscription);
     const test = await pushService.send([{ kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' }]);
     res.json({ subscribed: true, devices: pushService.count(), test });
+  }));
+  // The iPhone app registers an APNs device token (hex) instead of a Web Push subscription.
+  app.post('/api/push/subscribe-native', asyncRoute(async (req, res) => {
+    if (!validApnsToken(req.body?.token)) return res.status(400).json({ error: 'رمز الجهاز غير صالح' });
+    await pushService.subscribeNative(req.body.token);
+    const test = await pushService.send([{ kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' }]);
+    res.json({ subscribed: true, devices: pushService.count(), test });
+  }));
+  app.post('/api/push/unsubscribe-native', asyncRoute(async (req, res) => {
+    if (validApnsToken(req.body?.token)) await pushService.unsubscribeNative(req.body.token);
+    res.json({ subscribed: false, devices: pushService.count() });
   }));
   app.post('/api/push/unsubscribe', asyncRoute(async (req, res) => {
     if (typeof req.body?.endpoint === 'string') await pushService.unsubscribe(req.body.endpoint.slice(0, 1000));
