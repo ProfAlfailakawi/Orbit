@@ -27,11 +27,11 @@ base = base.replace(/\/$/, '');
 // Known Duo sizes (CSS px). Each runs portrait and landscape (w/h swapped), light and dark; plus 200 % text at the first screens.
 const SIZES = [[382, 580], [470, 780], [594, 368], [669, 867], [951, 585], [457, 678], [457, 760]];
 // The installed app (Capacitor WKWebView) has no browser toolbars, so its viewport is TALLER: these full-height sizes run in the APP context only.
-const TALL = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700]];
+const TALL = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700], [720, 900], [951, 669], [951, 800], [1000, 960]];
 // EMULATED app context in desktop WebKit (WKWebView UA without "Safari/", window.Capacitor native ios, navigator.standalone undefined). Not a real device.
 const APP_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
 // Sizes where the zone MUST be active (the Duo's own geometry); the swapped ones are checked only if the page itself activates the zone.
-const MUST_ACTIVE = new Set(['382x580', '470x780', '669x867', '594x368', '951x585', '368x594', '585x951', '867x669', '457x678', '457x760', '678x457', '760x457', '580x382', '780x470', '382x780', '382x844', '470x900', '669x1000', '951x700']);
+const MUST_ACTIVE = new Set(['382x580', '470x780', '669x867', '594x368', '951x585', '368x594', '585x951', '867x669', '457x678', '457x760', '678x457', '760x457', '580x382', '780x470', '720x900', '951x669', '951x800', '1000x960', '382x780', '382x844', '470x900', '669x1000', '951x700']);
 let n = 0;
 const ip = () => `10.99.${Math.floor(++n / 250)}.${n % 250 + 1}`;
 

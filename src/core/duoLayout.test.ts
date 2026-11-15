@@ -89,7 +89,8 @@ function squash_all(src: string): Array<{ query: string; body: string }> {
   for (const m of src.matchAll(/@media([^{]+)\{\s*:root\s*\{([^}]*)\}/g)) out.push({ query: squash(m[1]), body: m[2] });
   return out;
 }
-const ZONE_ON: Array<[number, number]> = [[382, 580], [470, 780], [669, 867], [368, 594], [585, 951], [594, 368], [951, 585], [867, 669], [700, 900], [457, 678], [457, 760], [678, 457], [780, 470], [580, 382], [844, 390], [951, 350]];
+const ZONE_ON: Array<[number, number]> = [[382, 580], [470, 780], [669, 867], [368, 594], [585, 951], [594, 368], [951, 585], [867, 669], [700, 900], [457, 678], [457, 760], [678, 457], [780, 470], [580, 382], [844, 390], [951, 350], [720, 900], [951, 669], [951, 800], [1000, 960], [867, 669], [700, 600], [540, 400]];
+const ZONE_ON_PORTRAIT_EDGE: Array<[number, number]> = [[720, 361], [720, 1200]];
 const ZONE_OFF: Array<[number, number]> = [[744, 1024], [820, 1180], [1024, 768], [1180, 820], [1280, 800], [1440, 900], [1100, 300], [1200, 520]];
 const ZONE_ON_APP: Array<[number, number]> = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700], [594, 420]];
 
@@ -98,7 +99,7 @@ for (const file of ZONE_FILES) {
     const queries = zoneQueries(file);
     assert.ok(queries.length >= 3, `${file}: widget zone definition missing`);
     assert.ok(!/display-mode/.test(queries.join(' ')), `${file}: the zone must not depend on display-mode`);
-    for (const [w, h] of ZONE_ON) assert.ok(queries.some(q => matches(q, w, h)), `${file}: zone must be active at ${w}x${h}`);
+    for (const [w, h] of [...ZONE_ON, ...ZONE_ON_PORTRAIT_EDGE]) assert.ok(queries.some(q => matches(q, w, h)), `${file}: zone must be active at ${w}x${h}`);
     for (const [w, h] of ZONE_ON_APP) assert.ok(queries.some(q => matches(q, w, h)), `${file}: zone must be active at the taller app viewport ${w}x${h}`);
     for (const [w, h] of ZONE_OFF) assert.ok(!queries.some(q => matches(q, w, h)), `${file}: zone must stay 0 at ${w}x${h}`);
   });

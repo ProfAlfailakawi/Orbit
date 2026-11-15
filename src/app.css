@@ -44,8 +44,9 @@
    up to 700 px wide: 382x580, 470x780, 669x867), the folded landscape 594x368, a real hinge, and the book spread (landscape inner
    screen 721-1000 x 520-960, e.g. 951x585). The landscape geometry has NOT been verified on a device. Physical `right` on purpose
    (never inline-end): the corner is the START side in RTL. */
-@media screen and (orientation: portrait) and (max-width: 700px),
-       screen and (orientation: landscape) and (min-width: 550px) and (max-width: 1000px) and (min-height: 300px) and (max-height: 519px),
+@media screen and (orientation: portrait) and (max-width: 720px),
+       screen and (orientation: landscape) and (min-width: 540px) and (max-width: 1000px) and (min-height: 300px) and (max-height: 519px),
+       screen and (orientation: landscape) and (min-width: 540px) and (max-width: 720px) and (min-height: 520px) and (max-height: 960px),
        screen and (horizontal-viewport-segments: 2) {
   :root {
     --duo-widget-w: 96px; --duo-widget-gap: 8px; --duo-widget-h: clamp(64px, 31vh, 270px);

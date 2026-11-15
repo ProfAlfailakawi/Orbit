@@ -27,7 +27,7 @@
   button:active { opacity: .7; }
   @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s; } }
   /* iPhone Duo: same widget zone as src/app.css (70 px + 8 px gap on the PHYSICAL right, 0 elsewhere; geometry not verified on a device). */
-  @media screen and (orientation:portrait) and (max-width:700px),screen and (orientation:landscape) and (min-width:550px) and (max-width:1000px) and (min-height:300px) and (max-height:519px),screen and (horizontal-viewport-segments:2),screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape) { :root { --duo-widget-w:96px;--duo-widget-gap:8px;--duo-widget-h:clamp(64px,31vh,270px);--duo-col:calc(var(--duo-widget-w) + var(--duo-widget-gap)); } body { padding-right: calc(max(24px, env(safe-area-inset-right)) + var(--duo-col)); padding-top: max(24px, calc(var(--duo-widget-h) + var(--duo-widget-gap))); } }
+  @media screen and (orientation:portrait) and (max-width:720px),screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:519px),screen and (orientation:landscape) and (min-width:540px) and (max-width:720px) and (min-height:520px) and (max-height:960px),screen and (horizontal-viewport-segments:2),screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape) { :root { --duo-widget-w:96px;--duo-widget-gap:8px;--duo-widget-h:clamp(64px,31vh,270px);--duo-col:calc(var(--duo-widget-w) + var(--duo-widget-gap)); } body { padding-right: calc(max(24px, env(safe-area-inset-right)) + var(--duo-col)); padding-top: max(24px, calc(var(--duo-widget-h) + var(--duo-widget-gap))); } }
 </style>
 </head>
 <body>
