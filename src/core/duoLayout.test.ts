@@ -33,7 +33,7 @@ for (const file of FILES) {
         const min = px(query, 'min-width'), max = px(query, 'max-width');
         assert.ok(!/min-aspect-ratio/.test(query), `old aspect-ratio spread query: @media ${query}`);
         assert.ok(!(min === 820 && max === 1000), `old 820-1000 spread query: @media ${query}`);
-        assert.ok(!/horizontal-viewport-segments/.test(query) || query.startsWith(BOOK), `hinge query must stay inside BOOK: @media ${query}`);
+        assert.ok(!/horizontal-viewport-segments/.test(query) || query.startsWith(BOOK) || query === 'screen and (horizontal-viewport-segments:2)', `hinge query must stay inside BOOK (or be the bare zone-only query): @media ${query}`);
         if (min === 640 && max === 720) {
           // The portrait inner screen only ever gets the widget keep-out, never a layout split.
           assert.ok(query.startsWith(PORTRAIT_INNER), `portrait query is not the shared DUO INNER one: @media ${query}`);
@@ -50,16 +50,6 @@ for (const file of FILES) {
   });
 }
 
-test('Duo round 2: the portrait inner screen block in app.css holds only the keep-out, no grid', () => {
-  const css = read('src/app.css');
-  const at = css.indexOf('screen and (min-width: 640px) and (max-width: 720px)');
-  assert.ok(at > 0, 'keep-out block missing');
-  const block = css.slice(at, css.indexOf('\n}\n', at));
-  assert.match(block, /--duo-cutout-w: 116px/);
-  assert.match(block, /--duo-cutout-h: 116px/);
-  assert.ok(!/grid-template-columns|column-count|columns:/.test(block), 'the shared portrait block must not split the page');
-});
-
 test('Duo round 2: BOOK matches the Duo landscape sizes and nothing else', () => {
   for (const [w, h] of [[951, 585], [951, 669], [951, 540], [800, 600], [1000, 700]]) assert.ok(isBook(w, h), `${w}x${h} should be book`);
   const notBook: Array<[number, number]> = [[669, 867], [720, 900], [390, 844], [844, 390], [932, 430], [744, 1024], [820, 1180], [1024, 768], [1180, 820], [1280, 800], [951, 350], [367, 740], [594, 368]];
@@ -74,36 +64,51 @@ test('Duo round 2: the laptop dock for short landscape stays as it was', () => {
   assert.ok(preludes(read('src/app.css')).includes('screen and (max-height:420px) and (min-width:560px)'));
 });
 
-// Round 3: the keep-out is evaluated for real, per file, at every size that matters.
-/** Minimal evaluator for the media features the keep-out uses (screen, min/max width/height, orientation). Unknown features fail loudly. */
+// Widget corner (round 4): ONE reserved zone as CSS variables, evaluated for real in every file that carries it.
+const ZONE_FILES = ['src/app.css', 'public/updating.html', 'public/privacy-policy.html', 'apple/www/index.html', 'apple/www/offline.html'];
+/** Minimal evaluator for the media features the zone uses. Unknown features fail loudly. */
 function matches(query: string, w: number, h: number): boolean {
-  const parts = query.split(/\s+and\s+/);
-  return parts.every(part => {
+  return query.split(/\s+and\s+/).every(part => {
     if (part === 'screen') return true;
     const m = part.match(/^\((min|max)-(width|height):(\d+)px\)$/);
     if (m) { const v = m[2] === 'width' ? w : h; return m[1] === 'min' ? v >= Number(m[3]) : v <= Number(m[3]); }
     if (part === '(orientation:landscape)') return w > h;
     if (part === '(orientation:portrait)') return h >= w;
-    throw new Error(`keep-out query uses a feature this guard cannot evaluate: ${part}`);
+    if (part === '(horizontal-viewport-segments:2)') return false; // real hinge only; not simulated
+    throw new Error(`widget zone query uses a feature this guard cannot evaluate: ${part}`);
   });
 }
-const keepOutQueries = (file: string) => {
-  const src = read(file);
+const zoneQueries = (file: string) => {
   const out: string[] = [];
-  for (const m of src.matchAll(/@media([^{]+)\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g)) {
-    if (/--duo-cutout-w\s*:\s*116px/.test(m[2])) out.push(...squash(m[1]).split(',').map(q => q.trim()));
-  }
+  for (const m of squash_all(read(file))) if (/--duo-widget-w\s*:\s*96px/.test(m.body)) out.push(...m.query.split(',').map(q => q.trim()));
   return out;
 };
-const IN: Array<[number, number]> = [[951, 669], [951, 585], [669, 867], [720, 900], [700, 900], [880, 585]];
-const OUT: Array<[number, number]> = [[390, 844], [844, 390], [932, 430], [430, 932], [744, 1024], [820, 1180], [1024, 768], [1180, 820], [1280, 800], [1440, 900], [367, 740], [951, 350], [594, 368]];
+/** Every `@media <q> { :root { ... } }` block, flattened. */
+function squash_all(src: string): Array<{ query: string; body: string }> {
+  const out: Array<{ query: string; body: string }> = [];
+  for (const m of src.matchAll(/@media([^{]+)\{\s*:root\s*\{([^}]*)\}/g)) out.push({ query: squash(m[1]), body: m[2] });
+  return out;
+}
+const ZONE_ON: Array<[number, number]> = [[382, 580], [470, 780], [669, 867], [368, 594], [585, 951], [594, 368], [951, 585], [867, 669], [700, 900], [457, 678], [457, 760], [678, 457], [780, 470], [580, 382], [844, 390], [951, 350]];
+const ZONE_OFF: Array<[number, number]> = [[744, 1024], [820, 1180], [1024, 768], [1180, 820], [1280, 800], [1440, 900], [1100, 300], [1200, 520]];
+const ZONE_ON_APP: Array<[number, number]> = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700], [594, 420]];
 
-for (const file of FILES) {
-  test(`Duo round 3: ${file} keep-out has no display-mode and matches only the Duo inner screen`, () => {
-    const queries = keepOutQueries(file);
-    assert.deepEqual(queries.sort(), [BOOK, PORTRAIT_INNER].sort(), `${file} keep-out must be exactly BOOK + PORTRAIT INNER`);
-    assert.ok(!/display-mode/.test(queries.join(' ')), `${file} keep-out must not depend on display-mode`);
-    for (const [w, h] of IN) assert.ok(queries.some(q => matches(q, w, h)), `${file}: keep-out must apply at ${w}x${h}`);
-    for (const [w, h] of OUT) assert.ok(!queries.some(q => matches(q, w, h)), `${file}: keep-out must NOT apply at ${w}x${h}`);
+for (const file of ZONE_FILES) {
+  test(`Duo widget corner: ${file} reserves the zone on the Duo screens only`, () => {
+    const queries = zoneQueries(file);
+    assert.ok(queries.length >= 3, `${file}: widget zone definition missing`);
+    assert.ok(!/display-mode/.test(queries.join(' ')), `${file}: the zone must not depend on display-mode`);
+    for (const [w, h] of ZONE_ON) assert.ok(queries.some(q => matches(q, w, h)), `${file}: zone must be active at ${w}x${h}`);
+    for (const [w, h] of ZONE_ON_APP) assert.ok(queries.some(q => matches(q, w, h)), `${file}: zone must be active at the taller app viewport ${w}x${h}`);
+    for (const [w, h] of ZONE_OFF) assert.ok(!queries.some(q => matches(q, w, h)), `${file}: zone must stay 0 at ${w}x${h}`);
   });
 }
+
+test('Duo widget corner: the zone variables live in the root tokens, are 0 by default and never use inline-end', () => {
+  const css = read('src/app.css');
+  const root = css.slice(css.indexOf(':root {'), css.indexOf('@media (prefers-color-scheme: dark)'));
+  for (const v of ['--duo-widget-w: 0px', '--duo-widget-gap: 0px', '--duo-widget-h: 0px']) assert.ok(root.includes(v), `${v} missing from :root`);
+  assert.match(css, /--duo-widget-h: clamp\(64px, 31vh, 270px\)/);
+  assert.ok(!/duo-cutout/.test(css + read('public/updating.html') + read('public/privacy-policy.html')), 'the old 116px keep-out variables must be gone');
+  assert.ok(!/padding-inline-end[^;]*--duo/.test(css), 'the zone is physical right; never inline-end');
+});
