@@ -258,3 +258,7 @@ Known limitation: an iPad Split View or Slide Over window of about 640–720 px 
 ### دخول Google / Apple: غير موجود في هذا الريبو
 
 لا `signInWithPopup`/`signInWithRedirect`/`GoogleAuthProvider`/`OAuthProvider` في `src` ولا `server.ts` (البحث لا يجد إلا `DOCTYPE` من `apple.com` في plist)، والدخول برمز (`passkey`) أو الوضع التجريبي (`server.ts` ≈ سطر 451، `App.tsx` نموذج `.login`). الغلاف يفتح الموقع عبر `server.url` لكن لا يوجد تسجيل دخول اجتماعي، فخطأ «missing initial state» لا ينطبق هنا. لو أُضيف Google لاحقًا: استعمل `@capgo/capacitor-social-login` ثم `signInWithCredential`، مع iOS client ID وURL scheme في `apple/ios/App/App/Info.plist`، ثم `npx cap sync ios` وأرشفة ورفع TestFlight.
+
+### متابعة: توسيع بوابات الكشف (duo-widget-corner-1114b)
+
+مراجعة Codex على مشروع آخر أظهرت أن بوابات `portrait ≤ 700` تُسقط 720×900 المحميّ سابقًا. التفعيل الآن: طولي حتى **720px** عرضًا؛ أفقي 540–1000 × 300–519؛ أفقي 540–720 × 520–960؛ الكتاب 721–1000 × 520–960 (يشمل 951×669 و951×800 و1000×960). أُضيفت 720×900 و951×669 و951×800 و1000×960 إلى الحارس كإلزامية التفعيل، وإلى اختبار CSS، وبقيت iPad 744×1024 فما فوق وسطح المكتب غير مفعّلة.
