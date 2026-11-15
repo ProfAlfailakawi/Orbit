@@ -130,8 +130,11 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
   body::after{content:"";position:fixed;top:0;bottom:0;left:calc(50% - 16px);width:32px;z-index:1;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(16,22,47,.07) 50%,transparent)}
 }
 @media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape) and (prefers-color-scheme:dark){body::after{background:linear-gradient(90deg,transparent,rgba(0,0,0,.32) 50%,transparent)}}
-/* System status widget over the physical top-right of the installed Duo: the words start below that corner box. */
-@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),screen and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){:root{--duo-cutout-w:116px;--duo-cutout-h:116px}.hud{padding-top:max(32px,var(--duo-cutout-h))}}
+/* iPhone Duo: the system widget floats over the PHYSICAL top-right corner (the START side in RTL). One reserved zone, same definition as src/app.css:
+   70 px + 8 px gap wide, up to 30 % of the height (max 200 px) high; 0 elsewhere. Landscape geometry is not verified on a device. */
+@media screen and (orientation:portrait) and (max-width:700px),screen and (orientation:landscape) and (min-width:550px) and (max-width:1000px) and (min-height:300px) and (max-height:519px),screen and (horizontal-viewport-segments:2){:root{--duo-widget-w:96px;--duo-widget-gap:8px;--duo-widget-h:clamp(64px,31vh,270px);--duo-col:calc(var(--duo-widget-w) + var(--duo-widget-gap));--duo-reserve-r:var(--duo-col)}}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){:root{--duo-widget-w:96px;--duo-widget-gap:8px;--duo-widget-h:clamp(64px,31vh,270px);--duo-col:calc(var(--duo-widget-w) + var(--duo-widget-gap));--duo-reserve-r:0px}}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){.hud{padding-top:max(32px,calc(var(--duo-widget-h) + var(--duo-widget-gap)))}}
 /* Wide and short (laptop posture 951x350, 600x350, folded landscape): words on the right half, the planet on the left half. */
 @media screen and (max-height:420px) and (min-width:560px){
   .hud{max-width:56%;padding-top:max(18px,env(safe-area-inset-top));padding-inline:max(24px,env(safe-area-inset-right)) 24px}
@@ -144,6 +147,8 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
 @media (prefers-reduced-motion:reduce){
   .stars i,.blip{animation:none}
 }
+/* last on purpose: the posture rules above set padding-inline too */
+@media screen and (orientation:portrait) and (max-width:700px),screen and (orientation:landscape) and (min-width:550px) and (max-width:1000px) and (min-height:300px) and (max-height:519px),screen and (horizontal-viewport-segments:2){.hud{padding-right:calc(max(20px,env(safe-area-inset-right)) + var(--duo-reserve-r))}.telemetry{align-items:flex-start}.telemetry .blip{margin-top:.45em}.telemetry span{white-space:normal;overflow-wrap:anywhere;min-width:0}}
 </style>
 </head>
 <body>
