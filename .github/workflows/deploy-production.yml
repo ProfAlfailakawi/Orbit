@@ -48,12 +48,13 @@ jobs:
           # Bind the token unconditionally. The deploy identity may not have
           # secret metadata read permission, so `secrets describe` is not a
           # reliable test for whether the runtime secret exists.
-          SECRET_BINDINGS="ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest,GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest"
+          # APNs key for the iPhone app: --set-secrets replaces every binding, so it must be listed here or each deploy drops it.
+          SECRET_BINDINGS="ORBIT_OPERATOR_PASSKEY=ORBIT_OPERATOR_PASSKEY:latest,GITHUB_READ_ONLY_TOKEN=GITHUB_READ_ONLY_TOKEN:latest,APNS_KEY_P8=apns-key-p8:latest"
           gcloud run deploy orbit-api \
             --source . --region "$REGION" --project "$PROJECT_ID" \
             --service-account "${{ vars.ORBIT_RUNTIME_SERVICE_ACCOUNT }}" \
             --allow-unauthenticated --min 0 --max 1 --cpu 1 --memory 1Gi \
-            --timeout 300 --concurrency 40 --set-env-vars DATA_STORE=firestore,FIREBASE_PROJECT_ID=$PROJECT_ID,FIREBASE_DATABASE_ID='${{ vars.FIREBASE_DATABASE_ID }}',SCHEDULER_ONLY=true,ORBIT_TRUST_PROXY_HOPS=1,GITHUB_SYNC_MIN_INTERVAL_HOURS=72,ORBIT_BUILD_ID=$ORBIT_BUILD_ID,ORBIT_PRODUCTION_URL=https://orbitq8.web.app,ORBIT_HEARTBEAT_URL='${{ vars.ORBIT_HEARTBEAT_URL }}',ORBIT_LOG_SOURCES='${{ vars.ORBIT_LOG_SOURCES }}' \
+            --timeout 300 --concurrency 40 --set-env-vars APNS_KEY_ID=68Q88AA7M5,APNS_TEAM_ID=55V8UB9X3H,APNS_BUNDLE_ID=com.dralfailakawi.orbit,DATA_STORE=firestore,FIREBASE_PROJECT_ID=$PROJECT_ID,FIREBASE_DATABASE_ID='${{ vars.FIREBASE_DATABASE_ID }}',SCHEDULER_ONLY=true,ORBIT_TRUST_PROXY_HOPS=1,GITHUB_SYNC_MIN_INTERVAL_HOURS=72,ORBIT_BUILD_ID=$ORBIT_BUILD_ID,ORBIT_PRODUCTION_URL=https://orbitq8.web.app,ORBIT_HEARTBEAT_URL='${{ vars.ORBIT_HEARTBEAT_URL }}',ORBIT_LOG_SOURCES='${{ vars.ORBIT_LOG_SOURCES }}' \
             --set-secrets "$SECRET_BINDINGS"
           SERVICE_URL="$(gcloud run services describe orbit-api --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
           gcloud run services update orbit-api --region "$REGION" --project "$PROJECT_ID" \
