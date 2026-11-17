@@ -483,6 +483,22 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .orbit { width: min(100%, 400px, max(172px, 31dvh)); }
   .page { gap: 10px; }
 }
+/* Duo's folded outer portrait reserves a narrow system-widget lane, leaving a narrow content card even at 382px viewport width.
+   Keep the full demo notice and verdict visible, while making the three fleet counts a readable single row so the primary action
+   remains reachable without scrolling. This is scoped to short, narrow viewports; wider Duo postures retain the standard layout. */
+@media (max-width: 420px) and (max-height: 650px) {
+  .banner-demo { padding: 4px 8px; font-size: .76rem; line-height: 1.35; }
+  .banner-demo strong { padding: 2px 8px; font-size: .7rem; }
+  .hero { gap: 4px; padding: 8px 14px 12px; }
+  .orbit { width: min(100%, 400px, max(148px, 26dvh)); margin-bottom: -2px; }
+  .hero-text { gap: 4px; }
+  .tally { flex-wrap: nowrap; gap: 4px; }
+  .tally li { flex: 1 1 0; justify-content: center; gap: 3px; min-width: 0; padding: 4px 3px; font-size: .68rem; white-space: nowrap; }
+  .tally li::before { width: 5px; height: 5px; }
+  .tally b { font-size: .92rem; }
+  .hero .btn-primary { margin-top: 2px; }
+  .page { gap: 10px; }
+}
 
 /* Tabletop posture (segments stacked): on sign-in the picture takes the upper half and the form the lower one. The dashboard is a
    scrolling page, so it keeps its normal flow (documented as partial in docs/IPHONE-DUO-ADAPTIVE-QUALITY.md). */
