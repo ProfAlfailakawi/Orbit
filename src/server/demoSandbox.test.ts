@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { createDemoGate, createDemoStore, buildDemoState, demoEnabled, DEMO_HEADER } from './demoSandbox.ts';
+import { REVIEW_DEMO_ACCESS_CODE } from '../shared/review-demo-entry.ts';
 
 /** A stand-in for every real handler: any hit means isolation failed. It would leak a "real" token and log line. */
 async function boot(enabled = true, max = 200) {
@@ -16,7 +17,12 @@ async function boot(enabled = true, max = 200) {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return { hits, base, close: () => server.close() };
 }
-const enter = async (base: string) => (await (await fetch(`${base}/api/demo/enter`, { method: 'POST' })).json()) as { sessionId: string };
+const withCode = (base: string) => fetch(`${base}/api/demo/enter`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: REVIEW_DEMO_ACCESS_CODE }),
+});
+const enter = async (base: string) => (await (await fetch(`${base}/api/demo/enter`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: REVIEW_DEMO_ACCESS_CODE }),
+})).json()) as { sessionId: string };
 
 test('enter issues demo_ + 64 hex; state is synthetic only', async () => {
   const s = await boot();
@@ -75,7 +81,7 @@ test('sandboxes are private per visitor; writes stay inside', async () => {
 
 test('kill switch: enter 404, demo header never falls through', async () => {
   const s = await boot(false);
-  assert.equal((await fetch(`${s.base}/api/demo/enter`, { method: 'POST' })).status, 404);
+  assert.equal((await withCode(s.base)).status, 404);
   assert.equal((await (await fetch(`${s.base}/api/demo/config`)).json()).enabled, false);
   const res = await fetch(`${s.base}/api/state`, { headers: { [DEMO_HEADER]: 'demo_' + 'a'.repeat(64) } });
   assert.equal(res.status, 404);
@@ -86,11 +92,11 @@ test('kill switch: enter 404, demo header never falls through', async () => {
 test('capacity cap and enter rate limit', async () => {
   const s = await boot(true, 2);
   await enter(s.base); await enter(s.base);
-  assert.equal((await fetch(`${s.base}/api/demo/enter`, { method: 'POST' })).status, 503);
+  assert.equal((await withCode(s.base)).status, 503);
   s.close();
   const r = await boot();
   let last = 0;
-  for (let i = 0; i < 22; i += 1) last = (await fetch(`${r.base}/api/demo/enter`, { method: 'POST' })).status;
+  for (let i = 0; i < 22; i += 1) last = (await withCode(r.base)).status;
   assert.equal(last, 429);
   r.close();
 });
@@ -104,4 +110,25 @@ test('TTL expiry drops the sandbox; env switch parsing; fixtures are fresh', () 
   for (const v of ['0', 'false', 'off', 'No']) assert.equal(demoEnabled({ ORBIT_DEMO_ENABLED: v } as NodeJS.ProcessEnv), false);
   const st = buildDemoState();
   assert.ok(st.platforms.every(p => p.repoUrl === '' && (!p.productionUrl || p.productionUrl.endsWith('.demo.invalid'))));
+});
+
+test('enter without the reserved reviewer code is refused: no sandbox, no session id', async () => {
+  const s = await boot();
+  const post = (body: unknown) => fetch(`${s.base}/api/demo/enter`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  for (const body of [undefined, {}, { code: '' }, { code: 'demo' }, { code: 'Test' }, { code: REVIEW_DEMO_ACCESS_CODE.slice(1) }, { code: REVIEW_DEMO_ACCESS_CODE + 'x' }, { code: 123 }, { code: [REVIEW_DEMO_ACCESS_CODE] }]) {
+    const res = await post(body);
+    assert.equal(res.status, 403, JSON.stringify(body));
+    assert.equal((await res.json()).sessionId, undefined);
+  }
+  // iOS capitalises the first letter: the check is case-insensitive
+  const ok = await post({ code: REVIEW_DEMO_ACCESS_CODE[0].toUpperCase() + REVIEW_DEMO_ACCESS_CODE.slice(1) });
+  assert.equal(ok.status, 200);
+  assert.match((await ok.json()).sessionId, /^demo_[0-9a-f]{64}$/);
+  s.close();
+});
+
+test('/api/demo/config no longer advertises the demo to the public', async () => {
+  const s = await boot();
+  assert.equal((await (await fetch(`${s.base}/api/demo/config`)).json()).enabled, false);
+  s.close();
 });

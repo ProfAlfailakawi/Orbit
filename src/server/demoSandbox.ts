@@ -11,6 +11,7 @@
 import crypto from 'crypto';
 import type express from 'express';
 import type { PlatformRecord } from '../core/types.ts';
+import { isReviewDemoAccessCode } from '../shared/review-demo-entry.ts';
 
 export const DEMO_HEADER = 'x-orbit-demo';
 /** نفس صيغة مِراس: demo_ + 32 بايت بالست عشري. */
@@ -152,12 +153,17 @@ export function createDemoGate(options: { enabled?: () => boolean; store?: Retur
 
     if (path === '/demo/config' && method === 'GET') {
       res.setHeader('Cache-Control', 'no-store');
-      return void res.json({ enabled: enabled(), ttlMs: DEMO_TTL_MS });
+      // Kept for compatibility, but it no longer reveals whether the demo exists: entry needs the reviewer code.
+      return void res.json({ enabled: false, ttlMs: DEMO_TTL_MS });
     }
 
     if (path === '/demo/enter' && method === 'POST') {
       res.setHeader('Cache-Control', 'no-store');
       if (!enabled()) return void res.status(404).json({ error: 'البيئة التجريبية غير مفعّلة في هذا النشر.' });
+      // The sandbox opens only for the reserved reviewer code (no visible button anywhere): a wrong or missing
+      // code is refused before any sandbox is created or any rate-limit slot is spent on it.
+      const code = (req.body && typeof req.body === 'object') ? (req.body as Record<string, unknown>).code : undefined;
+      if (!isReviewDemoAccessCode(code)) return void res.status(403).json({ error: 'رمز غير صحيح.' });
       const now = Date.now();
       const key = req.ip || 'unknown';
       const hit = enterHits.get(key);

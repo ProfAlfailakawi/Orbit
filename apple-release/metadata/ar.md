@@ -8,10 +8,10 @@
 | الفئة | Developer Tools |
 | معرّف الحزمة | `com.dralfailakawi.orbit` |
 | الإصدار | 1.0.0 (1) |
-| رابط الخصوصية | https://orbitq8.web.app/privacy — OWNER-TODO: تأكد أنه يعمل |
-| رابط الدعم | https://orbitq8.web.app — OWNER-TODO: صفحة دعم/تواصل |
-| حقوق النشر | © 2026 OWNER-TODO: اسم المالك القانوني كما في حساب Apple |
-| طريقة التوزيع | TestFlight داخلي فقط — لوحة مراقبة خاصة |
+| رابط الخصوصية | https://orbitq8.web.app/privacy-policy.html |
+| رابط الدعم | https://profalfailakawi.github.io/skygate-legal/support/ |
+| حقوق النشر | © 2026 SKY GATE EDUCATIONAL CONSULTING COMPANY |
+| طريقة التوزيع | App Store عام، مجاني، 148 دولة بلا الاتحاد الأوروبي، إصدار تلقائي بعد القبول (القرار: المالك، 2026-11-21) |
 | التصنيف العمري المقترح | 4+ |
 
 ## الوصف
