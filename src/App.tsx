@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, clearOrbitSessionToken, setOrbitSessionToken } from './core/api';
 import { forgetDemoId, readDemoId, rememberDemoId } from './core/demoTransport';
+import { isReviewDemoAccessCode } from './shared/review-demo-entry';
 import { SERVER_BACK_EVENT } from './core/updatingNotice';
 import type { IncidentCaseFile, PlatformLifecycleState, PlatformRecord, RadarEvent } from './core/types';
 import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } from './core/fleetStatus';
@@ -41,7 +42,6 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [logos, setLogos] = useState<Logos>({});
   const [isDemo, setIsDemo] = useState(() => Boolean(readDemoId()));
-  const [demoAvailable, setDemoAvailable] = useState(false);
   const [pushState, setPushState] = useState<PushState>('unsupported');
   const autoSyncedRef = useRef(false);
   const logosAskedRef = useRef(false);
@@ -237,15 +237,11 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (readDemoId()) return;
-    fetch('/api/demo/config', { cache: 'no-store' }).then(r => r.json()).then(d => setDemoAvailable(d?.enabled === true)).catch(() => {});
-  }, []);
-
-  const handleDemoEnter = async () => {
+  // No visible demo button: the isolated demo opens only when the reserved reviewer code is typed in the login field.
+  const handleDemoEnter = async (code: string) => {
     setAuthError(null);
     try {
-      const res = await fetch('/api/demo/enter', { method: 'POST', headers: { Accept: 'application/json' } });
+      const res = await fetch('/api/demo/enter', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ code }) });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || !rememberDemoId(data.sessionId)) { setAuthError(data?.error || 'تعذر فتح العرض التجريبي الآن.'); return; }
       clearOrbitSessionToken();
@@ -257,6 +253,7 @@ export default function App() {
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setAuthError(null);
+    if (isReviewDemoAccessCode(passkeyInput)) { await handleDemoEnter(passkeyInput); setPasskeyInput(''); return; }
     try {
       const res = await apiFetch('/api/auth/verify', {
         method: 'POST',
@@ -385,14 +382,9 @@ export default function App() {
         <form className="card login" onSubmit={handleLogin}>
           <div className="login-brand"><Mark size={44} /><div><h1>أوربت</h1><p className="login-sub">مراقب برامجك</p></div></div>
           <label htmlFor="orbit-passkey-input" className="login-label"><Icon name="key" size={16} />رمز الدخول</label>
-          <input id="orbit-passkey-input" type="password" autoComplete="current-password" value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
+          <input id="orbit-passkey-input" type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
           <button type="submit" className="btn btn-primary">دخول</button>
-          {demoAvailable && (
-            <button type="button" className="btn btn-demo" onClick={() => void handleDemoEnter()}>
-              <Icon name="play" size={16} />تجربة بدون حساب (بيانات وهمية)
-            </button>
-          )}
         </form>
         </div>
       </div>
