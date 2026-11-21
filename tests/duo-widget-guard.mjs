@@ -95,6 +95,11 @@ async function scan(page, label, mustBeActive, control = false) {
 async function newPage(browser, w, h, scheme, text200, app) {
   const context = await browser.newContext({ ...(app ? { userAgent: APP_UA, isMobile: true, hasTouch: true } : {}),  extraHTTPHeaders: { 'x-forwarded-for': ip() }, viewport: { width: w, height: h }, deviceScaleFactor: app ? 2 : 1, locale: 'ar-KW', reducedMotion: 'reduce', serviceWorkers: 'block', colorScheme: scheme });
   const page = await context.newPage();
+  // Every size here is an iPhone Duo screen: mark it the way src/lib/duo-markers.ts does on the device (the zone is gated on it).
+  await page.addInitScript(() => {
+    const mark = () => { const r = document.documentElement; if (r && r.dataset.device !== 'duo') r.dataset.device = 'duo'; };
+    mark(); document.addEventListener('DOMContentLoaded', () => { mark(); new MutationObserver(mark).observe(document.documentElement, { attributes: true, attributeFilter: ['data-device'] }); });
+  });
   if (app) await page.addInitScript(() => {
     window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios', platform: 'ios' };
     try { Object.defineProperty(navigator, 'standalone', { get: () => undefined, configurable: true }); } catch { /* already undefined */ }
@@ -141,8 +146,8 @@ try {
           const add = page.locator('.btn-add'); if (await add.count()) { await add.first().click(); await settle(page); await scan(page, `${tag} add-form-open`, must); }
           // Static pages.
           await page.route('**/api/version', r => r.fulfill({ status: 503, body: 'updating' }));
-          await page.goto(base + '/updating.html'); await page.locator('#retry').waitFor(); await settle(page); await scan(page, `${tag} updating.html`, must);
-          await page.goto(base + '/privacy-policy.html'); await page.locator('h1').waitFor(); await settle(page); await scan(page, `${tag} privacy-policy.html`, must);
+          await page.goto(base + '/updating.html'); await page.locator('#retry').waitFor(); await settle(page); await scan(page, `${tag} updating.html`, false); // static page: no markers, no zone
+          await page.goto(base + '/privacy-policy.html'); await page.locator('h1').waitFor(); await settle(page); await scan(page, `${tag} privacy-policy.html`, false); // static page: no markers, no zone
           await context.close();
           break;
           } catch (e) {
