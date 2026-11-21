@@ -1,6 +1,10 @@
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './app.css';
+import { installDuoMarkers } from './lib/duo-markers.ts';
+
+// علامات iPhone Duo قبل أول رسم: ركن الودجت في app.css لا يُحجز إلا حين data-device="duo".
+installDuoMarkers();
 
 createRoot(document.getElementById('root')!).render(<App />);
 

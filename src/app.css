@@ -63,6 +63,13 @@
     --duo-extra: max(0px, calc(var(--duo-widget-h) + var(--duo-widget-gap) - var(--bar-h)));
   }
 }
+/* The two queries above go by window size alone, so they also matched every ordinary iPhone (390-430 wide), a narrow iPad window and a
+   narrow desktop browser, leaving an empty ~104 px strip on the right. The zone is real on the iPhone Duo only: src/lib/duo-markers.ts
+   sets html[data-device="duo"] there, and everywhere else every zone variable goes back to 0 (higher specificity than :root). */
+html:not([data-device="duo"]) {
+  --duo-widget-w: 0px; --duo-widget-gap: 0px; --duo-widget-h: 0px;
+  --duo-col: 0px; --duo-reserve-r: 0px; --duo-extra: 0px;
+}
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--ink); font-family: 'Orbit Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-size: 16px; line-height: 1.6; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
