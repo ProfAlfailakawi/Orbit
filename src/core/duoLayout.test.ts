@@ -148,7 +148,7 @@ test('Widget corner: normal screens get no zone (the reset under html:not([data-
 test('Widget corner: the static pages (no device markers) carry no width-only zone', () => {
   for (const file of STATIC_PAGES) {
     const src = read(file);
-    assert.ok(!/--duo-widget-w\s*:\s*(?!0px)[^;}]+/.test(src), `${file}: a non-zero --duo-widget-w is back; without markers it would hit every ordinary iPhone`);
+    assert.ok(!/--duo-widget-w\s*:\s*(?!\s|0px)[^;}]+/.test(src), `${file}: a non-zero --duo-widget-w is back; without markers it would hit every ordinary iPhone`);
   }
 });
 
