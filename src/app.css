@@ -79,6 +79,12 @@ html[data-device="duo"][data-shell="app"] {
   --gut-l: max(var(--gut), calc(env(safe-area-inset-left, 0px) + 10px));
   --gut-r: max(var(--gut), calc(env(safe-area-inset-right, 0px) + 10px));
 }
+/* In Safari the clock and battery live in Safari's own bar, not over the page, so reserving a fixed column here only leaves an empty strip
+   on the right (and an empty band above the sign-in card). Nothing is reserved in the browser. */
+html[data-device="duo"][data-shell="browser"] {
+  --duo-widget-w: 0px; --duo-widget-gap: 0px; --duo-widget-h: 0px;
+  --duo-col: 0px; --duo-reserve-r: 0px; --duo-extra: 0px;
+}
 html[data-device="duo"][data-shell="app"] .bar { padding-left: var(--gut-l); padding-right: var(--gut-r); }
 html[data-device="duo"][data-shell="app"] .login-wrap { padding-left: var(--gut-l); padding-right: var(--gut-r); }
 * { box-sizing: border-box; }
