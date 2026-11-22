@@ -70,6 +70,17 @@ html:not([data-device="duo"]) {
   --duo-widget-w: 0px; --duo-widget-gap: 0px; --duo-widget-h: 0px;
   --duo-col: 0px; --duo-reserve-r: 0px; --duo-extra: 0px;
 }
+/* In the installed app the system already reports the widget column through env(safe-area-inset-*), which the bar, the page and the sign-in
+   wrap add to their padding. Reserving the column a second time (about 188 px instead of 84) squeezed the content to ~60% of the width, so the
+   fixed reservation is switched off there. Safari keeps its own rules: the clock lives in Safari's bar. */
+html[data-device="duo"][data-shell="app"] {
+  --duo-col: 0px; --duo-reserve-r: 0px; --duo-extra: 0px;
+  /* A little air between the content and the system column (the inset itself is the only reservation). */
+  --gut-l: max(var(--gut), calc(env(safe-area-inset-left, 0px) + 10px));
+  --gut-r: max(var(--gut), calc(env(safe-area-inset-right, 0px) + 10px));
+}
+html[data-device="duo"][data-shell="app"] .bar { padding-left: var(--gut-l); padding-right: var(--gut-r); }
+html[data-device="duo"][data-shell="app"] .login-wrap { padding-left: var(--gut-l); padding-right: var(--gut-r); }
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--ink); font-family: 'Orbit Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-size: 16px; line-height: 1.6; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
