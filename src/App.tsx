@@ -13,6 +13,7 @@ import { buildRows, minutesPhrase, sharedLinkReason, summarize, watchHealth } fr
 import { tokenNotice } from './core/expiry';
 import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
 import { Icon, LoginArt, Mark } from './components/Mark';
+import { pushBlockedMessage, pushInstallMessage } from './lib/native';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
@@ -280,13 +281,13 @@ export default function App() {
   }, [isLocked]);
 
   const handlePush = async () => {
-    if (pushState === 'ios-install') return showBanner('لتفعيل التنبيهات على الآيفون: من Safari اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتح أوربت من هناك.');
-    if (pushState === 'blocked') return showBanner('التنبيهات محجوبة. فعّلها من إعدادات المتصفح لهذا الموقع.');
+    if (pushState === 'ios-install') return showBanner(pushInstallMessage());
+    if (pushState === 'blocked') return showBanner(pushBlockedMessage());
     try {
       const next = pushState === 'on' ? await disablePush() : await enablePush();
       setPushState(next);
       if (next === 'on') showBanner('تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.');
-      if (next === 'blocked') showBanner('التنبيهات محجوبة. فعّلها من إعدادات المتصفح لهذا الموقع.');
+      if (next === 'blocked') showBanner(pushBlockedMessage());
     } catch { showBanner('تعذر تفعيل التنبيهات الآن.'); }
   };
 

@@ -8,12 +8,13 @@
  *
  * Safari على الجهاز لا يعلن مفصلًا ولا وضعية، فالقرار بالاتجاه والمقاس وحدهما.
  */
+import { isNativeIOS, isNativeShell } from './native';
+
 const root = document.documentElement;
 
 const isApp = (): boolean => {
   try {
-    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-    if (cap?.isNativePlatform?.()) return true;
+    if (isNativeShell()) return true;
     if ((navigator as unknown as { standalone?: boolean }).standalone === true) return true;
     return window.matchMedia('(display-mode: standalone)').matches;
   } catch {
@@ -27,7 +28,7 @@ const isApp = (): boolean => {
    وكل iPad ضلعُ شاشته القصير ≥ 744، فلا يُقبل ما زاد على 720. */
 const isAppleHandheld = (): boolean => {
   try {
-    return /iPhone|iPod/.test(navigator.userAgent) || (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor?.getPlatform?.() === 'ios';
+    return /iPhone|iPod/.test(navigator.userAgent) || isNativeIOS();
   } catch {
     return false;
   }
