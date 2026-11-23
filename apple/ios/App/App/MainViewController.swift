@@ -19,6 +19,7 @@ final class MainViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         guard let webView = webView else { return }
         NativePrint.install(on: webView, host: self)
+        NativeBridge.install(on: webView, host: self)
 
         view.backgroundColor = UIColor(named: "ShellBackground") ?? .systemBackground
         webView.isOpaque = false
@@ -178,6 +179,7 @@ final class MainViewController: CAPBridgeViewController {
 
     deinit { webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url)) }
 }
+
 
 /// window.print() is a silent no-op inside WKWebView. The page keeps calling it
 /// (print stylesheets, dossiers, receipts); this bridges it to the native iOS
