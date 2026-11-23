@@ -1,0 +1,32 @@
+{
+  "appId": "kw.edu.orbit.app",
+  "appName": "Orbit",
+  "webDir": "www",
+  "server": {
+    "url": "https://orbitq8.web.app",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "orbitq8.web.app",
+      "*.googleapis.com"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#161C24",
+      "showSpinner": false
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
+  },
+  "android": {
+    "backgroundColor": "#161C24",
+    "allowMixedContent": false
+  }
+}
