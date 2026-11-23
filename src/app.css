@@ -715,3 +715,29 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .login-art { display: none; }
   .login-copy { width: 100%; }
 }
+
+/* ═══ مراجعة التطبيق على الدوو (2026-11-23): كل القواعد تحت html[data-device="duo"]، فلا يتغيّر iPhone العادي ولا iPad ═══ */
+/* الشاشة الأمامية عرضياً (باقي القواعد للكتاب): الشرح يطول فيهبط القمر المدار إلى منتصف البطاقة خارج الشاشة.
+   يقف القمر عند أعلى البطاقة فيبقى في الشاشة الأولى بجانب نص التفاصيل. */
+@media screen and (orientation: landscape) and (min-width: 540px) and (max-width: 720px) {
+  html[data-device='duo'] .hero:has(.detail) > .orbit { align-self: flex-start; }
+}
+/* الكتاب (الشاشة الداخلية عرضياً). */
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
+  /* الدخول: حشوة الأعلى كانت تحجز ارتفاع الأداة (31% من الارتفاع) فتنزل الصفحتان وتُقصّان أسفل الشاشة.
+     عمود الأداة جانبيٌّ هنا (حدود النظام في حشوة الغلاف)، فلا حاجة لإنزال المحتوى. */
+  html[data-device='duo'] .login-wrap { padding-top: max(20px, env(safe-area-inset-top, 0px)); }
+  /* بطاقة الدخول تتوسّط الصفحة اليمنى بدل أن تمتدّ بطول الشاشة وفي وسطها حقل واحد. */
+  html[data-device='duo'] .login-stage .login { align-self: center; }
+  /* الشرح مفتوح: القمر المدار يتكرّر في الفهرس على الصفحة اليسرى، فيُخلى مكانه لنص الشرح بدل أن يُقصّ عنوان الملخص وزر النسخ. */
+  html[data-device='duo'] .hero:has(.explain) > .orbit { display: none; }
+  html[data-device='duo'] .hero:has(.explain) > .hero-text { margin-top: auto; }
+  /* وهج الزاوية (::before) يمتدّ 330px تحت البطاقة، والبطاقة هنا تتمرّر بنفسها (overflow-y)، فكان يضيف مساحة تمرير فارغة تُظهر البطاقة مقصوصة.
+     يصير طبقة في خلفية البطاقة نفسها فيبقى الشكل ولا يزيد التمرير. */
+  html[data-device='duo'] .hero::before { display: none; }
+  html[data-device='duo'] .hero {
+    background: radial-gradient(circle 300px at 0 100%, rgba(51, 191, 166, .14), transparent 68%),
+      radial-gradient(ellipse 60% 50% at 50% 34%, rgba(71, 155, 147, .26), transparent 70%),
+      linear-gradient(124deg, var(--hero-2) 0%, #111f38 53%, var(--hero-1) 100%);
+  }
+}
