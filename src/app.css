@@ -413,7 +413,7 @@ button, a, input, .sat { touch-action: manipulation; }
 .add-head h2 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', sans-serif; font-size: 1.2rem; line-height: 1.2; }
 .add-ico { flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-size: 1.4rem; color: var(--btn-ink); background: linear-gradient(135deg, var(--btn), var(--btn2)); box-shadow: 0 8px 18px -8px var(--btn); }
 .add input:focus { border-color: var(--btn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--btn) 22%, transparent); outline: none; }
-.manual textarea { font-size: .9rem; }
+.manual textarea { font-size: 1rem; } /* 16px: يمنع تكبير iOS عند التركيز */
 .roster-grid li { display: flex; } .roster-grid li > .rs { height: 100%; }
 /* The close button shrinks (its touch area stays 44px) so the name gets the width. */
 .detail .detail-close { width: 36px; height: 36px; position: relative; font-size: 1.15rem; }
