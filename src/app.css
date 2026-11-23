@@ -741,3 +741,17 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
       linear-gradient(124deg, var(--hero-2) 0%, #111f38 53%, var(--hero-1) 100%);
   }
 }
+
+/* ═══ ضغطة أزرار الشريط (تحديث، التنبيهات، خروج) — بصرية فقط، على الهاتف والدوو (2026-11-23) ═══
+   الشريط أفعالٌ لا وجهات، فلا مؤشّر منزلق؛ الضغطة وحدها وفق مرجع حركة شريط التنقّل:
+   الزرّ ينضغط تحت الإصبع فورًا (90ms) ويعود بنابضٍ خفيف (260ms). iPad وسطح المكتب كما هما. */
+@media (hover: none) and (max-width: 500px) {
+  html .bar-actions .btn { -webkit-tap-highlight-color: transparent; transition: transform .26s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease, background .2s ease, border-color .2s ease; }
+  html .bar-actions .btn:active:not(:disabled) { transform: scale(.9); transition-duration: .09s; transition-timing-function: ease-out; }
+}
+html[data-device='duo'] .bar-actions .btn { -webkit-tap-highlight-color: transparent; transition: transform .26s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease, background .2s ease, border-color .2s ease; }
+html[data-device='duo'] .bar-actions .btn:active:not(:disabled) { transform: scale(.9); transition-duration: .09s; transition-timing-function: ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  html .bar-actions .btn, html[data-device='duo'] .bar-actions .btn { transition: none; }
+  html .bar-actions .btn:active:not(:disabled), html[data-device='duo'] .bar-actions .btn:active:not(:disabled) { transform: scale(.96); }
+}
