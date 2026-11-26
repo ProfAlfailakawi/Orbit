@@ -674,6 +674,8 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
     --spine: max(28px, env(viewport-segment-left 1 0, 50vw) - env(viewport-segment-right 0 0, 50vw));
     --spine-x: calc((env(viewport-segment-right 0 0, 50vw) + env(viewport-segment-left 1 0, 50vw)) / 2);
   }
+  /* الكتاب الحقيقي (مفصلٌ يبلغه المتصفح): خطّ المفصل يعود على الفجوة. */
+  html[data-device="duo"] .page::before, html[data-device="duo"] .login-stage::before { visibility: visible; }
 }
 
 /* Laptop posture and short landscape (951x350, 600x350, folded landscape 594x368, phones on their side): the content keeps the
@@ -754,4 +756,57 @@ html[data-device='duo'] .bar-actions .btn:active:not(:disabled) { transform: sca
 @media (prefers-reduced-motion: reduce) {
   html .bar-actions .btn, html[data-device='duo'] .bar-actions .btn { transition: none; }
   html .bar-actions .btn:active:not(:disabled), html[data-device='duo'] .bar-actions .btn:active:not(:disabled) { transform: scale(.96); }
+}
+
+/* ═══ الدوو (2026-11-26، ملاحظات المالك): لا شيء تحت الساعة، المفصل في المنتصف، شريطٌ احترافي واحد، وبطاقات برامج هادئة ═══
+   كلها تحت html[data-device="duo"]، فلا يتغيّر iPhone العادي ولا iPad ولا الحاسوب. بصريّ فقط. */
+/* حدّ الساعة الأيمن: قيمة iOS عادةً، وفي الداخلية عرضاً داخل التطبيق لا يقلّ عن عمود الساعة (84)، لأن iOS قد يبلغ صفراً
+   والساعة في الركن الأعلى الأيمن (duo-markers.ts يعدّ الجهة «يمين» عندها). */
+:root { --duo-ir: env(safe-area-inset-right, 0px); }
+html[data-device="duo"][data-shell="app"] { --gut-r: max(var(--gut), calc(var(--duo-ir) + 10px)); }
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 760px) and (orientation: landscape) {
+  html[data-device="duo"][data-shell="app"][data-widget-side="right"] { --duo-ir: max(env(safe-area-inset-right, 0px), 84px); }
+}
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
+  /* اللوحان متساويان والفجوة على المفصل تماماً: حشوة الجهتين واحدة (عرض عمود الساعة). */
+  html[data-device="duo"][data-shell="app"] { --gut-l: var(--gut-r); }
+  /* الشاشة الكاملة ليست كتاباً: لا خطّ ولا ظلّ في المنتصف (يعود في كتلة المفصل الحقيقي أعلاه). الفجوة تبقى فارغة على المفصل. */
+  html[data-device="duo"] .page::before, html[data-device="duo"] .login-stage::before { visibility: hidden; }
+}
+
+/* الشريط الاحترافي: أزرار الشريط (تحديث، التنبيهات، خروج) كبسولةٌ داكنة عمودية تحت الساعة في عمودها، بالشكل والمكان نفسيهما في كل وضعية
+   فيها عمود ساعة (التطبيق: الخارجية طولاً وعرضاً، والداخلية عرضاً). نقلٌ لا زيادة ولا حذف؛ أسماء الأزرار باقية لقارئ الشاشة. */
+html[data-device="duo"] { --duo-clock-end: 176px; }
+@media screen and (orientation: landscape) and (max-width: 1000px) { html[data-device="duo"] { --duo-clock-end: 124px; } }
+@media screen and (orientation: portrait) and (max-width: 560px), screen and (orientation: landscape) and (max-width: 1000px) and (min-height: 421px) {
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions {
+    position: fixed; z-index: 30; top: var(--duo-clock-end); flex-direction: column; flex-wrap: nowrap; gap: 4px; padding: 5px; max-width: none;
+    border-radius: 999px; background: rgb(15 23 42 / .86); border: 1px solid rgb(255 255 255 / .1);
+    box-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 12px 30px rgb(10 14 12 / .28);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  }
+  html[data-device="duo"][data-shell="app"][data-widget-side="right"] .bar-actions { right: calc((var(--duo-ir) - 56px) / 2); left: auto; }
+  html[data-device="duo"][data-shell="app"][data-widget-side="left"] .bar-actions { left: calc((env(safe-area-inset-left, 0px) - 56px) / 2); right: auto; }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn {
+    width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center;
+    border: 0; border-radius: 50%; background: none; box-shadow: none; color: rgb(255 255 255 / .86);
+  }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn.is-on { background: rgb(255 255 255 / .16); color: #fff; }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn-label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  /* الكتاب كان يقيّد الأزرار بنصف الشاشة؛ صارت في العمود. */
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar { justify-content: flex-start; }
+}
+
+/* بطاقات «برامجك»: الاسم أولاً بحروفٍ صغيرة هادئة بدل الحروف الكبيرة الصاخبة، والحالة سطرٌ ثانٍ أصغر وأهدأ.
+   رسالة الخطأ الإنجليزية الطويلة («Error: 4 DEADLINE_EXCEEDED…») سطرٌ واحد ينتهي بنقاط؛ نصّها كاملٌ باقٍ في الصفحة لقارئ الشاشة،
+   وفي بطاقة التفاصيل عند لمس البرنامج. */
+html[data-device="duo"] .rs-info { gap: 2px; }
+html[data-device="duo"] .rs-info strong { font-size: .98rem; font-weight: 700; font-variant-caps: all-small-caps; letter-spacing: .03em; line-height: 1.3; }
+html[data-device="duo"] .rs-info span { font-size: .8rem; font-weight: 500; line-height: 1.45; opacity: .92; }
+/* سطرٌ واحد حيث البطاقة عريضة (العرض الأفقي)؛ في الشاشات الضيّقة يبقى سطرين، لأن سطراً واحداً يقصّ أول الكلمة الإنجليزية في سطرٍ عربي. */
+html[data-device="duo"] .rs-bad .rs-info span { overflow-wrap: normal; word-break: normal; }
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
+  html[data-device="duo"] .rs-bad .rs-info span { -webkit-line-clamp: 1; line-clamp: 1; }
 }
