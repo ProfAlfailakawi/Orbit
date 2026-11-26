@@ -776,8 +776,10 @@ html[data-device="duo"][data-shell="app"] { --gut-r: max(var(--gut), calc(var(--
 
 /* الشريط الاحترافي: أزرار الشريط (تحديث، التنبيهات، خروج) كبسولةٌ داكنة عمودية تحت الساعة في عمودها، بالشكل والمكان نفسيهما في كل وضعية
    فيها عمود ساعة (التطبيق: الخارجية طولاً وعرضاً، والداخلية عرضاً). نقلٌ لا زيادة ولا حذف؛ أسماء الأزرار باقية لقارئ الشاشة. */
-html[data-device="duo"] { --duo-clock-end: 176px; }
-@media screen and (orientation: landscape) and (max-width: 1000px) { html[data-device="duo"] { --duo-clock-end: 124px; } }
+/* مربع الساعة على الجهاز الحقيقي يمتدّ إلى ≈235pt على الشاشة الخارجية (لقطة المالك 2026-11-26)، أطول منه في المحاكاة:
+   فأول عنصرٍ في العمود يبدأ بعد 244pt، أو بعد ارتفاع الودجت + 8 إن كان أكبر. والداخلية عرضاً ركنُها أقصر (124). */
+html[data-device="duo"] { --duo-clock-end: max(244px, calc(var(--duo-widget-h, 0px) + 8px)); }
+@media screen and (orientation: landscape) and (max-width: 1000px) and (min-height: 521px) { html[data-device="duo"] { --duo-clock-end: 124px; } }
 @media screen and (orientation: portrait) and (max-width: 560px), screen and (orientation: landscape) and (max-width: 1000px) and (min-height: 421px) {
   html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions {
     position: fixed; z-index: 30; top: var(--duo-clock-end); flex-direction: column; flex-wrap: nowrap; gap: 4px; padding: 5px; max-width: none;
