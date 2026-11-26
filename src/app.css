@@ -783,7 +783,6 @@ html[data-device="duo"] { --duo-clock-end: max(244px, calc(var(--duo-widget-h, 0
 @media screen and (orientation: portrait) and (max-width: 560px), screen and (orientation: landscape) and (max-width: 1000px) and (min-height: 421px) {
   html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions {
     position: fixed; z-index: 30; top: var(--duo-clock-end); flex-direction: column; flex-wrap: nowrap; gap: 4px; padding: 5px; max-width: none;
-    max-height: calc(100dvh - var(--duo-clock-end) - 12px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
     border-radius: 999px; background: rgb(15 23 42 / .86); border: 1px solid rgb(255 255 255 / .1);
     box-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 12px 30px rgb(10 14 12 / .28);
     -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
@@ -792,7 +791,7 @@ html[data-device="duo"] { --duo-clock-end: max(244px, calc(var(--duo-widget-h, 0
   html[data-device="duo"][data-shell="app"][data-widget-side="left"] .bar-actions { left: calc((env(safe-area-inset-left, 0px) - 56px) / 2); right: auto; }
   html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn {
     width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center;
-    border: 0; border-radius: 50%; background: none; box-shadow: none; color: rgb(255 255 255 / .86); flex: none;
+    border: 0; border-radius: 50%; background: none; box-shadow: none; color: rgb(255 255 255 / .86);
   }
   html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn.is-on { background: rgb(255 255 255 / .16); color: #fff; }
   html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn-label {
