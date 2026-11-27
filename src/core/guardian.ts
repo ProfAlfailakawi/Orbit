@@ -210,8 +210,13 @@ export function buildFleetReportForClaude(platforms: PlatformRecord[], incidents
     linkIssues.forEach(({ p, issue }) => lines.push('- ' + displayName(p) + ' (' + p.owner + '/' + p.repoName + '): ' + issue));
   }
   // Nothing marks a user journey healthy yet, so requiring it listed every program on every report; only a site not seen working is a gap.
-  const gaps = fleet.filter(p => p.fourState?.siteReachable !== true);
-  lines.push('', '## برامج رصدها غير مكتمل (لم يتأكد أوربت أن موقعها يعمل)', gaps.length ? gaps.map(p => displayName(p)).join('، ') : 'لا يوجد.',
+  // Programs that run on the owner's computer have no website to check; they are listed apart, not as monitoring gaps.
+  const isLocal = (p: PlatformRecord) => p.runtimeMode === 'local-only' || p.runtimeMode === 'github-local';
+  const gaps = fleet.filter(p => !isLocal(p) && p.fourState?.siteReachable !== true);
+  const local = fleet.filter(isLocal);
+  lines.push('', '## برامج رصدها غير مكتمل (لم يتأكد أوربت أن موقعها يعمل)', gaps.length ? gaps.map(p => displayName(p)).join('، ') : 'لا يوجد.');
+  if (local.length) lines.push('', '## برامج محلية بلا موقع (يراقب أوربت مستودعها وفحوصات GitHub فقط)', local.map(p => displayName(p)).join('، '));
+  lines.push(
     'أوربت لا يختبر رحلة المستخدم الكاملة (الدخول والدفع والحفظ)، فغياب المشاكل ليس دليل سلامة كاملة.');
   return lines.join('\n');
 }

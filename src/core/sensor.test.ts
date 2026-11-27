@@ -250,3 +250,11 @@ test('the address used to tell visitors apart is the left-most X-Forwarded-For e
 test('visitor counts use correct Arabic agreement', () => {
   assert.deepEqual([1, 2, 3, 10, 11, 25].map(visitorsLabel), ['زائر واحد', 'زائران', '3 زوار', '10 زوار', '11 زائرًا', '25 زائرًا']);
 });
+
+test('a failed Google push registration is labelled as the external FCM service, not the program', async () => {
+  const { sensorLabel } = await import('./sensor.ts');
+  assert.match(sensorLabel('request', 'فشل الاتصال /v1/projects/:id/registrations/:id'), /FCM/);
+  assert.match(sensorLabel('request', 'فشل الاتصال /v1/projects/:id/registrations'), /FCM/);
+  assert.equal(sensorLabel('request', 'HTTP 503 /api/v1/audience/pulse'), 'طلب من الموقع يفشل عند الزوّار');
+  assert.equal(sensorLabel('error', 'x /v1/projects/a/registrations'), 'خطأ برمجي ظهر لزوّار الموقع');
+});

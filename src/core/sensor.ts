@@ -89,6 +89,15 @@ export function originOf(url: string | null | undefined): string | null {
 const KIND_LABEL: Record<SensorReport['kind'], string> = {
   error: 'خطأ برمجي ظهر لزوّار الموقع', rejection: 'عملية داخل الموقع فشلت عند الزوّار', resource: 'ملف لا يُحمَّل عند الزوّار', request: 'طلب من الموقع يفشل عند الزوّار',
 };
+/**
+ * Firebase Cloud Messaging registers a browser for push at fcmregistrations.googleapis.com/v1/projects/{id}/registrations.
+ * The sensor drops the host, but this path is Google's push service, not the program's own server.
+ */
+const PUSH_REGISTRATION = /\/v1\/projects\/[^/\s]+\/registrations(?:\/|\b)/;
+const EXTERNAL_PUSH_LABEL = 'خدمة إشعارات Google الخارجية (FCM، لا خادم البرنامج) لم تستجب عند الزوّار';
+export function sensorLabel(kind: SensorReport['kind'], message: string): string {
+  return kind === 'request' && PUSH_REGISTRATION.test(message) ? EXTERNAL_PUSH_LABEL : KIND_LABEL[kind];
+}
 /** `note`: seen, but too thin to call the program broken (one visitor's own-code error, a few scattered connection failures). `lastAt`: when it was last seen. */
 export interface SensorFinding { text: string; page: string; visitors: number; stack: string[]; steps: string[]; lastAt?: string; note?: boolean }
 export const SENSOR_WINDOW_MS = 24 * 3_600_000;
@@ -141,7 +150,7 @@ export function createSensorHub(now: () => number = Date.now) {
     seen.set(programId, bucket);
     for (const r of reports) {
       const signature = `${r.kind}|${r.message}`;
-      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), addresses: new Map<string, number>(), text: `${KIND_LABEL[r.kind]}: ${r.message}`, page: r.page, stack: [], steps: [], own: false, network: r.kind === 'request' && NETWORK_FAILURE.test(r.message) };
+      const entry = bucket.get(signature) || { sessions: new Map<string, number>(), addresses: new Map<string, number>(), text: `${sensorLabel(r.kind, r.message)}: ${r.message}`, page: r.page, stack: [], steps: [], own: false, network: r.kind === 'request' && NETWORK_FAILURE.test(r.message) };
       entry.sessions.set(r.session, t);
       entry.addresses.set(addressKey === undefined ? 's:' + r.session : 'a:' + addressKey, t);
       entry.own = entry.own || r.own;
