@@ -136,3 +136,14 @@ test('text anyone can post to the public sensor reaches the Claude report only a
   assert.ok(text.includes(UNTRUSTED_EVIDENCE_NOTICE));
   assert.ok(text.indexOf(UNTRUSTED_EVIDENCE_NOTICE) < text.indexOf(message), 'the notice comes before any quoted evidence');
 });
+
+test('a local program without a website is listed apart, not as a monitoring gap', () => {
+  const web = { id: 'w', codeName: 'WEB', runtimeMode: 'github-web', fourState: { siteReachable: null }, recentRuns: [], recentCommits: [] } as unknown as PR;
+  const local = { id: 'l', codeName: 'LOCALAPP', runtimeMode: 'github-local', fourState: { siteReachable: null }, recentRuns: [], recentCommits: [] } as unknown as PR;
+  const text = buildFleetReportForClaude([web, local], [], '2026-01-01');
+  const gaps = text.split('## برامج رصدها غير مكتمل')[1].split('\n')[1];
+  assert.match(gaps, /WEB/);
+  assert.doesNotMatch(gaps, /LOCALAPP/);
+  assert.match(text, /## برامج محلية بلا موقع[^\n]*\n[^\n]*LOCALAPP/);
+  assert.doesNotMatch(buildFleetReportForClaude([web], [], '2026-01-01'), /برامج محلية بلا موقع/);
+});
