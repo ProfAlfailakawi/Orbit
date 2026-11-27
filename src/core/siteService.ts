@@ -24,7 +24,7 @@ async function isLive(url: string): Promise<boolean> {
 }
 
 export function createSiteService(options: {
-  firestore: Firestore | null; snapshotPath: string; getPlatforms: () => PlatformRecord[]; githubToken: () => string | undefined;
+  firestore: Firestore | null; snapshotPath: string; getPlatforms: () => PlatformRecord[]; githubToken: () => string | undefined | Promise<string | undefined>;
 }) {
   const entries = new Map<string, Entry>();
   let running: Promise<{ checked: number; found: number; remaining: number }> | null = null;
@@ -85,7 +85,7 @@ export function createSiteService(options: {
       const typed = p.productionUrl ? toOrigin(p.productionUrl) : null;
       return typed && await isLive(typed) ? { url: typed, source: 'typed by owner' } : null;
     }
-    const repo = await openRepo(p, options.githubToken(), 20);
+    const repo = await openRepo(p, await options.githubToken(), 20);
     const paths = new Set(repo.files.map(f => f.path));
     const texts: RepoTexts = {};
     for (const path of [...SITE_FILE_PATHS, ...deployWorkflowPaths([...paths])]) {
