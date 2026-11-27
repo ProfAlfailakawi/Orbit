@@ -14,9 +14,10 @@ import { tokenNotice } from './core/expiry';
 import { Dashboard, type Explanation, type Logos } from './components/Dashboard';
 import { Icon, LoginArt, Mark } from './components/Mark';
 import { pushBlockedMessage, pushInstallMessage } from './lib/native';
-import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
 import PasskeyEntry, { rearmPasskeyAuto } from './components/PasskeyEntry';
 import PasskeyPanel from './components/PasskeyPanel';
+import { autoRegisterNativePush, disablePush, enablePush, readPushDevices, readPushState, sendTestPush, type PushState } from './core/pushClient';
+import { devicesPhrase } from './lib/devicesPhrase';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
 
@@ -47,6 +48,10 @@ export default function App() {
   const [isDemo, setIsDemo] = useState(() => Boolean(readDemoId()));
   const [pushState, setPushState] = useState<PushState>('unsupported');
   const [passkeyPanelOpen, setPasskeyPanelOpen] = useState(false);
+  const [pushDevices, setPushDevices] = useState(0);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
   const autoSyncedRef = useRef(false);
   const logosAskedRef = useRef(false);
   const bannerTimer = useRef<number | undefined>(undefined);
@@ -284,19 +289,54 @@ export default function App() {
     }
   };
 
+  // After a login, and on every start while logged in: the iPhone app registers for alerts by itself
+  // (silently when already allowed, asking once when not decided), then the bell shows the real state.
   useEffect(() => {
-    if (!isLocked) void readPushState().then(setPushState);
-  }, [isLocked]);
+    if (isLocked || isDemo) return;
+    let alive = true;
+    void (async () => {
+      await autoRegisterNativePush();
+      const [state, devices] = await Promise.all([readPushState(), readPushDevices()]);
+      if (alive) { setPushState(state); setPushDevices(devices); }
+    })();
+    return () => { alive = false; };
+  }, [isLocked, isDemo]);
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    const close = (event: Event) => { if (!bellRef.current?.contains(event.target as Node)) setBellOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setBellOpen(false); };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', onKey); };
+  }, [bellOpen]);
 
   const handlePush = async () => {
+    setBellOpen(false);
     if (pushState === 'ios-install') return showBanner(pushInstallMessage());
     if (pushState === 'blocked') return showBanner(pushBlockedMessage());
     try {
       const next = pushState === 'on' ? await disablePush() : await enablePush();
       setPushState(next);
+      setPushDevices(await readPushDevices());
       if (next === 'on') showBanner('تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.');
       if (next === 'blocked') showBanner(pushBlockedMessage());
     } catch { showBanner('تعذر تفعيل التنبيهات الآن.'); }
+  };
+
+  const handleTestPush = async () => {
+    setBellOpen(false);
+    if (testingPush) return;
+    setTestingPush(true);
+    try {
+      const result = await sendTestPush();
+      if (!result.ok) return showBanner(result.error || 'تعذر إرسال التنبيه التجريبي الآن.');
+      setPushDevices(result.devices);
+      if (!result.sent) return showBanner('لم يصل التنبيه التجريبي إلى أي جهاز. فعّل التنبيهات من جديد على جهازك.');
+      showBanner(result.sent < result.devices
+        ? `أُرسل التنبيه التجريبي إلى ${devicesPhrase(result.sent)} من أصل ${devicesPhrase(result.devices)}.`
+        : `أُرسل التنبيه التجريبي إلى ${devicesPhrase(result.sent)}.`);
+    } finally { setTestingPush(false); }
   };
 
   const handleLogout = () => {
@@ -411,10 +451,35 @@ export default function App() {
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
             <Icon name="refresh" /><span className="btn-label">{isSyncing ? 'جارٍ الفحص…' : 'تحديث'}</span>
           </button>
-          {!isDemo && pushState !== 'unsupported' && (
-            <button type="button" className={'btn' + (pushState === 'on' ? ' is-on' : '')} onClick={() => void handlePush()} aria-pressed={pushState === 'on'}>
-              <Icon name="bell" /><span className="btn-label">{pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}</span>
-            </button>
+          {!isDemo && (pushState !== 'unsupported' || pushDevices > 0) && (
+            // With no registered device the bell switches alerts on directly; once a device is registered it opens a small
+            // menu that also offers «إرسال تنبيه تجريبي».
+            <div className="bell-wrap" ref={bellRef}>
+              <button
+                type="button"
+                className={'btn' + (pushState === 'on' ? ' is-on' : '')}
+                onClick={() => (pushDevices > 0 ? setBellOpen(open => !open) : void handlePush())}
+                aria-pressed={pushDevices > 0 ? undefined : pushState === 'on'}
+                aria-haspopup={pushDevices > 0 ? 'menu' : undefined}
+                aria-expanded={pushDevices > 0 ? bellOpen : undefined}
+                aria-busy={testingPush}
+              >
+                <Icon name="bell" /><span className="btn-label">{pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}</span>
+              </button>
+              {bellOpen && (
+                <div className="bell-menu" role="menu" aria-label="التنبيهات">
+                  {pushState !== 'unsupported' && (
+                    <button type="button" role="menuitem" onClick={() => void handlePush()}>
+                      {pushState === 'on' ? 'إيقاف التنبيهات على هذا الجهاز' : 'تفعيل التنبيهات على هذا الجهاز'}
+                    </button>
+                  )}
+                  <button type="button" role="menuitem" onClick={() => void handleTestPush()} disabled={testingPush}>
+                    إرسال تنبيه تجريبي
+                    <small>الأجهزة المسجّلة: {pushDevices}</small>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {!isDemo && (
             <button type="button" className="btn" onClick={() => setPasskeyPanelOpen(true)} aria-haspopup="dialog">

@@ -15,7 +15,8 @@ import { createPushService, validSubscription } from './src/core/pushService.ts'
 import * as simpleWebAuthn from '@simplewebauthn/server';
 import { createPasskeyService, firestorePasskeyStore, memoryPasskeyStore, registerPasskeyAccountRoutes, registerPasskeyLoginRoutes, type PasskeyRouteDeps, type WebAuthnLib } from './src/server/passkeys.ts';
 import { validApnsToken } from './src/core/apns.ts';
-import { computeAlertChanges } from './src/core/alerts.ts';
+import { computeAlertChanges, type PushMessage } from './src/core/alerts.ts';
+import { createRateGate } from './src/core/rateGate.ts';
 import { applyCert, certDue } from './src/core/certs.ts';
 import { readCertificate } from './src/core/tlsExpiry.ts';
 import { explainProgram } from './src/core/causes.ts';
@@ -805,19 +806,22 @@ async function startServer() {
   });
 
   // Alerts on the owner's phone: subscribe a device, forget it, or send it a test message.
+  const WELCOME: PushMessage = { kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' };
   app.get('/api/push/key', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ publicKey: pushService.publicKey(), devices: pushService.count() }); });
   app.post('/api/push/subscribe', asyncRoute(async (req, res) => {
     if (!validSubscription(req.body?.subscription)) return res.status(400).json({ error: 'اشتراك غير صالح' });
-    await pushService.subscribe(req.body.subscription);
-    const test = await pushService.send([{ kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' }]);
-    res.json({ subscribed: true, devices: pushService.count(), test });
+    const { added } = await pushService.subscribe(req.body.subscription);
+    const test = added ? await pushService.send([WELCOME], { endpoint: req.body.subscription.endpoint }) : { sent: 0, removed: 0 };
+    res.json({ subscribed: true, added, devices: pushService.count(), test });
   }));
-  // The iPhone app registers an APNs device token (hex) instead of a Web Push subscription.
+  // The iPhone app registers an APNs device token (hex) instead of a Web Push subscription. It calls this on every start
+  // (idempotent): only a token the server did not know gets the welcome message, and only that device gets it.
   app.post('/api/push/subscribe-native', asyncRoute(async (req, res) => {
     if (!validApnsToken(req.body?.token)) return res.status(400).json({ error: 'رمز الجهاز غير صالح' });
-    await pushService.subscribeNative(req.body.token);
-    const test = await pushService.send([{ kind: 'recovered', title: 'أوربت', body: 'تم تفعيل التنبيهات. سيصلك إشعار عند أي مشكلة جديدة.', tag: 'orbit-welcome', url: '/' }]);
-    res.json({ subscribed: true, devices: pushService.count(), test });
+    const replaces = validApnsToken(req.body?.replaces) ? req.body.replaces : undefined;
+    const { added } = await pushService.subscribeNative(req.body.token, replaces);
+    const test = added ? await pushService.send([WELCOME], { nativeToken: req.body.token }) : { sent: 0, removed: 0 };
+    res.json({ subscribed: true, added, devices: pushService.count(), test });
   }));
   app.post('/api/push/unsubscribe-native', asyncRoute(async (req, res) => {
     if (validApnsToken(req.body?.token)) await pushService.unsubscribeNative(req.body.token);
@@ -826,6 +830,18 @@ async function startServer() {
   app.post('/api/push/unsubscribe', asyncRoute(async (req, res) => {
     if (typeof req.body?.endpoint === 'string') await pushService.unsubscribe(req.body.endpoint.slice(0, 1000));
     res.json({ subscribed: false, devices: pushService.count() });
+  }));
+  // «إرسال تنبيه تجريبي» (operator session only, behind the /api gate): one message to every registered device.
+  // At most one every 20 seconds and 10 an hour, so a stuck button can never flood the phone.
+  const testPushGate = createRateGate({ minIntervalMs: 20_000, windowMs: 60 * 60_000, maxPerWindow: 10 });
+  app.post('/api/push/test', asyncRoute(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const wait = testPushGate.take(Date.now());
+    if (wait > 0) return res.status(429).set('Retry-After', String(Math.ceil(wait / 1000))).json({ error: `انتظر ${Math.ceil(wait / 1000)} ثانية ثم أعد المحاولة.` });
+    if (!pushService.count()) return res.status(409).json({ error: 'لا يوجد جهاز مسجّل للتنبيهات بعد.', devices: 0, sent: 0 });
+    const result = await pushService.sendTest();
+    appendAudit('Operator', 'PUSH_TEST', 'ORBIT Console', `تنبيه تجريبي: وصل إلى ${result.sent} من ${result.devices}.`);
+    res.json({ ...result, devices: pushService.count() });
   }));
 
   // Real website of each program, discovered from its repository; and an on-demand visit of every site.
