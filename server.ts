@@ -20,6 +20,7 @@ import { explainProgram } from './src/core/causes.ts';
 import { applyDomain, domainDue, registrableDomain } from './src/core/expiry.ts';
 import { readDomainExpiry } from './src/core/rdap.ts';
 import { createTokenWatch } from './src/core/tokenWatch.ts';
+import { createGithubAuth } from './src/core/githubAuth.ts';
 import { applyRepoRenames } from './src/core/repoRenames.ts';
 import { applyServerErrors, createCloudLogReader, LOG_WINDOW_MS, parseLogSources, summarizeLogEntries } from './src/core/cloudLogs.ts';
 import { applyProbe, splitProbe } from './src/core/sensorChannel.ts';
@@ -297,12 +298,29 @@ let movedProgramIds: string[] = [];
 
 async function startServer() {
   const app = express();
+  // GitHub App (never expires) when configured; otherwise the older personal token.
+  const githubAuth = createGithubAuth({
+    appId: process.env.GITHUB_APP_ID, privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+    installationId: process.env.GITHUB_APP_INSTALLATION_ID, owner: process.env.GITHUB_APP_OWNER || 'ProfAlfailakawi',
+    pat: process.env.GITHUB_READ_ONLY_TOKEN,
+  });
+  const githubAuthConfigured = githubAuth.mode() !== 'none';
+  /** Calls GitHub with the current credential; a 401 drops that credential and the call is retried once with the next one (fresh App token, or anonymous). */
+  async function githubFetch(url: string, init: { headers: Record<string, string>; signal?: AbortSignal }) {
+    const send = (token: string | undefined) => fetch(url, { ...init, headers: token ? { ...init.headers, Authorization: `Bearer ${token}` } : init.headers });
+    const token = await githubAuth.token();
+    const first = await send(token);
+    if (first.status !== 401 || !token) return first;
+    githubAuth.rejected(token);
+    const next = await githubAuth.token();
+    return next === token ? first : send(next);
+  }
   const logoService = createLogoService({
-    firestore, snapshotPath: LOGO_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
+    firestore, snapshotPath: LOGO_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => githubAuth.token(),
   });
   await logoService.load();
   const siteService = createSiteService({
-    firestore, snapshotPath: SITE_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => process.env.GITHUB_READ_ONLY_TOKEN,
+    firestore, snapshotPath: SITE_SNAPSHOT_PATH, getPlatforms: () => platforms, githubToken: () => githubAuth.token(),
   });
   await siteService.load();
   const pushService = createPushService({ firestore, snapshotPath: PUSH_SNAPSHOT_PATH });
@@ -735,8 +753,10 @@ async function startServer() {
       acceptanceCriteria,
       canaryHistory,
       auditLogs,
-      hasGithubTokenConfigured: Boolean(process.env.GITHUB_READ_ONLY_TOKEN),
-      githubTokenExpiresAt: tokenWatch.expiresAt(),
+      hasGithubTokenConfigured: githubAuthConfigured,
+      githubAuthMode: githubAuth.mode(),
+      // A GitHub App renews itself; only a personal token has an end date worth warning about.
+      githubTokenExpiresAt: githubAuth.mode() === 'app' ? null : githubAuth.patRejected() ? new Date(0).toISOString() : tokenWatch.expiresAt(),
     });
   });
 
@@ -816,14 +836,11 @@ async function startServer() {
 
   // 3. Read-Only GitHub Sync Probe (Respects Rate Limits & Never Writes to Any Repo)
   async function syncGithubFleet(appId?: string) {
-    const token = process.env.GITHUB_READ_ONLY_TOKEN;
+    const token = await githubAuth.token();
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'ORBIT-Mission-Control-ReadOnly',
     };
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
 
     const targets = appId
       ? platforms.filter((p) => p.id === appId || p.codeName === appId)
@@ -834,7 +851,7 @@ async function startServer() {
     for (const plat of targets.slice(0, 25)) {
       try {
         costGuard.githubApiCallsToday += 1;
-        const resp = await fetch(`https://api.github.com/repos/${plat.owner}/${plat.repoName}`, {
+        const resp = await githubFetch(`https://api.github.com/repos/${plat.owner}/${plat.repoName}`, {
           headers,
           signal: AbortSignal.timeout(3500),
         });
@@ -856,7 +873,7 @@ async function startServer() {
           const baseUrl = `https://api.github.com/repos/${encodeURIComponent(plat.owner)}/${encodeURIComponent(plat.repoName)}`;
           try {
             costGuard.githubApiCallsToday += 1;
-            const runsResponse = await fetch(`${baseUrl}/actions/runs?per_page=5`, {
+            const runsResponse = await githubFetch(`${baseUrl}/actions/runs?per_page=5`, {
               headers,
               signal: AbortSignal.timeout(4500),
             });
@@ -898,7 +915,7 @@ async function startServer() {
           // for the current fleet (four requests per repository).
           try {
             costGuard.githubApiCallsToday += 1;
-            const branchesResponse = await fetch(`${baseUrl}/branches?per_page=100`, {
+            const branchesResponse = await githubFetch(`${baseUrl}/branches?per_page=100`, {
               headers,
               signal: AbortSignal.timeout(4500),
             });
@@ -917,7 +934,7 @@ async function startServer() {
 
             const defaultBranch = repoData.default_branch || plat.defaultBranch;
             costGuard.githubApiCallsToday += 1;
-            const commitResponse = await fetch(`${baseUrl}/commits?sha=${encodeURIComponent(defaultBranch)}&per_page=1`, {
+            const commitResponse = await githubFetch(`${baseUrl}/commits?sha=${encodeURIComponent(defaultBranch)}&per_page=1`, {
               headers,
               signal: AbortSignal.timeout(4500),
             });
@@ -1018,7 +1035,7 @@ async function startServer() {
         } else {
           const failureReason = resp.status === 403 && Number(resp.headers.get('x-ratelimit-remaining')) === 0
             ? 'استُنفد حد طلبات GitHub؛ أضف توكن قراءة فقط أو انتظر ساعة'
-            : resp.status === 401 ? 'توكن GitHub غير صالح أو منتهي'
+            : resp.status === 401 ? (githubAuth.mode() === 'app' ? `تعذر توليد توكن GitHub App${githubAuth.lastError() ? ': ' + githubAuth.lastError() : ''}` : 'توكن GitHub غير صالح أو منتهي')
             : resp.status === 404 ? (token ? 'المستودع غير موجود أو التوكن لا يملك صلاحية قراءته' : 'المستودع خاص ولم يُضبط توكن GitHub')
             : `GitHub repository API returned HTTP ${resp.status}`;
           platforms = platforms.map(p => p.id === plat.id ? {
@@ -1173,7 +1190,7 @@ async function startServer() {
           return 'entries' in got.result ? applyServerErrors(p, summarizeLogEntries(got.result.entries, got.serving), null, now) : applyServerErrors(p, null, got.result.error, now);
         });
       }
-      await tokenWatch.check(process.env.GITHUB_READ_ONLY_TOKEN);
+      if (githubAuth.mode() === 'pat') await tokenWatch.check(await githubAuth.token());
       broadcastRealtimeUpdate('SITE_WATCH');
       await persistenceQueue;
       await notifyChanges();
@@ -1250,7 +1267,7 @@ async function startServer() {
   // Automatic monitoring is opt-in: a read-only token is required for a sustainable
   // rate limit budget. Without a token, the operator can request a manual sync.
   // Never write to or redeploy the monitored repositories.
-  if (process.env.GITHUB_READ_ONLY_TOKEN && !process.env.SCHEDULER_ONLY) {
+  if (githubAuthConfigured && !process.env.SCHEDULER_ONLY) {
     let githubRefreshActive = false;
     const refresh = async () => {
       if (githubRefreshActive) return;
@@ -1431,11 +1448,7 @@ async function startServer() {
         Accept: 'application/vnd.github+json',
         'User-Agent': 'ORBIT-Cockpit-2026',
       };
-      const readOnlyToken = process.env.GITHUB_READ_ONLY_TOKEN;
-      if (readOnlyToken) {
-        headers.Authorization = `Bearer ${readOnlyToken}`;
-      }
-      const repoRes = await fetch(`https://api.github.com/repos/${repoSlug}`, {
+      const repoRes = await githubFetch(`https://api.github.com/repos/${repoSlug}`, {
         headers,
         signal: AbortSignal.timeout(4000),
       });
@@ -1447,7 +1460,7 @@ async function startServer() {
       };
       let latestCommitSha: string | undefined;
       try {
-        const commitsRes = await fetch(
+        const commitsRes = await githubFetch(
           `https://api.github.com/repos/${repoSlug}/commits?per_page=1`,
           { headers, signal: AbortSignal.timeout(3500) }
         );

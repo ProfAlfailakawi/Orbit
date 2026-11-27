@@ -89,7 +89,7 @@ async function repositoryLogo(p: PlatformRecord, token: string | undefined): Pro
 }
 
 export function createLogoService(options: {
-  firestore: Firestore | null; snapshotPath: string; getPlatforms: () => PlatformRecord[]; githubToken: () => string | undefined;
+  firestore: Firestore | null; snapshotPath: string; getPlatforms: () => PlatformRecord[]; githubToken: () => string | undefined | Promise<string | undefined>;
 }) {
   const entries = new Map<string, Entry>();
   let running: Promise<{ checked: number; found: number; remaining: number }> | null = null;
@@ -138,7 +138,7 @@ export function createLogoService(options: {
    */
   async function discover(p: PlatformRecord): Promise<{ found: FoundLogo | null; source: Entry['source'] }> {
     if (p.runtimeMode !== 'non-github-web') {
-      const found = await repositoryLogo(p, options.githubToken()).catch(() => null);
+      const found = await repositoryLogo(p, await options.githubToken()).catch(() => null);
       if (found) return { found, source: found.sourceUrl.startsWith('https://github.com/') ? 'github' : 'site' };
     }
     if (p.isCustomAdded && p.productionUrl) {
