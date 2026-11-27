@@ -119,6 +119,13 @@ h1 { margin: 0; font-family: 'Orbit Display', 'Orbit Sans', system-ui, sans-seri
 .btn.is-copied { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-edge); box-shadow: none; }
 .btn.is-copied::before { content: '✓'; margin-inline-end: 6px; font-weight: 700; }
 .btn.is-on { color: var(--ok-ink); border-color: var(--ok-edge); background: var(--ok-bg); }
+/* The bell's small menu (alerts on/off on this device, «إرسال تنبيه تجريبي»): anchored to the bar's inline end, never wider than the screen. */
+.bell-wrap { position: relative; display: inline-flex; }
+.bell-menu { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 20; display: grid; gap: 4px; min-width: 220px; max-width: min(300px, calc(100vw - 32px)); padding: 6px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow); }
+.bell-menu button { display: grid; gap: 2px; min-height: 44px; padding: 10px 14px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-align: start; cursor: pointer; }
+.bell-menu button:hover:not(:disabled), .bell-menu button:focus-visible { background: var(--ok-bg); }
+.bell-menu button:disabled { opacity: .6; cursor: default; }
+.bell-menu small { color: var(--muted); font-weight: 500; font-size: .8em; }
 .btn-danger { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-edge); }
 .row-center { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .btn-add { align-self: center; border-style: dashed; border-color: var(--muted); background: transparent; color: var(--ink); padding-inline: 22px; }
