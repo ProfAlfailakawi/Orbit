@@ -15,6 +15,8 @@ import { Dashboard, type Explanation, type Logos } from './components/Dashboard'
 import { Icon, LoginArt, Mark } from './components/Mark';
 import { pushBlockedMessage, pushInstallMessage } from './lib/native';
 import { disablePush, enablePush, readPushState, type PushState } from './core/pushClient';
+import PasskeyEntry, { rearmPasskeyAuto } from './components/PasskeyEntry';
+import PasskeyPanel from './components/PasskeyPanel';
 
 const ORBIT_BUILD_ID = import.meta.env.VITE_ORBIT_BUILD_ID || 'development';
 
@@ -44,6 +46,7 @@ export default function App() {
   const [logos, setLogos] = useState<Logos>({});
   const [isDemo, setIsDemo] = useState(() => Boolean(readDemoId()));
   const [pushState, setPushState] = useState<PushState>('unsupported');
+  const [passkeyPanelOpen, setPasskeyPanelOpen] = useState(false);
   const autoSyncedRef = useRef(false);
   const logosAskedRef = useRef(false);
   const bannerTimer = useRef<number | undefined>(undefined);
@@ -251,6 +254,15 @@ export default function App() {
     } catch { setAuthError('تعذر الاتصال بالخادم.'); }
   };
 
+  /** Both sign-ins (the code, or «الدخول بالبصمة») end here with the same session answer. */
+  const completeLogin = async (data: { sessionToken?: string }) => {
+    setAuthError(null);
+    if (data.sessionToken) setOrbitSessionToken(data.sessionToken);
+    setIsLocked(false);
+    setPasskeyInput('');
+    await fetchServerState();
+  };
+
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setAuthError(null);
@@ -265,12 +277,8 @@ export default function App() {
       let data: { authenticated?: boolean; error?: string; sessionToken?: string } | null = null;
       try { data = JSON.parse(await res.text()); } catch { data = null; }
       if (!data) { setAuthError('تعذر الاتصال بالخادم.'); return; }
-      if (res.ok && data.authenticated) {
-        if (data.sessionToken) setOrbitSessionToken(data.sessionToken);
-        setIsLocked(false);
-        setPasskeyInput('');
-        await fetchServerState();
-      } else setAuthError(data.error || 'رمز الدخول غير صحيح.');
+      if (res.ok && data.authenticated) await completeLogin(data);
+      else setAuthError(data.error || 'رمز الدخول غير صحيح.');
     } catch {
       setAuthError('تعذر الاتصال بالخادم.');
     }
@@ -294,6 +302,8 @@ export default function App() {
   const handleLogout = () => {
     void apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => {
       clearOrbitSessionToken();
+      rearmPasskeyAuto();
+      setPasskeyPanelOpen(false);
       forgetDemoId();
       setIsDemo(false);
       autoSyncedRef.current = false;
@@ -386,6 +396,7 @@ export default function App() {
           <input id="orbit-passkey-input" type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={passkeyInput} onChange={event => setPasskeyInput(event.target.value)} />
           {authError && <p role="alert" className="error">{authError}</p>}
           <button type="submit" className="btn btn-primary">دخول</button>
+          <PasskeyEntry onSuccess={data => { void completeLogin(data); }} holdAuto={passkeyInput.length > 0} />
         </form>
         </div>
       </div>
@@ -405,9 +416,15 @@ export default function App() {
               <Icon name="bell" /><span className="btn-label">{pushState === 'on' ? 'التنبيهات ✓' : 'التنبيهات'}</span>
             </button>
           )}
+          {!isDemo && (
+            <button type="button" className="btn" onClick={() => setPasskeyPanelOpen(true)} aria-haspopup="dialog">
+              <Icon name="key" /><span className="btn-label">البصمة</span>
+            </button>
+          )}
           <button type="button" className="btn" onClick={handleLogout}><Icon name="logout" /><span className="btn-label">خروج</span></button>
         </div>
       </header>
+      {passkeyPanelOpen && !isDemo && <PasskeyPanel onClose={() => setPasskeyPanelOpen(false)} />}
       <Dashboard
         isDemo={isDemo}
         rows={rows}

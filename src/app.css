@@ -812,3 +812,20 @@ html[data-device="duo"] .rs-bad .rs-info span { overflow-wrap: normal; word-brea
 @media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
   html[data-device="duo"] .rs-bad .rs-info span { -webkit-line-clamp: 1; line-clamp: 1; }
 }
+
+/* «الدخول بالبصمة»: the button under the code form, and the settings dialog (enable on this device, list, remove). */
+.passkey-entry { display: grid; gap: 10px; }
+.passkey-go { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.passkey-panel { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px 22px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--card); color: var(--ink); display: grid; gap: 14px; }
+.passkey-panel:not([open]) { display: none; }
+.passkey-panel::backdrop { background: rgba(8, 14, 24, .55); }
+.passkey-panel h2 { margin: 0; font-size: 1.25rem; }
+.passkey-panel-lead, .passkey-empty { margin: 0; color: var(--muted); }
+.passkey-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.passkey-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); min-width: 0; }
+.passkey-list li > div { display: grid; gap: 2px; min-width: 0; }
+.passkey-list strong, .passkey-list small { overflow-wrap: anywhere; }
+.passkey-list small { color: var(--muted); }
+.passkey-enable { display: grid; gap: 8px; }
+.passkey-enable input { font-size: 16px; }
+.passkey-close { justify-self: start; }

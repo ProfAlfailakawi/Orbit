@@ -2,13 +2,14 @@
   "hosting": {
     "target": "production",
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "server.mjs"],
+    "ignore": ["firebase.json", "**/.DS_Store", "**/.env", "**/.env.*", "**/.git/**", "**/node_modules/**", "server.mjs"],
     "rewrites": [
       { "source": "/api/**", "run": { "serviceId": "orbit-api", "region": "me-central1" } },
       { "source": "/healthz", "run": { "serviceId": "orbit-api", "region": "me-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
+      { "source": "/.well-known/apple-app-site-association", "headers": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Cache-Control", "value": "public, max-age=3600" }] },
       { "source": "**", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }, { "key": "X-Frame-Options", "value": "DENY" }, { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'" }] }
     ]
   },

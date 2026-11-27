@@ -12,6 +12,8 @@ import { createServer as createViteServer } from 'vite';
 import { createLogoService } from './src/core/logoService.ts';
 import { createSiteService } from './src/core/siteService.ts';
 import { createPushService, validSubscription } from './src/core/pushService.ts';
+import * as simpleWebAuthn from '@simplewebauthn/server';
+import { createPasskeyService, firestorePasskeyStore, memoryPasskeyStore, registerPasskeyAccountRoutes, registerPasskeyLoginRoutes, type PasskeyRouteDeps, type WebAuthnLib } from './src/server/passkeys.ts';
 import { validApnsToken } from './src/core/apns.ts';
 import { computeAlertChanges } from './src/core/alerts.ts';
 import { applyCert, certDue } from './src/core/certs.ts';
@@ -433,6 +435,7 @@ async function startServer() {
   const sessions = new Map<string, number>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const cookieName = 'orbit_operator_session';
+  const SESSION_MS = 8 * 60 * 60_000;
 
   function getSessionToken(req: express.Request) {
     const authorization = req.get('authorization') || '';
@@ -488,14 +491,52 @@ async function startServer() {
     }
     loginAttempts.delete(address);
     if (attemptRef) await attemptRef.delete();
+    appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
+    await openOperatorSession(req, res);
+  }));
+
+  /** The operator session both sign-ins open (the code above, or a passkey): an HTTP-only cookie plus the bearer token. */
+  async function openOperatorSession(req: express.Request, res: express.Response) {
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = now + 8 * 60 * 60_000;
+    const expiresAt = Date.now() + SESSION_MS;
     sessions.set(token, expiresAt);
     if (firestore) await firestore.collection('orbitSessions').doc(crypto.createHash('sha256').update(token).digest('hex')).set({ expiresAt });
-    res.cookie(cookieName, token, getCookieOptions(req, 8 * 60 * 60_000));
-    appendAudit('Operator', 'AUTH_LOGIN_SUCCESS', 'ORBIT Console', 'تسجيل دخول المشغل.');
-    return res.json({ authenticated: true, operator: 'Operator', sessionToken: token });
-  }));
+    res.cookie(cookieName, token, getCookieOptions(req, SESSION_MS));
+    res.json({ authenticated: true, operator: 'Operator', sessionToken: token });
+  }
+
+  /**
+   * The operator code typed again (enabling a passkey from an older session): same constant-time comparison and the same
+   * per-address lockout as the code login (five wrong attempts lock it for fifteen minutes).
+   */
+  async function checkOperatorCode(req: express.Request, supplied: string): Promise<'ok' | 'wrong' | 'locked'> {
+    const address = req.ip || 'unknown';
+    const now = Date.now();
+    const attempt = loginAttempts.get(address);
+    if (attempt && attempt.until > now && attempt.count >= 5) return 'locked';
+    const currentPasskey = resolveOperatorPasskey();
+    const left = crypto.createHash('sha256').update(supplied).digest();
+    const right = crypto.createHash('sha256').update(currentPasskey || crypto.randomBytes(16).toString('hex')).digest();
+    if (currentPasskey && currentPasskey.length >= 16 && supplied && crypto.timingSafeEqual(left, right)) return 'ok';
+    loginAttempts.set(address, { count: (attempt && attempt.until > now ? attempt.count : 0) + 1, until: now + 15 * 60_000 });
+    appendAudit('Operator', 'PASSKEY_CODE_FAILED', 'ORBIT Console', 'رمز دخول خاطئ عند تفعيل البصمة.');
+    return 'wrong';
+  }
+
+  // «الدخول بالبصمة»: credentials in Firestore in production (memory locally); see src/server/passkeys.ts.
+  const passkeyService = createPasskeyService({ store: firestore ? firestorePasskeyStore(firestore) : memoryPasskeyStore(), lib: simpleWebAuthn as unknown as WebAuthnLib });
+  const passkeyDeps: PasskeyRouteDeps = {
+    service: passkeyService,
+    openSession: (req, res) => openOperatorSession(req, res),
+    sessionOf: res => {
+      const token = typeof res.locals.sessionToken === 'string' ? res.locals.sessionToken : '';
+      const expiresAt = Number(res.locals.sessionExpiresAt) || 0;
+      return token && expiresAt ? { hash: crypto.createHash('sha256').update(token).digest('hex'), openedAt: expiresAt - SESSION_MS } : null;
+    },
+    checkOperatorCode,
+    audit: (action, detail) => appendAudit('Operator', action, 'ORBIT Console', detail),
+  };
+  registerPasskeyLoginRoutes(app, passkeyDeps);
 
   app.post('/api/auth/logout', asyncRoute(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -701,6 +742,7 @@ async function startServer() {
     }
     if (!expiry || expiry <= Date.now()) return res.status(401).json({ error: 'Authentication required' });
     res.locals.sessionToken = token;
+    res.locals.sessionExpiresAt = expiry;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.get('origin');
       const host = req.get('x-forwarded-host')?.split(',')[0]?.trim() || req.get('host');
@@ -717,6 +759,8 @@ async function startServer() {
     }
     next();
   }));
+
+  registerPasskeyAccountRoutes(app, passkeyDeps);
 
   // 2. Full Mission Control State Endpoint
   app.get('/api/state', (_req, res) => {
