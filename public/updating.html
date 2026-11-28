@@ -150,7 +150,7 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
 /* last on purpose: the posture rules above set padding-inline too */
 @media screen and (orientation:portrait) and (max-width:720px),screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:519px),screen and (orientation:landscape) and (min-width:540px) and (max-width:720px) and (min-height:520px) and (max-height:960px),screen and (horizontal-viewport-segments:2){.hud{padding-right:calc(max(20px,env(safe-area-inset-right)) + var(--duo-reserve-r))}.telemetry{align-items:flex-start}.telemetry .blip{margin-top:.45em}.telemetry span{white-space:normal;overflow-wrap:anywhere;min-width:0}}
 </style>
-</head>
+<style>html[data-device="duo"]{--duo-widget-w:env(safe-area-inset-right,0px)!important;--duo-widget-h:env(safe-area-inset-top,0px)!important;--duo-widget-gap:0px!important;--duo-col:0px!important;--duo-reserve-r:0px!important}</style></head>
 <body>
 <div class="stars" aria-hidden="true"><i class="far"></i><i class="near"></i></div>
 
@@ -310,5 +310,5 @@ h1{margin:0;font-family:"Orbit Display","Orbit Sans",sans-serif;font-size:clamp(
   later();
 })();
 </script>
-</body>
+<script>(function(){if(typeof screen==="undefined"||typeof document==="undefined"||!document.documentElement||!document.documentElement.dataset)return;var m=function(){var lo=Math.min(screen.width,screen.height),hi=Math.max(screen.width,screen.height);document.documentElement.dataset.device=lo>=440&&lo<=700&&hi/lo<=1.48?"duo":"other"};m();if(typeof addEventListener==="function")addEventListener("resize",m)})();</script></body>
 </html>

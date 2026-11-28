@@ -366,6 +366,12 @@ export default function App() {
     return response.json();
   };
 
+  /* The Duo toolbars carry a "+" that opens the page's own add form and brings it into view. */
+  const openAddForm = () => {
+    document.querySelector<HTMLButtonElement>('.row-center .btn-add')?.click();
+    window.setTimeout(() => document.querySelector('.add')?.scrollIntoView({ block: 'start' }), 60);
+  };
+
   if (isLocked) {
     return (
       <div className="login-wrap" dir="rtl">
@@ -404,6 +410,7 @@ export default function App() {
       <header className="bar">
         <span className="brand"><Mark />أوربت</span>
         <div className="bar-actions">
+          <button type="button" className="btn bar-add" onClick={openAddForm}><Icon name="plus" /><span className="btn-label">إضافة برنامج</span></button>
           <button type="button" className="btn" onClick={() => void handleSync()} disabled={isSyncing} aria-busy={isSyncing}>
             <Icon name="refresh" /><span className="btn-label">{isSyncing ? 'جارٍ الفحص…' : 'تحديث'}</span>
           </button>

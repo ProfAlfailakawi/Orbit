@@ -691,3 +691,99 @@ h1, .brand, .roster-head h2, .banner-demo strong { letter-spacing: normal; }
   .login-art { display: none; }
   .login-copy { width: 100%; }
 }
+
+/* ═══ iPhone Duo pattern (2026-11-19) — html[data-device="duo"] only (markers in src/main.tsx); iPhone and iPad never change. ═══
+   The clock/battery zone is what iOS reports (env(safe-area-inset-*)): a side column on the outer screen in the app, a top strip on
+   the inner portrait screen in the app, and nothing in Safari (the clock lives in Safari's own bar). The older fixed 96 px reservation
+   and the values the native shell writes inline are re-pointed here, so no empty strip is left in Safari. */
+html[data-device="duo"] {
+  --duo-widget-w: max(env(safe-area-inset-right, 0px), env(safe-area-inset-left, 0px)) !important;
+  --duo-widget-h: env(safe-area-inset-top, 0px) !important;
+  --duo-widget-gap: 0px !important;
+  --duo-col: 0px !important; --duo-reserve-r: 0px !important; --duo-extra: 0px !important;
+  --duo-glass: rgb(22 28 46 / .9);
+  --duo-glass-edge: rgb(255 255 255 / .1);
+  --duo-glass-shadow: 0 1px 0 rgb(255 255 255 / .06) inset, 0 12px 32px rgb(8 12 28 / .3);
+}
+/* The "+" (add a program) only exists in the Duo toolbars; everywhere else the page's own button stays the only one. */
+.bar-add { display: none; }
+html[data-device="duo"] .bar-actions .bar-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--btn); color: var(--btn-ink); border-color: transparent; }
+html[data-device="duo"] .bar { padding-right: var(--gut-r); }
+
+/* ── Portrait (outer screen, inner screen open or book): one compact bar on top, the tools in ONE row at the bottom. ── */
+@media screen and (orientation: portrait) {
+  html[data-device="duo"] .bar { padding-block: max(8px, env(safe-area-inset-top)) 8px; }
+  html[data-device="duo"] .bar-actions {
+    position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; flex-wrap: nowrap; justify-content: center; gap: 8px;
+    padding: 8px max(var(--gut), env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(var(--gut), env(safe-area-inset-left));
+    background: var(--bg); border-top: 1px solid var(--line);
+  }
+  html[data-device="duo"] .bar-actions .btn { flex: 1 1 0; min-width: 0; padding-inline: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  html[data-device="duo"] .bar-actions .btn-label { position: static; width: auto; height: auto; overflow: hidden; clip-path: none; text-overflow: ellipsis; }
+  html[data-device="duo"] .page { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  html[data-device="duo"] .hero h1 { font-size: 1.3rem; line-height: 1.35; }
+}
+
+/* ── App shell: glass capsules instead of a bottom row. ── */
+html[data-device="duo"][data-shell="app"] .bar-actions .btn:not(.bar-add) { background: none; border: 0; color: rgb(255 255 255 / .86); box-shadow: none; }
+/* Clock column (outer screen, either orientation): the capsule stands in the column, under the clock; labels stay for screen readers. */
+@media screen and (orientation: portrait), screen and (orientation: landscape) and (max-height: 480px) {
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions {
+    position: fixed; z-index: 20; top: 150px; bottom: auto; left: auto; right: max(8px, calc((env(safe-area-inset-right) - 60px) / 2));
+    width: 60px; flex-direction: column; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--duo-glass-edge); border-radius: 30px;
+    background: var(--duo-glass); box-shadow: var(--duo-glass-shadow); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  }
+  html[data-device="duo"][data-shell="app"][data-widget-side="left"] .bar-actions { right: auto; left: max(8px, calc((env(safe-area-inset-left) - 60px) / 2)); }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn { flex: none; width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: 50%; }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar-actions .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .bar { position: sticky; top: 0; bottom: auto; border-top: 0; box-shadow: none; padding-inline: var(--gut-l) var(--gut-r); }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .shell { padding-bottom: 0; }
+  html[data-device="duo"][data-shell="app"]:not([data-widget-side="none"]) .page { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+}
+/* Inner portrait in the app: the clock is a top strip. The bar sits under it, the brand rides in the strip opposite the clock, and
+   the tools float as a glass capsule at the bottom with a separate coloured "+". */
+@media screen and (orientation: portrait) {
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .bar-actions {
+    left: 50%; right: auto; transform: translateX(-50%); bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px)); width: auto; gap: 4px; padding: 6px;
+    border: 1px solid var(--duo-glass-edge); border-radius: 999px; background: var(--duo-glass); box-shadow: var(--duo-glass-shadow);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .bar-actions .btn { flex: none; width: 52px; height: 48px; padding: 0; }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .bar-actions .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .bar { min-height: 0; padding-top: env(safe-area-inset-top); background: transparent; border-bottom: 0; }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .brand { position: fixed; z-index: 21; top: 0; left: var(--gut-l); height: env(safe-area-inset-top); display: flex; align-items: center; pointer-events: none; }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .bar:has(.brand) { height: env(safe-area-inset-top); padding: 0; }
+}
+/* Outer landscape in Safari: the dock rule already puts the bar in one bottom row; the "+" joins it. */
+
+/* ── Inner landscape (open or book): two panes, the gap on the hinge. Right pane: a small app bar over the fleet verdict.
+   Left pane: notices, the program index and the forms, scrolling alone, fading before a floating glass toolbar with a coloured "+". ── */
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) {
+  html[data-device="duo"] { --pane-r: calc(100vw - var(--spine-x) - var(--spine) / 2); }
+  html[data-device="duo"] .shell { background: linear-gradient(to left, color-mix(in srgb, var(--btn) 6%, var(--bg)) var(--pane-r), var(--bg) var(--pane-r)); }
+  html[data-device="duo"] .bar {
+    position: fixed; top: 0; right: 0; left: auto; width: var(--pane-r); z-index: 20; background: transparent; border-bottom: 0;
+    padding: max(8px, env(safe-area-inset-top)) var(--gut-r) 8px 16px;
+  }
+  html[data-device="duo"] .bar-actions {
+    position: fixed; z-index: 20; top: auto; right: auto; max-width: none; left: calc((var(--spine-x) - var(--spine) / 2) / 2); transform: translateX(-50%);
+    bottom: max(12px, calc(env(safe-area-inset-bottom) - 10px)); flex-wrap: nowrap; gap: 4px; padding: 6px; border: 1px solid var(--duo-glass-edge); border-radius: 999px;
+    background: var(--duo-glass); box-shadow: var(--duo-glass-shadow); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  }
+  html[data-device="duo"] .bar-actions .btn:not(.bar-add) { background: none; border: 0; color: rgb(255 255 255 / .86); box-shadow: none; }
+  html[data-device="duo"] .bar-actions .btn { min-height: 44px; padding-inline: 14px; display: inline-flex; align-items: center; gap: 6px; }
+  html[data-device="duo"] .page { padding-top: 0; padding-bottom: 0; min-height: 100dvh; }
+  html[data-device="duo"] .page::before { margin-block: 0; }
+  html[data-device="duo"] .hero { top: calc(var(--bar-h) + 4px); margin-top: calc(var(--bar-h) + 4px); --page-h: calc(100dvh - var(--bar-h) - 20px - env(safe-area-inset-bottom)); min-height: var(--page-h); max-height: var(--page-h); }
+  html[data-device="duo"] .page-aside {
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    padding: max(16px, env(safe-area-inset-top)) 0 calc(96px + env(safe-area-inset-bottom));
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 76px));
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 120px), transparent calc(100% - 76px));
+  }
+  html[data-device="duo"] .page-aside::-webkit-scrollbar { display: none; }
+}
+@media screen and (min-width: 721px) and (max-width: 1000px) and (min-height: 520px) and (max-height: 960px) and (orientation: landscape) and (prefers-color-scheme: dark) {
+  html[data-device="duo"] .shell { background: linear-gradient(to left, color-mix(in srgb, var(--btn) 8%, var(--bg)) var(--pane-r), var(--bg) var(--pane-r)); }
+}
